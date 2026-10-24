@@ -323,14 +323,32 @@
     .nva-pantalla button.bio{background:#0f766e;margin-bottom:12px}
     .nva-pantalla .error{color:#b91c1c;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
     #nvaUsuario{font-size:.75rem;opacity:.85;margin-left:6px;cursor:pointer;white-space:nowrap}
-    .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem}
-    .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:6px 4px;text-align:left;vertical-align:top}
-    .nva-tabla select,.nva-tabla input{font-size:.8rem;padding:4px;max-width:100%}
-    .nva-scroll{overflow-x:auto}
-    .nva-equipos{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin:4px 0 8px}
-    .nva-equipos label{display:flex;align-items:center;gap:6px;font-size:.8rem;white-space:nowrap}
-    .nva-equipos input{margin:0}
-    .nva-tabla details summary{cursor:pointer;font-size:.8rem;color:#1e3a8a}
+    .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem;color:#0f172a;table-layout:fixed}
+    .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:8px 4px;text-align:left;vertical-align:bottom}
+    .nva-tabla th{vertical-align:middle;font-size:.75rem;color:#475569}
+    .nva-tabla .nva-email{display:block;font-size:.72rem;color:#64748b;margin-bottom:4px;overflow-wrap:anywhere}
+    .nva-tabla select,.nva-tabla input[type=text],.nva-multi summary{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.8rem;color:#0f172a;margin:0}
+    .nva-tabla select:disabled{background:#f1f5f9;color:#94a3b8}
+    .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
+    .nva-check input{width:18px;height:18px;margin:0}
+    .nva-tabla .nva-col-rol{width:30%}
+    .nva-tabla .nva-col-equipos{width:30%}
+    .nva-tabla .nva-col-activo{width:44px;text-align:center}
+    .nva-permisos td{vertical-align:middle}
+    .nva-permisos .nva-col-acceso{width:110px}
+    .nva-multi{position:relative;margin:0 0 8px}
+    .nva-tabla .nva-multi{margin:0}
+    .nva-multi summary{display:flex;align-items:center;gap:6px;cursor:pointer;list-style:none;user-select:none}
+    .nva-multi summary::-webkit-details-marker{display:none}
+    .nva-multi summary span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .nva-multi summary::after{content:"▾";color:#64748b}
+    .nva-multi.grande summary{height:auto;padding:8px 10px;font-size:.82rem}
+    .nva-equipos{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(300px,85vw);box-sizing:border-box;display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(15,23,42,.18)}
+    .nva-tabla .nva-equipos{left:auto;right:0}
+    .nva-equipos label{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#0f172a;padding:6px;border-radius:6px;cursor:pointer}
+    .nva-equipos label:hover{background:#f1f5f9}
+    .nva-equipos input{margin:0;flex:none}
+    .nva-equipos p{margin:4px;font-size:.75rem;color:#64748b}
   `;
 
   function pintarLogin(modo, mensaje) {
@@ -646,6 +664,7 @@
   // ------------------------------------------------------------------
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
 
+  let cierreDesplegables = false;
   async function pintarPanelUsuarios() {
     const caja = document.getElementById("nvaPanelUsuarios");
     if (!caja) return;
@@ -668,23 +687,26 @@
     try { equiposClub = (JSON.parse(c.data.contenido).teams || []).map(t => `${t.name} (${t.category})`); } catch (_) { }
     u.data.forEach(x => (x.equipos || []).forEach(e => { if (!equiposClub.includes(e)) equiposClub.push(e); }));
     equiposClub = [...new Set(equiposClub)].sort((a, b) => a.localeCompare(b, "es"));
-    const casillasEquipos = sel => equiposClub.length
-      ? `<div class="nva-equipos">${equiposClub.map(e => `<label><input type="checkbox" value="${esc(e)}"${sel.includes(e) ? " checked" : ""}>${esc(e)}</label>`).join("")}</div>`
-      : "<p style=\"font-size:.75rem;color:#64748b\">No hay equipos. Créalos primero en Opciones.</p>";
     const resumenEquipos = sel => sel.length ? sel.length === 1 ? sel[0] : `${sel.length} equipos` : "Ninguno";
+    // Desplegable con casillas para elegir varios equipos
+    const desplegableEquipos = (sel, clase = "") => `<details class="nva-multi ${clase}"><summary><span>${esc(resumenEquipos(sel))}</span></summary><div class="nva-equipos">${equiposClub.length
+      ? equiposClub.map(e => `<label><input type="checkbox" value="${esc(e)}"${sel.includes(e) ? " checked" : ""}>${esc(e)}</label>`).join("")
+      : "<p>No hay equipos. Créalos primero en Opciones.</p>"}</div></details>`;
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
-        <td>${esc(x.email)}<br><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"></td>
+        <td><span class="nva-email">${esc(x.email)}</span><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
-        <td data-campo="equipos"><details><summary>${esc(resumenEquipos(x.equipos || []))}</summary>${casillasEquipos(x.equipos || [])}</details></td>
-        <td><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></td>
+        <td data-campo="equipos">${desplegableEquipos(x.equipos || [])}</td>
+        <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
     const nivel = (rol, menu) => (p.data.find(x => x.rol === rol && x.menu === menu) || {}).acceso || "ninguno";
     const opcAcceso = sel => [["ninguno", "—"], ["lectura", "Ver"], ["escritura", "Editar"]]
       .map(([v, t]) => `<option value="${v}"${v === sel ? " selected" : ""}>${t}</option>`).join("");
-    const filasPermisos = menus.map(mn => `<tr><td>${esc(mn.nombre)}</td>${roles.map(ro =>
-      `<td><select data-rol="${esc(ro.id)}" data-menu="${esc(mn.id)}"${ro.id === "propietario" ? " disabled" : ""}>${opcAcceso(nivel(ro.id, mn.id))}</select></td>`).join("")}</tr>`).join("");
+    // Se pintan las filas de todos los roles y solo se ve el rol elegido
+    const rolInicial = (roles.find(x => x.id !== "propietario") || roles[0] || {}).id;
+    const filasPermisos = roles.map(ro => menus.map(mn => `<tr data-rol="${esc(ro.id)}"${ro.id === rolInicial ? "" : " hidden"}><td>${esc(mn.nombre)}</td>
+      <td><select data-rol="${esc(ro.id)}" data-menu="${esc(mn.id)}"${ro.id === "propietario" ? " disabled" : ""}>${opcAcceso(nivel(ro.id, mn.id))}</select></td></tr>`).join("")).join("");
 
     caja.innerHTML = `
       <div class="config-section">
@@ -693,22 +715,24 @@
         <input type="text" id="nvaInvNombre" class="app-input" placeholder="Nombre">
         <select id="nvaInvRol" class="app-input">${roles.filter(x => x.id !== "propietario").map(x => `<option value="${esc(x.id)}"${x.id === "entrenador" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <div id="nvaInvEquiposCaja">
-          <div style="font-size:.8rem;color:#475569">Equipos que entrena:</div>
-          <div id="nvaInvEquipos">${casillasEquipos([])}</div>
+          <div style="font-size:.8rem;color:#475569;margin-bottom:4px">Equipos que entrena:</div>
+          <div id="nvaInvEquipos">${desplegableEquipos([], "grande")}</div>
         </div>
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
         <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>
       </div>
       <div class="config-section">
         <div class="config-subtitle">Usuarios</div>
-        <div class="nva-scroll"><table class="nva-tabla"><thead><tr><th>Usuario</th><th>Rol</th><th>Equipos</th><th>Activo</th></tr></thead>
-        <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table></div>
+        <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-equipos">Equipos</th><th class="nva-col-activo">Activo</th></tr></thead>
+        <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>
       </div>
       <div class="config-section">
         <div class="config-subtitle">Permisos por rol</div>
-        <div class="nva-scroll"><table class="nva-tabla"><thead><tr><th>Menú</th>${roles.map(x => `<th>${esc(x.nombre)}</th>`).join("")}</tr></thead>
-        <tbody id="nvaPermisos">${filasPermisos}</tbody></table></div>
+        <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolInicial ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
+        <p id="nvaPermFijo" style="font-size:.75rem;color:#64748b" hidden>El propietario siempre puede editarlo todo.</p>
+        <table class="nva-tabla nva-permisos"><thead><tr><th>Menú</th><th class="nva-col-acceso">Acceso</th></tr></thead>
+        <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
         <p style="font-size:.75rem;color:#64748b">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados.</p>
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>
       </div>`;
@@ -719,9 +743,21 @@
     const verEquiposInv = () => { caja.querySelector("#nvaInvEquiposCaja").hidden = !rolConEquipos(rolInv.value); };
     rolInv.onchange = verEquiposInv;
     verEquiposInv();
-    caja.querySelectorAll("#nvaUsuarios td[data-campo=equipos]").forEach(td => td.addEventListener("change", () => {
-      td.querySelector("summary").textContent = resumenEquipos(marcados(td));
+    caja.querySelectorAll("details.nva-multi").forEach(d => d.addEventListener("change", () => {
+      d.querySelector("summary span").textContent = resumenEquipos(marcados(d));
     }));
+    if (!cierreDesplegables) {
+      // Un clic fuera cierra los desplegables de equipos abiertos
+      cierreDesplegables = true;
+      document.addEventListener("click", e => document.querySelectorAll("details.nva-multi[open]").forEach(d => {
+        if (!d.contains(e.target)) d.open = false;
+      }));
+    }
+    const rolPerm = caja.querySelector("#nvaPermRol");
+    rolPerm.onchange = () => {
+      caja.querySelectorAll("#nvaPermisos tr").forEach(tr => { tr.hidden = tr.dataset.rol !== rolPerm.value; });
+      caja.querySelector("#nvaPermFijo").hidden = rolPerm.value !== "propietario";
+    };
     caja.querySelector("#nvaInvitar").onclick = async () => {
       const email = caja.querySelector("#nvaInvEmail").value.trim();
       if (!email) return alert("Escribe el email.");

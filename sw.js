@@ -1,6 +1,6 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v110";
+const VERSION = "nva-v111";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
@@ -9,6 +9,9 @@ const CDN_CACHE = VERSION + "-cdn";
 const SHELL_FILES = [
   "./",
   "index.html",
+  "vendor/supabase.js",
+  "supabase-config.js",
+  "nva-supabase.js",
   "styles.css",
   "animaciones.css",
   "animaciones.js",
@@ -112,6 +115,8 @@ self.addEventListener("fetch", (event) => {
 
   // La API de GitHub NUNCA se toca: datos siempre en directo (app.js ya gestiona su cola offline)
   if (url.hostname === "api.github.com") return;
+  // Supabase tampoco: datos y login siempre en directo
+  if (url.hostname.endsWith(".supabase.co")) return;
 
   // Librerías CDN
   if (CDN_HOSTS.includes(url.hostname)) {

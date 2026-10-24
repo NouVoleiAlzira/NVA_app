@@ -29,6 +29,8 @@
     applyVisibility();
   }
 
+  window.igApplyVisibility = function () { applyVisibility(); };
+
   function applyVisibility() {
     const ig = loadIg();
     // La sección Redes Sociales (con Carteles) se ve siempre; Reels y Stories solo con el token

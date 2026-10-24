@@ -76,6 +76,7 @@ create table public.archivos (
   contenido       text not null,               -- texto tal cual (JSON o txt)
   equipo          text,                        -- equipo al que pertenece, si aplica
   version         bigint not null default 1,   -- sustituye al "sha" de GitHub
+  creado          timestamptz not null default now(),
   actualizado     timestamptz not null default now(),
   actualizado_por uuid references auth.users(id) on delete set null
 );
@@ -191,6 +192,10 @@ language plpgsql security definer set search_path = public as $$
 begin
   if tg_op = 'UPDATE' then
     new.version := old.version + 1;
+    new.creado := old.creado;
+  else
+    new.version := 1;
+    new.creado := now();
   end if;
   new.actualizado := now();
   new.actualizado_por := auth.uid();

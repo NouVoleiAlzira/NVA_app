@@ -326,6 +326,10 @@
     .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:6px 4px;text-align:left;vertical-align:top}
     .nva-tabla select,.nva-tabla input{font-size:.8rem;padding:4px;max-width:100%}
     .nva-scroll{overflow-x:auto}
+    .nva-equipos{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;margin:4px 0 8px}
+    .nva-equipos label{display:flex;align-items:center;gap:6px;font-size:.8rem;white-space:nowrap}
+    .nva-equipos input{margin:0}
+    .nva-tabla details summary{cursor:pointer;font-size:.8rem;color:#1e3a8a}
   `;
 
   function pintarLogin(modo, mensaje) {
@@ -473,20 +477,33 @@
     if (!caja) return;
     if (!perfil || perfil.rol !== "propietario") { caja.innerHTML = "<p>Solo el propietario gestiona usuarios.</p>"; return; }
     caja.innerHTML = "<p>Cargando...</p>";
-    const [u, r, m, p] = await Promise.all([
+    const [u, r, m, p, c] = await Promise.all([
       sb.from("perfiles").select("*").order("email"),
       sb.from("roles").select("*").order("nivel", { ascending: false }),
       sb.from("menus").select("*").order("orden"),
-      sb.from("permisos_rol").select("*")
+      sb.from("permisos_rol").select("*"),
+      sb.from("archivos").select("contenido").eq("ruta", "configuracion.json").maybeSingle()
     ]);
     if (u.error || r.error || m.error || p.error) { caja.innerHTML = "<p>No se pudo cargar (¿sin conexión?).</p>"; return; }
     const roles = r.data, menus = m.data;
+
+    // Equipos del club (Opciones › Equipos, en configuracion.json) con el mismo
+    // nombre que usa la app: «Nombre (Categoría)». Se añaden los que ya tenga
+    // asignados algún usuario aunque ya no existan, para no perderlos al guardar.
+    let equiposClub = [];
+    try { equiposClub = (JSON.parse(c.data.contenido).teams || []).map(t => `${t.name} (${t.category})`); } catch (_) { }
+    u.data.forEach(x => (x.equipos || []).forEach(e => { if (!equiposClub.includes(e)) equiposClub.push(e); }));
+    equiposClub = [...new Set(equiposClub)].sort((a, b) => a.localeCompare(b, "es"));
+    const casillasEquipos = sel => equiposClub.length
+      ? `<div class="nva-equipos">${equiposClub.map(e => `<label><input type="checkbox" value="${esc(e)}"${sel.includes(e) ? " checked" : ""}>${esc(e)}</label>`).join("")}</div>`
+      : "<p style=\"font-size:.75rem;color:#64748b\">No hay equipos. Créalos primero en Opciones.</p>";
+    const resumenEquipos = sel => sel.length ? sel.length === 1 ? sel[0] : `${sel.length} equipos` : "Ninguno";
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
         <td>${esc(x.email)}<br><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
-        <td><input type="text" data-campo="equipos" value="${esc((x.equipos || []).join(", "))}" placeholder="Equipos (separados por coma)"></td>
+        <td data-campo="equipos"><details><summary>${esc(resumenEquipos(x.equipos || []))}</summary>${casillasEquipos(x.equipos || [])}</details></td>
         <td><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></td>
       </tr>`).join("");
     const nivel = (rol, menu) => (p.data.find(x => x.rol === rol && x.menu === menu) || {}).acceso || "ninguno";
@@ -501,7 +518,10 @@
         <input type="email" id="nvaInvEmail" class="app-input" placeholder="Email">
         <input type="text" id="nvaInvNombre" class="app-input" placeholder="Nombre">
         <select id="nvaInvRol" class="app-input">${roles.filter(x => x.id !== "propietario").map(x => `<option value="${esc(x.id)}"${x.id === "entrenador" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
-        <input type="text" id="nvaInvEquipos" class="app-input" placeholder="Equipos, si es entrenador (separados por coma)">
+        <div id="nvaInvEquiposCaja">
+          <div style="font-size:.8rem;color:#475569">Equipos que entrena:</div>
+          <div id="nvaInvEquipos">${casillasEquipos([])}</div>
+        </div>
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
         <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>
       </div>
@@ -519,13 +539,21 @@
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>
       </div>`;
 
-    const lista = s => s.split(",").map(x => x.trim()).filter(Boolean);
+    const marcados = nodo => Array.from(nodo.querySelectorAll("input[type=checkbox]:checked")).map(x => x.value);
+    const rolInv = caja.querySelector("#nvaInvRol");
+    const rolConEquipos = id => !!(roles.find(x => x.id === id) || {}).restringir_equipos;
+    const verEquiposInv = () => { caja.querySelector("#nvaInvEquiposCaja").hidden = !rolConEquipos(rolInv.value); };
+    rolInv.onchange = verEquiposInv;
+    verEquiposInv();
+    caja.querySelectorAll("#nvaUsuarios td[data-campo=equipos]").forEach(td => td.addEventListener("change", () => {
+      td.querySelector("summary").textContent = resumenEquipos(marcados(td));
+    }));
     caja.querySelector("#nvaInvitar").onclick = async () => {
       const email = caja.querySelector("#nvaInvEmail").value.trim();
       if (!email) return alert("Escribe el email.");
       const { data, error: e } = await sb.functions.invoke("invitar-usuario", { body: {
         email, nombre: caja.querySelector("#nvaInvNombre").value.trim(), rol: caja.querySelector("#nvaInvRol").value,
-        equipos: lista(caja.querySelector("#nvaInvEquipos").value), redirectTo: location.origin + location.pathname
+        equipos: rolConEquipos(rolInv.value) ? marcados(caja.querySelector("#nvaInvEquipos")) : [], redirectTo: location.origin + location.pathname
       } });
       if (e || (data && data.error)) return alert("No se pudo invitar: " + ((data && data.error) || e.message));
       alert(`Invitación enviada a ${email}.`);
@@ -537,7 +565,7 @@
         const cambios = {
           nombre: tr.querySelector("[data-campo=nombre]").value.trim() || null,
           rol: tr.querySelector("[data-campo=rol]").value,
-          equipos: lista(tr.querySelector("[data-campo=equipos]").value),
+          equipos: marcados(tr.querySelector("[data-campo=equipos]")),
           activo: tr.querySelector("[data-campo=activo]").checked
         };
         const { error: e } = await sb.from("perfiles").update(cambios).eq("id", tr.dataset.id);

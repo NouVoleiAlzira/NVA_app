@@ -11,6 +11,7 @@ Viene del repositorio `Entrenadores`. Los datos ya no se guardan en GitHub, sino
     - `.json` y `.txt` → tabla `archivos`;
     - PDF, imágenes, vídeos y música → Storage, bucket privado `privado`;
   - ocultar los menús a los que el rol del usuario no tiene acceso.
+  - la entrada con **huella** (Android) o **Face ID / Touch ID** (iPhone): tras entrar con contraseña, la app ofrece activarla. Se crea una llave de acceso (WebAuthn) del propio móvil y, con su extensión PRF, la contraseña se guarda **cifrada** en ese navegador; solo se descifra tras comprobar la huella o la cara. Necesita Android con Chrome reciente o iOS 18 o posterior. Si el móvil no lo permite, la app lo dice y se puede usar el gestor de contraseñas del móvil.
 - Los permisos los aplica la base de datos (RLS). Ver `supabase/migrations/`.
 
 ## Roles

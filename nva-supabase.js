@@ -312,15 +312,16 @@
   // ------------------------------------------------------------------
   const CSS = `
     [data-nva-oculto]{display:none!important}
-    #nvaLogin{position:fixed;inset:0;z-index:100000;background:#0f172a;display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit}
-    #nvaLogin .caja{background:#fff;border-radius:16px;max-width:360px;width:100%;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.4);text-align:center}
-    #nvaLogin img{width:84px;height:84px;object-fit:contain;margin-bottom:8px}
-    #nvaLogin h1{font-size:1.2rem;margin:0 0 4px;color:#0f172a}
-    #nvaLogin p{font-size:.85rem;color:#64748b;margin:0 0 16px}
-    #nvaLogin input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:10px;margin-bottom:10px;font-size:1rem}
-    #nvaLogin button{width:100%;padding:12px;border:0;border-radius:10px;background:#1e3a8a;color:#fff;font-weight:700;font-size:1rem;cursor:pointer}
-    #nvaLogin button.link{background:none;color:#1e3a8a;font-weight:600;font-size:.85rem;margin-top:8px}
-    #nvaLogin .error{color:#b91c1c;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
+    .nva-pantalla{position:fixed;inset:0;z-index:100000;background:#0f172a;display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit}
+    .nva-pantalla .caja{background:#fff;border-radius:16px;max-width:360px;width:100%;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.4);text-align:center}
+    .nva-pantalla img{width:84px;height:84px;object-fit:contain;margin-bottom:8px}
+    .nva-pantalla h1{font-size:1.2rem;margin:0 0 4px;color:#0f172a}
+    .nva-pantalla p{font-size:.85rem;color:#64748b;margin:0 0 16px}
+    .nva-pantalla input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:10px;margin-bottom:10px;font-size:1rem}
+    .nva-pantalla button{width:100%;padding:12px;border:0;border-radius:10px;background:#1e3a8a;color:#fff;font-weight:700;font-size:1rem;cursor:pointer}
+    .nva-pantalla button.link{background:none;color:#1e3a8a;font-weight:600;font-size:.85rem;margin-top:8px}
+    .nva-pantalla button.bio{background:#0f766e;margin-bottom:12px}
+    .nva-pantalla .error{color:#b91c1c;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
     #nvaUsuario{font-size:.75rem;opacity:.85;margin-left:6px;cursor:pointer;white-space:nowrap}
     .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem}
     .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:6px 4px;text-align:left;vertical-align:top}
@@ -337,6 +338,7 @@
     if (!el) {
       el = document.createElement("div");
       el.id = "nvaLogin";
+      el.className = "nva-pantalla";
       document.body.appendChild(el);
     }
     const logo = `<img src="LOGO-NVA.png" alt="">`;
@@ -353,15 +355,25 @@
       el.querySelector("#nvaGuardarClave").onclick = guardarClave;
       return;
     }
+    // Es un <form> de verdad para que el móvil ofrezca guardar la contraseña
+    // en su gestor (llavero de iOS, Google) y rellenarla después.
+    const bio = bioGuardada();
     el.innerHTML = `<div class="caja">${logo}<h1>Nou Volei Alzira</h1><p>Inicia sesión para entrar en la app.</p>
-      <div class="error" id="nvaError">${mensaje || ""}</div>
-      <input type="email" id="nvaEmail" placeholder="Email" autocomplete="username">
-      <input type="password" id="nvaClave" placeholder="Contraseña" autocomplete="current-password">
-      <button id="nvaEntrar">Entrar</button>
-      <button class="link" id="nvaOlvido">¿Has olvidado la contraseña?</button></div>`;
-    el.querySelector("#nvaEntrar").onclick = entrar;
-    el.querySelector("#nvaClave").onkeydown = e => { if (e.key === "Enter") entrar(); };
+      <div class="error" id="nvaError">${esc(mensaje || "")}</div>
+      ${bio ? `<button type="button" class="bio" id="nvaEntrarBio">${nombreBio().icono} Entrar con ${nombreBio().texto}</button>` : ""}
+      <form id="nvaFormLogin">
+        <input type="email" id="nvaEmail" placeholder="Email" autocomplete="username" value="${esc(bio ? bio.email : "")}">
+        <input type="password" id="nvaClave" placeholder="Contraseña" autocomplete="current-password">
+        <button type="submit" id="nvaEntrar">Entrar</button>
+      </form>
+      <button type="button" class="link" id="nvaOlvido">¿Has olvidado la contraseña?</button>
+      ${bio ? `<button type="button" class="link" id="nvaQuitarBio">No usar ${nombreBio().texto} en este móvil</button>` : ""}</div>`;
+    el.querySelector("#nvaFormLogin").onsubmit = e => { e.preventDefault(); entrar(); };
     el.querySelector("#nvaOlvido").onclick = olvido;
+    if (bio) {
+      el.querySelector("#nvaEntrarBio").onclick = entrarConBio;
+      el.querySelector("#nvaQuitarBio").onclick = () => { olvidarBio(); pintarLogin("login", "Hecho. Entra con tu email y contraseña."); };
+    }
   }
 
   const error = t => { const e = document.getElementById("nvaError"); if (e) e.textContent = t; };
@@ -373,6 +385,7 @@
     error("Entrando...");
     const { error: e } = await sb.auth.signInWithPassword({ email, password });
     if (e) return error(/invalid/i.test(e.message) ? "Email o contraseña incorrectos." : e.message);
+    ofrecerBio(email, password);
   }
 
   async function olvido() {
@@ -391,12 +404,173 @@
     if (e) return error(e.message);
     history.replaceState(null, "", location.pathname + location.search);
     await alEntrar();
+    if (perfil) ofrecerBio(perfil.email, a);
   }
 
   async function salir() {
     await sb.auth.signOut();
     try { localStorage.removeItem("NVA_IG_SETTINGS"); } catch (e) {}
     location.reload();
+  }
+
+  // ------------------------------------------------------------------
+  // Entrar con huella (Android) o Face ID / Touch ID (iPhone)
+  // - Al activarlo, el móvil crea una «llave de acceso» (WebAuthn) que solo
+  //   usa tras comprobar la huella o la cara.
+  // - Con la extensión PRF esa llave da un secreto que nunca sale del móvil.
+  //   Con él se cifra la contraseña y se guarda cifrada en este navegador.
+  //   Sin la huella o la cara no se puede descifrar.
+  // - Al entrar se descifra y se hace el login normal con email y contraseña.
+  // ------------------------------------------------------------------
+  const BIO = "NVA_BIOMETRIA";
+  const BIO_NO = "NVA_BIOMETRIA_NO"; // email que dijo «Ahora no» en este móvil
+
+  function bioGuardada() {
+    try { return JSON.parse(localStorage.getItem(BIO) || "null"); } catch (e) { return null; }
+  }
+  function olvidarBio() {
+    try { localStorage.removeItem(BIO); } catch (e) {}
+  }
+  function nombreBio() {
+    const apple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    return apple ? { texto: "Face ID", icono: "🙂" } : { texto: "huella", icono: "👆" };
+  }
+  async function bioDisponible() {
+    if (!window.isSecureContext || !window.PublicKeyCredential || !window.crypto || !crypto.subtle) return false;
+    try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } catch (e) { return false; }
+  }
+
+  async function claveDe(secreto) {
+    const base = await crypto.subtle.importKey("raw", secreto, "HKDF", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new TextEncoder().encode("NVA login") },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+
+  const secretoDe = cred => {
+    const r = cred && cred.getClientExtensionResults && cred.getClientExtensionResults().prf;
+    return r && r.results && r.results.first ? new Uint8Array(r.results.first) : null;
+  };
+
+  // Pide la huella / cara y devuelve el secreto PRF de la llave
+  async function pedirSecreto(id, sal) {
+    const cred = await navigator.credentials.get({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rpId: location.hostname,
+      allowCredentials: [{ type: "public-key", id }],
+      userVerification: "required",
+      timeout: 60000,
+      extensions: { prf: { eval: { first: sal } } }
+    } });
+    const secreto = secretoDe(cred);
+    if (!secreto) throw new Error("sin-prf");
+    return secreto;
+  }
+
+  async function guardarBio(id, sal, secreto, email, password) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cifrado = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await claveDe(secreto), new TextEncoder().encode(password));
+    localStorage.setItem(BIO, JSON.stringify({
+      email, id: bytesAB64(id), sal: bytesAB64(sal), iv: bytesAB64(iv), dato: bytesAB64(new Uint8Array(cifrado))
+    }));
+    try { localStorage.removeItem(BIO_NO); } catch (e) {}
+  }
+
+  const cancelado = e => e && (e.name === "NotAllowedError" || e.name === "AbortError");
+
+  async function entrarConBio() {
+    const g = bioGuardada();
+    if (!g) return pintarLogin("login");
+    const { texto } = nombreBio();
+    error(`Usa tu ${texto}...`);
+    let password;
+    try {
+      const secreto = await pedirSecreto(b64aBytes(g.id), b64aBytes(g.sal));
+      const plano = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64aBytes(g.iv) }, await claveDe(secreto), b64aBytes(g.dato));
+      password = new TextDecoder().decode(plano);
+    } catch (e) {
+      if (cancelado(e)) return error(`No se ha podido comprobar tu ${texto}. Vuelve a intentarlo o entra con tu contraseña.`);
+      console.warn("Entrada con biometría:", e);
+      olvidarBio();
+      return pintarLogin("login", `La ${texto} ya no sirve en este móvil. Entra con tu contraseña y vuelve a activarla.`);
+    }
+    error("Entrando...");
+    const { error: e } = await sb.auth.signInWithPassword({ email: g.email, password });
+    if (e && /invalid/i.test(e.message)) {
+      olvidarBio();
+      return pintarLogin("login", `Tu contraseña ha cambiado. Entra con la nueva y vuelve a activar la ${texto}.`);
+    }
+    if (e) return error(e.message);
+  }
+
+  // Tras entrar con contraseña: propone activar la huella / Face ID
+  async function ofrecerBio(email, password) {
+    const g = bioGuardada();
+    let dijoNo = null;
+    try { dijoNo = localStorage.getItem(BIO_NO); } catch (e) {}
+    if ((g && g.email === email) || dijoNo === email || !(await bioDisponible())) return;
+    await listo;
+    const { texto, icono } = nombreBio();
+    const el = document.createElement("div");
+    el.id = "nvaBio";
+    el.className = "nva-pantalla";
+    el.innerHTML = `<div class="caja"><img src="LOGO-NVA.png" alt=""><h1>${icono} ¿Entrar con ${texto}?</h1>
+      <p>La próxima vez que tengas que iniciar sesión podrás usar tu ${texto} en lugar de escribir la contraseña.
+      La contraseña se guarda cifrada solo en este móvil.</p>
+      <div class="error" id="nvaBioError"></div>
+      <button type="button" class="bio" id="nvaBioSi">Activar ${texto}</button>
+      <button type="button" class="link" id="nvaBioNo">Ahora no</button></div>`;
+    document.body.appendChild(el);
+    const aviso = t => { el.querySelector("#nvaBioError").textContent = t; };
+    const cerrar = () => { password = null; el.remove(); };
+    const si = el.querySelector("#nvaBioSi");
+    const noSePuede = () => {
+      aviso(`Este móvil o navegador no permite guardar la contraseña con ${texto}. Puedes guardarla en el gestor de contraseñas del móvil cuando te lo ofrezca.`);
+      si.textContent = "Cerrar";
+      si.onclick = cerrar;
+    };
+    el.querySelector("#nvaBioNo").onclick = () => { try { localStorage.setItem(BIO_NO, email); } catch (e) {} cerrar(); };
+    si.onclick = async () => {
+      aviso("");
+      const sal = crypto.getRandomValues(new Uint8Array(32));
+      let cred;
+      try {
+        cred = await navigator.credentials.create({ publicKey: {
+          rp: { name: "Nou Volei Alzira", id: location.hostname },
+          // Mismo id para el mismo usuario: si la vuelve a activar, el móvil reemplaza la llave anterior
+          user: { id: new TextEncoder().encode(perfil.id), name: email, displayName: perfil.nombre || email },
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: "platform", residentKey: "required", userVerification: "required" },
+          timeout: 60000,
+          extensions: { prf: { eval: { first: sal } } }
+        } });
+      } catch (e) {
+        if (cancelado(e)) return aviso("Cancelado. Puedes volver a intentarlo.");
+        console.warn("Activar biometría:", e);
+        return noSePuede();
+      }
+      const prf = cred.getClientExtensionResults().prf;
+      if (!prf || prf.enabled === false) return noSePuede();
+      const id = new Uint8Array(cred.rawId);
+      const terminar = async secreto => {
+        await guardarBio(id, sal, secreto, email, password);
+        el.querySelector(".caja").innerHTML = `<h1>✅ ${texto} activada</h1><p>La próxima vez pulsa «Entrar con ${texto}».</p><button type="button" id="nvaBioOk">Seguir</button>`;
+        el.querySelector("#nvaBioOk").onclick = cerrar;
+      };
+      const secreto = secretoDe(cred);
+      if (secreto) return terminar(secreto);
+      // iPhone y otros no dan el secreto al crear la llave: hay que usarla una vez
+      aviso("");
+      si.textContent = `Confirmar con ${texto}`;
+      si.onclick = async () => {
+        try { await terminar(await pedirSecreto(id, sal)); } catch (e) {
+          if (cancelado(e)) return aviso("Cancelado. Pulsa otra vez para confirmar.");
+          console.warn("Activar biometría:", e);
+          noSePuede();
+        }
+      };
+    };
   }
 
   // ------------------------------------------------------------------

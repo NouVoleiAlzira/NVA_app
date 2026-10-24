@@ -27,7 +27,7 @@ El propietario cambia todo esto desde **⚙️ Opciones › Usuarios y permisos*
 ## Puesta en marcha
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En **SQL Editor**, pega y ejecuta `supabase/migrations/20261024000001_esquema_inicial.sql`.
+2. En **SQL Editor**, pega y ejecuta, por orden, los archivos de `supabase/migrations/` (`20261024000001_esquema_inicial.sql` y después `20261024000002_alta_solo_por_invitacion.sql`).
 3. Pon tu email de propietario:
    ```sql
    update public.ajustes set valor = 'tu@email.com' where clave = 'email_propietario';

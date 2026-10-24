@@ -44,3 +44,27 @@ El propietario cambia todo esto desde **⚙️ Opciones › Usuarios y permisos*
    La *anon key* es pública. **No** pongas nunca la *service_role*.
 
 Los demás usuarios se invitan desde el panel: les llega un email para elegir su contraseña.
+
+## Tareas automáticas (reels, stories, música y PDF de la federación)
+
+Los workflows siguen en el repositorio privado `Registro_Entrenamientos` (allí no se ven los logs públicamente).
+Cuando la app guarda un archivo de solicitud (`Reels/solicitud.json`, `Calendarios/solicitud.json`…), llama a la Edge Function `lanzar-tarea`. Esta comprueba que el usuario tiene permiso de escritura en ese menú y arranca el workflow. El workflow baja los datos de Supabase, hace su trabajo y sube el resultado.
+
+Configuración:
+
+1. En Supabase (**Edge Functions › Secrets**, o `supabase secrets set`):
+   - `GITHUB_TOKEN`: un token *fine-grained* de GitHub con permiso **Actions: Read and write** solo sobre `Registro_Entrenamientos`.
+   - `TAREAS_REPO` (opcional): `NouVoleiAlzira/Registro_Entrenamientos`.
+2. En GitHub, en `Registro_Entrenamientos` › Settings › Secrets and variables › Actions:
+   - secretos `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`;
+   - cuando los datos ya estén migrados, la variable `DATOS_EN_SUPABASE` = `si`, para que las tareas programadas (reels de los lunes y martes, PDF diarios) también usen Supabase.
+
+## Traspaso de los datos existentes
+
+```bash
+git clone https://github.com/NouVoleiAlzira/Registro_Entrenamientos
+SUPABASE_URL=https://avsovxrohruariydaned.supabase.co SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/migrar-datos.mjs ./Registro_Entrenamientos
+```
+
+Se puede repetir sin problema: sobrescribe por ruta.

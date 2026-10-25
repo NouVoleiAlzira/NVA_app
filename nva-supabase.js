@@ -72,6 +72,10 @@
   } catch (e) {}
 
   let sb = null;
+  const SALIENDO = "NVA_SALIENDO"; // marca de «cerrar sesión» hasta la siguiente carga
+  function borrarSesionGuardada() {
+    Object.keys(localStorage).filter(k => k.startsWith("NVA_SUPABASE_AUTH")).forEach(k => localStorage.removeItem(k));
+  }
   let perfil = null;
   let permisos = {};
   let resolverListo;
@@ -491,8 +495,11 @@
     await conLimite(sb.auth.signOut(), 3000);
     await conLimite(sb.auth.signOut({ scope: "local" }), 1000);
     try {
-      Object.keys(localStorage).filter(k => k.startsWith("NVA_SUPABASE_AUTH")).forEach(k => localStorage.removeItem(k));
+      borrarSesionGuardada();
       ["NVA_IG_SETTINGS", "NVA_PERFIL", "NVA_PERMISOS"].forEach(k => localStorage.removeItem(k));
+      // Una renovación del token que termine justo ahora podría volver a
+      // guardar la sesión antes de recargar: al arrancar se borra otra vez.
+      localStorage.setItem(SALIENDO, "1");
     } catch (e) {}
     location.replace(location.pathname + location.search);
   }
@@ -982,6 +989,9 @@
     else alEntrar();
   }
 
+  try {
+    if (localStorage.getItem(SALIENDO)) { borrarSesionGuardada(); localStorage.removeItem(SALIENDO); }
+  } catch (e) {}
   if (CFG.url && CFG.anonKey && window.supabase) {
     sb = window.supabase.createClient(CFG.url, CFG.anonKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "NVA_SUPABASE_AUTH" }

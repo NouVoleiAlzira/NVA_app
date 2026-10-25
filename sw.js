@@ -1,6 +1,6 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v116";
+const VERSION = "nva-v117";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
@@ -75,7 +75,9 @@ function networkFirst(request, cacheName, timeoutMs) {
       if (cached && !settled) { settled = true; resolve(cached); }
     }, timeoutMs);
 
-    fetch(request).then(async (res) => {
+    // «no-cache»: se pregunta siempre al servidor (GitHub Pages deja los
+    // archivos 10 min en la caché del navegador y el móvil seguía con la versión vieja)
+    fetch(new Request(request.url, { cache: "no-cache", credentials: "same-origin" })).then(async (res) => {
       clearTimeout(timer);
       if (res && res.ok) {
         const copy = res.clone();

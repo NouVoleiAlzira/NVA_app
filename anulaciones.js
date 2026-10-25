@@ -69,7 +69,7 @@
   }
   window.nvaRecargarAnulaciones = cargar;
 
-  function quien() { return { t: new Date().toISOString(), disp: window.nvaDispositivo ? window.nvaDispositivo() : "" }; }
+  function quien() { return { t: new Date().toISOString(), usuario: window.nvaUsuario ? window.nvaUsuario() : "" }; }
   function anotar(texto, deshacer) { if (window.nvaRegistrar) window.nvaRegistrar("anulacion", texto, { deshacer }); }
   function nombreEquipo(k) { return k; }
 

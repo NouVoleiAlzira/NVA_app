@@ -1718,24 +1718,29 @@
     if (!sel) return;
     await ensureExportLibs();
     await syncTrainingLogsForPdf();
+    if (ghSettings.user && ghSettings.repo && navigator.onLine) await fetchMatchLogsFromGitHub();
 
     // La jugadora se busca en los registros de TODOS los equipos: si ha cambiado
-    // de equipo, sus entrenamientos anteriores siguen guardados en el equipo viejo.
+    // de equipo, sus registros anteriores siguen guardados en el equipo viejo.
+    // Entran entrenamientos y partidos; los partidos se marcan con «*» y en verde.
     const registros = [];
     const otrosEquipos = [];
-    allTrainingLogs
-      .filter(l => l.fecha >= rangeStart && l.fecha <= rangeEnd)
-      .sort((a, b) => a.fecha.localeCompare(b.fecha))
-      .forEach(l => {
+    const enPeriodo = l => l.fecha >= rangeStart && l.fecha <= rangeEnd;
+    allTrainingLogs.filter(enPeriodo).map(l => ({ l, partido: false }))
+      .concat(allMatchLogs.filter(enPeriodo).map(l => ({ l, partido: true })))
+      .sort((a, b) => a.l.fecha.localeCompare(b.l.fecha) || (a.partido - b.partido))
+      .forEach(({ l, partido }) => {
         const p = (l.jugadores || []).find(j => j.name === sel.player);
         if (!p) return;
-        registros.push({ fecha: l.fecha, p });
+        registros.push({ fecha: l.fecha, p, partido });
         if (l.equipo !== sel.teamKey && !otrosEquipos.includes(l.equipo)) otrosEquipos.push(l.equipo);
       });
     if (registros.length === 0) {
-      alert(`No existen registros de entrenamiento de ${sel.player} en ningún equipo entre ${rangeStart} y ${rangeEnd}.`);
+      alert(`No existen registros de entrenamiento ni de partido de ${sel.player} en ningún equipo entre ${rangeStart} y ${rangeEnd}.`);
       return;
     }
+    const COL_PARTIDO = NVA_PDF_COL.verde;
+    const nPartidos = registros.filter(r => r.partido).length;
 
     document.getElementById("pdfPlayerTitle").innerText = sel.player;
     document.getElementById("pdfPlayerCoach").innerText = sel.coachName;
@@ -1744,17 +1749,19 @@
     document.getElementById("pdfPlayerPeriod").innerText = nvaPeriodo();
 
     // --- Datos de los gráficos ---
-    const labels = registros.map(r => pdfFechaCorta(r.fecha).slice(0, 5));
+    const labels = registros.map(r => pdfFechaCorta(r.fecha).slice(0, 5) + (r.partido ? "*" : ""));
     const calidad = registros.map(r => r.p.attendance === "presente" ? (r.p.quality || 0) : null);
     const presentes = calidad.filter(v => v !== null);
     const media = presentes.length ? presentes.reduce((a, b) => a + b, 0) / presentes.length : null;
     const strikes = registros.map(r => r.p.strikes || 0);
     const totalStrikes = strikes.reduce((a, b) => a + b, 0);
-    document.getElementById("pdfPlayerChartTitle").innerText = "Calidad de entrenamiento y strikes por sesión";
+    document.getElementById("pdfPlayerChartTitle").innerText = nPartidos
+      ? "Calidad y strikes por sesión (* en verde = partido)"
+      : "Calidad de entrenamiento y strikes por sesión";
     const pctAsis = registros.length ? Math.round(presentes.length * 100 / registros.length) : 0;
     const nComent = registros.filter(r => (r.p.comments || "").trim()).length;
     document.getElementById("pdfPlayerKpis").innerHTML =
-      nvaKpi("Asistencia", `${pctAsis}<small>%</small>`, `${presentes.length} de ${registros.length} sesiones`, NVA_PDF_COL.azul) +
+      nvaKpi("Asistencia", `${pctAsis}<small>%</small>`, `${presentes.length} de ${registros.length} sesiones` + (nPartidos ? ` (${nPartidos} partido${nPartidos > 1 ? "s" : ""})` : ""), NVA_PDF_COL.azul) +
       nvaKpi("Calidad media", media !== null ? `${media.toFixed(1).replace(".", ",")}<small>/ 5</small>` : "—", "en las sesiones asistidas", NVA_PDF_COL.balon) +
       nvaKpi("Strikes", totalStrikes, "acumulados en el período", NVA_PDF_COL.alzira) +
       nvaKpi("Comentarios", nComent, "anotados por el entrenador/a", NVA_PDF_COL.pista);
@@ -1767,7 +1774,7 @@
     tablaCom.style.fontSize = nCom > 16 ? "10px" : (nCom > 8 ? "11px" : "");
     tablaCom.classList.toggle("pdf-table-compact", nCom > 8);
     body.innerHTML = conComentario.length
-      ? conComentario.map(r => `<tr data-pdf-row><td style="white-space:nowrap; font-weight:700;">${pdfFechaCorta(r.fecha)}</td><td>${pdfEscape(r.p.comments.trim())}</td></tr>`).join("")
+      ? conComentario.map(r => `<tr data-pdf-row><td style="white-space:nowrap; font-weight:700;${r.partido ? ` color:${COL_PARTIDO};` : ""}">${pdfFechaCorta(r.fecha)}${r.partido ? "* 🏐" : ""}</td><td>${pdfEscape(r.p.comments.trim())}</td></tr>`).join("")
       : `<tr data-pdf-row><td colspan="2" class="nva-na" style="text-align:center;">Sin comentarios en el período</td></tr>`;
 
     // --- Gráficos ---
@@ -1786,12 +1793,13 @@
             if (val === null || val === undefined) return;
             if (esBarra && !val) return;   // sin etiqueta en 0 strikes
             ctx.save();
-            ctx.fillStyle = esBarra ? "#B4172A" : "#0D1B45";
+            const partido = !esBarra && registros[idx] && registros[idx].partido;
+            ctx.fillStyle = esBarra ? "#B4172A" : (partido ? COL_PARTIDO : "#0D1B45");
             ctx.font = "700 11px Barlow, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "bottom";
             const pos = el.tooltipPosition();
-            ctx.fillText(val, pos.x, pos.y - 4);
+            ctx.fillText(partido ? val + "*" : val, pos.x, pos.y - 4);
             ctx.restore();
           });
         });
@@ -1831,8 +1839,8 @@
         spanGaps: true,
         tension: 0.35,
         pointRadius: 5,
-        pointBackgroundColor: "#F5C518",
-        pointBorderColor: "#0D1B45",
+        pointBackgroundColor: registros.map(r => r.partido ? COL_PARTIDO : "#F5C518"),
+        pointBorderColor: registros.map(r => r.partido ? COL_PARTIDO : "#0D1B45"),
         pointBorderWidth: 2,
         order: 2
       }
@@ -1871,6 +1879,23 @@
       noLabel: true,
       order: 0
     });
+    if (nPartidos) {
+      // Solo para la leyenda: explica el distintivo de los partidos
+      dsCombinado.push({
+        type: "line",
+        label: "Partido (*)",
+        data: labels.map(() => null),
+        yAxisID: "y",
+        showLine: false,
+        pointStyle: "circle",
+        pointBackgroundColor: COL_PARTIDO,
+        pointBorderColor: COL_PARTIDO,
+        borderColor: COL_PARTIDO,
+        backgroundColor: COL_PARTIDO,
+        noLabel: true,
+        order: 4
+      });
+    }
     pdfPlayerChart1 = new Chart(ctx1, {
       data: { labels, datasets: dsCombinado },
       plugins: [labelPlugin],
@@ -1881,7 +1906,7 @@
         layout: { padding: { top: 20 } },
         plugins: { legend: { display: true, position: "bottom", labels: { usePointStyle: true, boxWidth: 12, padding: 16, color: "#0D1B45", font: { size: 11, weight: "600" } } }, tooltip: { enabled: false } },
         scales: {
-          x: { grid: { display: false }, border: { color: "#E3E8F4" }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } },
+          x: { grid: { display: false }, border: { color: "#E3E8F4" }, ticks: { maxRotation: 0, autoSkip: true, font: c => ({ size: 10, weight: registros[c.index] && registros[c.index].partido ? "700" : "400" }), color: c => registros[c.index] && registros[c.index].partido ? COL_PARTIDO : "#64748B" } },
           // Un único eje para calidad (1-5) y strikes (0-3): misma escala
           y: {
             min: 0,

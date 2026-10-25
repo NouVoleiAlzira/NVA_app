@@ -1719,19 +1719,28 @@
     await ensureExportLibs();
     await syncTrainingLogsForPdf();
 
+    // La jugadora se busca en los registros de TODOS los equipos: si ha cambiado
+    // de equipo, sus entrenamientos anteriores siguen guardados en el equipo viejo.
     const registros = [];
-    collectTeamLogs(sel.teamKey).forEach(l => {
-      const p = (l.jugadores || []).find(j => j.name === sel.player);
-      if (p) registros.push({ fecha: l.fecha, p });
-    });
+    const otrosEquipos = [];
+    allTrainingLogs
+      .filter(l => l.fecha >= rangeStart && l.fecha <= rangeEnd)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .forEach(l => {
+        const p = (l.jugadores || []).find(j => j.name === sel.player);
+        if (!p) return;
+        registros.push({ fecha: l.fecha, p });
+        if (l.equipo !== sel.teamKey && !otrosEquipos.includes(l.equipo)) otrosEquipos.push(l.equipo);
+      });
     if (registros.length === 0) {
-      alert(`No existen registros de entrenamiento de ${sel.player} (${sel.teamLabel}) entre ${rangeStart} y ${rangeEnd}.`);
+      alert(`No existen registros de entrenamiento de ${sel.player} en ningún equipo entre ${rangeStart} y ${rangeEnd}.`);
       return;
     }
 
     document.getElementById("pdfPlayerTitle").innerText = sel.player;
     document.getElementById("pdfPlayerCoach").innerText = sel.coachName;
-    document.getElementById("pdfPlayerTeam").innerText = sel.teamLabel;
+    document.getElementById("pdfPlayerTeam").innerText = otrosEquipos.length
+      ? `${sel.teamLabel} (también en ${otrosEquipos.join(", ")})` : sel.teamLabel;
     document.getElementById("pdfPlayerPeriod").innerText = nvaPeriodo();
 
     // --- Datos de los gráficos ---

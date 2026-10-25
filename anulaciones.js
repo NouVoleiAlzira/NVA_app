@@ -14,9 +14,7 @@
   function lsGet(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function gh() { try { return typeof ghSettings !== "undefined" ? ghSettings : null; } catch (e) { return null; } }
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
-  function b64dec(s) { return decodeURIComponent(escape(atob(String(s).replace(/\n/g, "")))); }
-  function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
+  const esc = escapeHtml, b64dec = b64_to_utf8, b64enc = utf8_to_b64;   // de app.js
   function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function fmt(f) { const d = new Date(f + "T12:00:00"); return DIAS[(d.getDay() + 6) % 7] + " " + d.getDate() + "/" + (d.getMonth() + 1); }
   function vacio() { return { entrenos: {}, dias: {}, partidos: {}, deshechos: [] }; }

@@ -28,7 +28,8 @@ El propietario cambia todo esto desde **⚙️ Opciones › Usuarios y permisos*
 ## Puesta en marcha
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. En **SQL Editor**, pega y ejecuta, por orden, los archivos de `supabase/migrations/` (`20261024000001_esquema_inicial.sql` y después `20261024000002_alta_solo_por_invitacion.sql`).
+2. En **SQL Editor**, pega y ejecuta, uno a uno y por orden de nombre, todos los archivos de `supabase/migrations/`.
+   No hay ninguna tarea que los aplique sola: cada migración nueva hay que ejecutarla a mano igual.
 3. Pon tu email de propietario:
    ```sql
    update public.ajustes set valor = 'tu@email.com' where clave = 'email_propietario';
@@ -40,16 +41,20 @@ El propietario cambia todo esto desde **⚙️ Opciones › Usuarios y permisos*
    ```bash
    supabase functions deploy invitar-usuario
    supabase functions deploy lanzar-tarea
+   supabase functions deploy descargar-calendarios
    ```
 7. Rellena `supabase-config.js` con la *Project URL* y la *anon key* (Project Settings › API).
    La *anon key* es pública. **No** pongas nunca la *service_role*.
 
 Los demás usuarios se invitan desde el panel: les llega un email para elegir su contraseña.
+Los equipos de cada entrenador no se eligen al invitar: son los que tenga en **Opciones › Entrenadores y equipos** (el usuario y el entrenador se enlazan por el nombre).
 
 ## Tareas automáticas (reels, stories, música y PDF de la federación)
 
 Los workflows siguen en el repositorio privado `Registro_Entrenamientos` (allí no se ven los logs públicamente).
-Cuando la app guarda un archivo de solicitud (`Reels/solicitud.json`, `Calendarios/solicitud.json`…), llama a la Edge Function `lanzar-tarea`. Esta comprueba que el usuario tiene permiso de escritura en ese menú y arranca el workflow. El workflow baja los datos de Supabase, hace su trabajo y sube el resultado.
+Cuando la app guarda un archivo de solicitud (`Reels/solicitud.json`, `Reels/solicitud_historia.json`, `Reels/publicar.json` o `Reels/musica/solicitud.json`), llama a la Edge Function `lanzar-tarea`. Esta comprueba que el usuario tiene permiso de escritura en ese menú y arranca el workflow. El workflow baja los datos de Supabase, hace su trabajo y sube el resultado.
+
+Los PDF de la federación que se piden desde la app (botón «Actualizar automáticamente») ya no pasan por GitHub: los baja la Edge Function `descargar-calendarios` y los guarda en `Calendarios/`. La descarga programada diaria sigue siendo un workflow.
 
 Configuración:
 

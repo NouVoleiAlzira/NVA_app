@@ -101,7 +101,7 @@
     const m = mesCompleto();
     return m ? `${MESES[+m.slice(5) - 1]} ${m.slice(0, 4)}` : `del ${fmtCorta(st.desde)} al ${fmtCorta(st.hasta)}`;
   }
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const esc = escapeHtml;
   const fmtDia = (iso) => { const d = new Date(iso + "T12:00:00"); return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }); };
 
   function partidosDe(coach, propio) {

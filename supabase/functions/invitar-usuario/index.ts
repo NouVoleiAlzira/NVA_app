@@ -5,8 +5,10 @@
 //
 // Llamada desde la app:
 //   supabase.functions.invoke("invitar-usuario", {
-//     body: { email, nombre, rol: "administrador", equipos: ["Enova NVA (Cadete)"] }
+//     body: { email, nombre, rol: "administrador", redirectTo }
 //   })
+// Los equipos no se eligen aquí: son los del entrenador con el mismo nombre
+// en Opciones › Entrenadores y equipos.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const CORS = {
@@ -35,13 +37,13 @@ Deno.serve(async (req) => {
   const { data: esGestor, error: errGestor } = await comoUsuario.rpc("es_gestor");
   if (errGestor || !esGestor) return respuesta(403, { error: "Solo el propietario puede invitar usuarios" });
 
-  const { email, nombre, rol = "lectura", equipos = [], redirectTo } = await req.json();
-  if (!email) return respuesta(400, { error: "Falta el email" });
+  const { email, nombre, rol = "lectura", redirectTo } = await req.json().catch(() => ({}));
+  if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return respuesta(400, { error: "Falta el email o no es válido" });
   if (rol === "propietario") return respuesta(400, { error: "El rol de propietario se asigna desde el panel de usuarios" });
 
   const admin = createClient(url, service);
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { nombre, rol, equipos },
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
+    data: { nombre, rol },
     redirectTo,
   });
   if (error) return respuesta(400, { error: error.message });

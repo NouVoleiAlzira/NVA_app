@@ -20,6 +20,10 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const BUCKET = "privado";
+// Supabase corta la función a los 150 s: a partir de aquí no se empieza otro PDF
+// y los que falten se piden en otra pulsación.
+const MARGEN_MS = 100_000;
+const MAX_EQUIPOS = 60;
 const FED_URL = (iden: string) => `https://fvbcv.com/exportar_competiciones.php?idens=${encodeURIComponent(iden)}`;
 
 function respuesta(status: number, body: unknown) {
@@ -49,7 +53,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   const { idens } = await req.json().catch(() => ({}));
-  if (!idens || typeof idens !== "object") return respuesta(400, { error: "Faltan los iden de los equipos" });
+  if (!idens || typeof idens !== "object" || Array.isArray(idens)) return respuesta(400, { error: "Faltan los iden de los equipos" });
+  if (Object.keys(idens).length > MAX_EQUIPOS) return respuesta(400, { error: `Como mucho ${MAX_EQUIPOS} equipos a la vez` });
 
   const comoUsuario = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
@@ -58,8 +63,10 @@ Deno.serve(async (req) => {
   const { data: puede } = await comoUsuario.rpc("puede_escribir", { p_ruta: "Calendarios/", p_equipo: null });
   if (!usuario?.user || !puede) return respuesta(403, { error: "Sin permiso para actualizar los PDF" });
 
+  const inicio = Date.now();
   const resultados: Record<string, string> = {};
   for (const [equipo, iden] of Object.entries(idens as Record<string, unknown>)) {
+    if (Date.now() - inicio > MARGEN_MS) { resultados[equipo] = "no dio tiempo; vuelve a pulsar «Actualizar automáticamente»"; continue; }
     if (typeof iden !== "string" || !/^\d{4,5}$/.test(iden)) { resultados[equipo] = "iden no válido"; continue; }
     try {
       const pdf = await bajarPdf(iden);

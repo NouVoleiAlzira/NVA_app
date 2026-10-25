@@ -76,8 +76,7 @@
   // --- Envío a GitHub ---
   let timer = null, enviando = false;
   function programarEnvio(ms) { clearTimeout(timer); timer = setTimeout(enviar, ms || 15000); }
-  function b64dec(s) { return decodeURIComponent(escape(atob(s.replace(/\n/g, "")))); }
-  function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
+  const b64dec = b64_to_utf8, b64enc = utf8_to_b64;   // de app.js
   function urlMes(g, mes) { return `https://api.github.com/repos/${g.user}/${g.repo}/contents/${FOLDER}/historial_${mes}.json`; }
 
   async function leerMes(g, mes) {
@@ -132,7 +131,7 @@
 
   // --- Pantalla del historial ---
   const filtro = "guardado"; // solo cambios en registros (las acciones antiguas de clics se ocultan)
-  function esc(s) { return String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  const esc = escapeHtml;
 
   // Botón «Deshacer» en los cambios de anulación (anulaciones.js)
   let porId = {};

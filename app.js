@@ -135,9 +135,9 @@
   }
 
   // Escapa texto antes de insertarlo como HTML (innerHTML o atributos). Los
-  // datos llegan de GitHub y los puede editar cualquiera con acceso al
-  // repositorio: sin escapar, un nombre como <img onerror=...> ejecutaría
-  // código y podría leer el token guardado en este dispositivo.
+  // datos los escriben otros usuarios: sin escapar, un nombre como
+  // <img onerror=...> ejecutaría código con la sesión de quien lo abre.
+  // Es la única función de escape de la app: los demás scripts la usan.
   function escapeHtml(v) {
     return String(v == null ? "" : v)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -405,7 +405,7 @@
     const container = document.getElementById("warningPlayersContainer");
     container.innerHTML = "";
     const players = getPlayersForTeamKey(currentTeam);
-    const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const esc = escapeHtml;
 
     players.forEach(playerName => {
       const wObj = warningsData[playerName];
@@ -1063,12 +1063,12 @@
       const label = document.createElement("label");
       label.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 10px; background:#f8fafc; border:1px solid var(--gray-border); border-radius:10px; cursor:pointer; font-size:0.82rem;";
       const scoreTxt = sm.hasScore
-        ? `${escapeHtmlMatch(sm.home)} <b>${sm.sl} - ${sm.sv}</b> ${escapeHtmlMatch(sm.visit)}`
+        ? `${escapeHtml(sm.home)} <b>${sm.sl} - ${sm.sv}</b> ${escapeHtml(sm.visit)}`
         : `<span style="color:#94a3b8;">Sin resultado</span>`;
       label.innerHTML = `
         <input type="checkbox" class="results-match-check" data-idx="${i}" checked onchange="updateResultsSelectionUI()" style="width:18px; height:18px; flex-shrink:0;">
         <span style="min-width:0;">
-          <span style="font-weight:700; color:var(--azul-dark);">${fmtDate(log.fecha)} · ${escapeHtmlMatch(log.equipo)}</span><br>
+          <span style="font-weight:700; color:var(--azul-dark);">${fmtDate(log.fecha)} · ${escapeHtml(log.equipo)}</span><br>
           <span style="color:#334155;">${scoreTxt}</span>
         </span>`;
       list.appendChild(label);
@@ -1117,7 +1117,7 @@
     if (!logs || logs.length === 0) return;
     await ensureExportLibs();
 
-    const esc = (v) => escapeHtmlMatch(v);
+    const esc = escapeHtml;
     const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -2147,7 +2147,7 @@
         : "";
       return `<div class="reason-option ${player.absenceReason === reason ? 'selected' : ''}"
                    onclick="pickAbsenceReason('${kind}', ${index}, ${i})">
-                <span>${escapeHtmlMatch(reason)}</span>${delBtn}
+                <span>${escapeHtml(reason)}</span>${delBtn}
               </div>`;
     }).join("");
 
@@ -3609,11 +3609,6 @@
     for (let i = 0; i < MATCH_SETS_COUNT; i++) matchScore.sets.push({ local: "", visitante: "" });
   }
 
-  function escapeHtmlMatch(str) {
-    return String(str == null ? "" : str)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
   // Sets ganados: en cada fila con los dos puntos rellenados, +1 al que tenga más puntos.
   function computeMatchSets() {
     let local = 0, visitante = 0;
@@ -3792,14 +3787,14 @@
     box.style.display = "";
     const t = computeMatchSets();
 
-    const teamBox = (name, placeholder) => `<div class="ms-box ms-team ${name ? '' : 'placeholder'}">${name ? escapeHtmlMatch(name) : placeholder}</div>`;
+    const teamBox = (name, placeholder) => `<div class="ms-box ms-team ${name ? '' : 'placeholder'}">${name ? escapeHtml(name) : placeholder}</div>`;
     const rows = matchScore.sets
       .filter(s => s.local !== "" || s.visitante !== "")
       .map(s => `
       <div class="ms-set-row">
-        <span class="ms-set-input ms-set-ro">${escapeHtmlMatch(s.local)}</span>
+        <span class="ms-set-input ms-set-ro">${escapeHtml(s.local)}</span>
         <span class="ms-dash">-</span>
-        <span class="ms-set-input ms-set-ro">${escapeHtmlMatch(s.visitante)}</span>
+        <span class="ms-set-input ms-set-ro">${escapeHtml(s.visitante)}</span>
       </div>`).join("");
 
     box.innerHTML = `
@@ -3915,7 +3910,7 @@
     container.innerHTML = "";
 
     if (leagueTeamsList.length === 0) {
-      container.innerHTML = `<p style="text-align:center; font-size:0.85rem; color:#64748b; padding:20px;">No se encontró la lista de equipos de la liga para ${escapeHtmlMatch(currentTeam)} (carpeta "${LEAGUES_FOLDER}"). Comprueba la conexión y que exista el archivo .txt con el nombre del equipo.</p>`;
+      container.innerHTML = `<p style="text-align:center; font-size:0.85rem; color:#64748b; padding:20px;">No se encontró la lista de equipos de la liga para ${escapeHtml(currentTeam)} (carpeta "${LEAGUES_FOLDER}"). Comprueba la conexión y que exista el archivo .txt con el nombre del equipo.</p>`;
     } else {
       leagueTeamsList.forEach((name, i) => {
         const btn = document.createElement("button");
@@ -3999,7 +3994,7 @@
       item.className = "item-row";
       item.style.marginBottom = "4px";
       item.innerHTML = `
-        <span style="font-weight:600;">${escapeHtmlMatch(name)}</span>
+        <span style="font-weight:600;">${escapeHtml(name)}</span>
         <div style="display:flex; gap:4px; align-items:center;">
           <button style="border:none; background:#e2e8f0; border-radius:4px; padding:2px 5px; font-size:0.7rem;" onclick="moveLeagueTeam(${index}, -1)">▲</button>
           <button style="border:none; background:#e2e8f0; border-radius:4px; padding:2px 5px; font-size:0.7rem;" onclick="moveLeagueTeam(${index}, 1)">▼</button>
@@ -4752,7 +4747,7 @@
     teamLogs.slice(0, matchHistoryLimit).forEach((log) => {
       const m = log.marcador;
       const resultHtml = m
-        ? `<div style="font-size:0.72rem; color:#0f172a; font-weight:700; margin-top:2px;">${escapeHtmlMatch(m.local || 'Home')} ${m.setsLocal ?? 0} - ${m.setsVisitante ?? 0} ${escapeHtmlMatch(m.visitante || 'VISIT')}</div>`
+        ? `<div style="font-size:0.72rem; color:#0f172a; font-weight:700; margin-top:2px;">${escapeHtml(m.local || 'Home')} ${m.setsLocal ?? 0} - ${m.setsVisitante ?? 0} ${escapeHtml(m.visitante || 'VISIT')}</div>`
         : "";
 
       const card = document.createElement("div");
@@ -4835,11 +4830,6 @@
   let otrosData = JSON.parse(localStorage.getItem("NVA_OTROS_DATA")) || [];
   let otrosOpenId = null;
   let otrosEditingId = null;
-
-  function escapeHtmlOtros(str) {
-    return String(str == null ? "" : str)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
 
   // Estilos visuales permitidos en el texto enriquecido (colores, bordes y espaciado).
   const OTROS_STYLE_OK = new Set(["color", "background", "background-color", "border", "border-left",
@@ -4962,7 +4952,7 @@
       const isOpen = otrosOpenId === entry.id;
       const btn = document.createElement("button");
       btn.className = "coach-btn" + (isOpen ? " selected" : "");
-      btn.innerHTML = `<span>${escapeHtmlOtros(entry.icon || "📌")} ${escapeHtmlOtros(entry.title)}</span> <span>${isOpen ? "🔻" : "➤"}</span>`;
+      btn.innerHTML = `<span>${escapeHtml(entry.icon || "📌")} ${escapeHtml(entry.title)}</span> <span>${isOpen ? "🔻" : "➤"}</span>`;
       btn.onclick = () => toggleOtros(entry.id);
       box.appendChild(btn);
 
@@ -5179,7 +5169,7 @@
       btn.className = "coach-btn";
       btn.setAttribute("role", "button");
       btn.tabIndex = 0;
-      btn.innerHTML = `<span>📄 ${escapeHtmlOtros(team.name)} (${escapeHtmlOtros(team.category)})</span>
+      btn.innerHTML = `<span>📄 ${escapeHtml(team.name)} (${escapeHtml(team.category)})</span>
                        <span class="ficha-edit" role="button" title="Subir un PDF nuevo">✏️</span>`;
       btn.onclick = () => openFicha(team);
       btn.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openFicha(team); } };

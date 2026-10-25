@@ -13,7 +13,7 @@
   const CAL_FOLDER = "Calendarios";
   const CATEGORIES = ["Escuela", "Alevín", "Infantil", "Cadete", "Juvenil", "Junior", "Senior Femenino", "Senior Masculino", "Mixto"];
 
-  const esc = (v) => escapeHtml(v);
+  const esc = escapeHtml;
   const norm = (s) => normalizeTeamName(s);
 
   let xlsxPromise = null;

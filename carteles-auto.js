@@ -12,7 +12,7 @@
   "use strict";
 
   const AUTO_KEY = "NVA_CARTEL_AUTO";
-  const esc = (v) => escapeHtml(v);
+  const esc = escapeHtml;
   // En los PDF el apóstrofo sale como coma: "L,ILLA" -> "L'ILLA"
   const apos = (t) => String(t || "").replace(/([A-Za-zÀ-ÿ]),(?=[A-Za-zÀ-ÿ])/g, "$1'");
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

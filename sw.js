@@ -1,11 +1,11 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v125";
+const VERSION = "nva-v126";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
 
-// Archivos de la app que se guardan al instalar (rutas relativas: funciona en /Entrenadores/)
+// Archivos de la app que se guardan al instalar (rutas relativas: funciona en /NVA_app/)
 const SHELL_FILES = [
   "./",
   "index.html",

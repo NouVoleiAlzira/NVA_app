@@ -113,6 +113,18 @@
     }[ext] || "application/octet-stream";
   }
 
+  // «sha» de un archivo de texto. La app lo usa como clave de su caché de
+  // contenidos (Cache API, sobrevive a «Borrar datos locales»), así que tiene
+  // que ser distinto para cada archivo y cada versión: con solo «v1» todos los
+  // archivos nuevos compartían clave y se leía el mismo contenido para todos.
+  // El número de versión va delante para que guardar() lo siga entendiendo.
+  function shaTexto(ruta, version, actualizado) {
+    let h = 0x811c9dc5;
+    const s = ruta + "|" + (actualizado || "");
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return "v" + version + "-" + (h >>> 0).toString(16);
+  }
+
   function equipoDe(texto) {
     try { const j = JSON.parse(texto); return j && typeof j.equipo === "string" ? j.equipo : null; } catch (e) { return null; }
   }
@@ -133,13 +145,13 @@
 
   async function leerArchivo(ruta, init) {
     if (TEXTO.test(ruta)) {
-      const { data, error } = await sb.from("archivos").select("contenido, version").eq("ruta", ruta).maybeSingle();
+      const { data, error } = await sb.from("archivos").select("contenido, version, actualizado").eq("ruta", ruta).maybeSingle();
       revisar(error);
       if (data) {
         if (/raw/.test(cabecera(init, "Accept"))) return new Response(data.contenido, { status: 200 });
         const b64 = textoAB64(data.contenido);
         return json(200, {
-          type: "file", name: nombreDe(ruta), path: ruta, sha: "v" + data.version, url: urlApi(ruta),
+          type: "file", name: nombreDe(ruta), path: ruta, sha: shaTexto(ruta, data.version, data.actualizado), url: urlApi(ruta),
           size: new TextEncoder().encode(data.contenido).length,
           encoding: "base64", content: b64,
           download_url: "data:application/octet-stream;base64," + b64
@@ -168,7 +180,7 @@
   async function listarCarpeta(ruta) {
     const pref = ruta ? ruta.replace(/\/$/, "") + "/" : "";
     const items = new Map();
-    const { data: filas, error } = await sb.from("archivos").select("ruta, version, contenido").like("ruta", pref.replace(/[%_]/g, "\\$&") + "%");
+    const { data: filas, error } = await sb.from("archivos").select("ruta, version, actualizado, contenido").like("ruta", pref.replace(/[%_]/g, "\\$&") + "%");
     revisar(error);
     (filas || []).forEach(f => {
       const resto = f.ruta.slice(pref.length);
@@ -178,7 +190,7 @@
         items.set(dir, { type: "dir", name: dir, path: pref + dir, sha: "d", size: 0, url: urlApi(pref + dir) });
       } else {
         items.set(resto, {
-          type: "file", name: resto, path: f.ruta, sha: "v" + f.version, url: urlApi(f.ruta),
+          type: "file", name: resto, path: f.ruta, sha: shaTexto(f.ruta, f.version, f.actualizado), url: urlApi(f.ruta),
           size: new TextEncoder().encode(f.contenido).length,
           download_url: "data:application/octet-stream;base64," + textoAB64(f.contenido)
         });
@@ -212,7 +224,7 @@
       let res;
       if (cuerpo.sha) {
         const version = parseInt(String(cuerpo.sha).replace(/^v/, ""), 10);
-        res = await sb.from("archivos").update(fila).eq("ruta", ruta).eq("version", version).select("version").maybeSingle();
+        res = await sb.from("archivos").update(fila).eq("ruta", ruta).eq("version", version).select("version, actualizado").maybeSingle();
         revisar(res.error);
         if (res.error) return esRls(res.error) ? sinPermiso() : json(422, { message: res.error.message });
         if (!res.data) {
@@ -223,18 +235,19 @@
             if (!puede) return sinPermiso();
             return json(409, { message: `${ruta} does not match ${cuerpo.sha}` });
           }
-          res = await sb.from("archivos").insert(fila).select("version").single();
+          res = await sb.from("archivos").insert(fila).select("version, actualizado").single();
         }
       } else {
-        res = await sb.from("archivos").insert(fila).select("version").single();
+        res = await sb.from("archivos").insert(fila).select("version, actualizado").single();
         if (res.error && res.error.code === "23505") return json(422, { message: "Invalid request.\n\n\"sha\" wasn't supplied." });
       }
       revisar(res.error);
       if (res.error) return esRls(res.error) ? sinPermiso() : json(422, { message: res.error.message });
       lanzarTarea(ruta);
+      const sha = shaTexto(ruta, res.data.version, res.data.actualizado);
       return json(cuerpo.sha ? 200 : 201, {
-        content: { type: "file", name: nombreDe(ruta), path: ruta, sha: "v" + res.data.version },
-        commit: { sha: "v" + res.data.version, message: cuerpo.message || "" }
+        content: { type: "file", name: nombreDe(ruta), path: ruta, sha },
+        commit: { sha, message: cuerpo.message || "" }
       });
     }
     const bytes = b64aBytes(cuerpo.content);

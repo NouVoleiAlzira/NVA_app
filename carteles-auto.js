@@ -206,17 +206,13 @@
     const results = tipo === "resultados";
     const range0 = results ? lastWeekend() : ((window.cpGetRange && window.cpGetRange()) || {});
     if (!range0.from || !range0.to) { const w = lastWeekend(); range0.from = range0.from || w.from; range0.to = range0.to || w.to; }
-    // Primero se eligen las fechas; luego se leen los PDF más nuevos de GitHub
+    // Primero se eligen las fechas; luego se cargan los datos de partidos más recientes
     const range = await askDates(tipo, range0);
     if (!range) return;
     if (window.cpRefreshFromGitHub && typeof ghSettings !== "undefined" && ghSettings.token && navigator.onLine) {
-      mostrarCargando("Revisando los PDF guardados...");
-      // La revisión oculta la pantalla de carga entre PDF y PDF: se mantiene visible hasta terminar
-      const ov = document.getElementById("loadingOverlay");
-      const keep = new MutationObserver(() => { if (ov && !ov.classList.contains("active")) ov.classList.add("active"); });
-      if (ov) keep.observe(ov, { attributes: true, attributeFilter: ["class"] });
+      mostrarCargando("Cargando el calendario de partidos...");
       try { await window.cpRefreshFromGitHub(); } catch (e) { console.warn(e); }
-      finally { keep.disconnect(); ocultarCargando(); }
+      finally { ocultarCargando(); }
     }
     const ans = await askMatches(tipo, range);
     if (!ans) return;

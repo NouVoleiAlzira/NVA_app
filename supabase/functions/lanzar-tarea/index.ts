@@ -18,7 +18,6 @@ const CORS = {
 };
 
 const WORKFLOWS: Record<string, string> = {
-  "Calendarios/solicitud.json": "descargar-calendarios.yml",
   "Reels/solicitud.json": "generar-reels.yml",
   "Reels/solicitud_historia.json": "generar-historias.yml",
   "Reels/publicar.json": "publicar-reels.yml",

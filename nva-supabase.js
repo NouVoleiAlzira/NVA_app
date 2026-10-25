@@ -24,7 +24,6 @@
   const MAX_INLINE = 1024 * 1024; // como GitHub: >1 MB no viene el contenido en la respuesta
   // Archivos «solicitud» que arrancan tareas automáticas (GitHub Actions)
   const TAREAS = [
-    "Calendarios/solicitud.json",
     "Reels/solicitud.json",
     "Reels/solicitud_historia.json",
     "Reels/publicar.json",

@@ -640,6 +640,8 @@
           <label style="flex:1; font-size:0.75rem; color:#475569;">Desde<input type="date" id="igResDesde" class="app-input" style="margin-top:2px;"></label>
           <label style="flex:1; font-size:0.75rem; color:#475569;">Hasta<input type="date" id="igResHasta" class="app-input" style="margin-top:2px;"></label>
         </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.8rem; color:#1e293b; cursor:pointer;">
+          <input type="checkbox" id="igResConFotos" checked style="width:20px; height:20px; flex:none; accent-color:#2563eb;">📸 Reel con las fotos de los partidos</label>
         <p class="ig-info" id="igResInfo"></p>
         <div id="igResLista" style="display:flex; flex-direction:column; gap:6px; max-height:46vh; overflow:auto;"></div>
         <small class="ig-info" id="igResEstado"></small>
@@ -692,6 +694,7 @@
     document.getElementById("igEvFotos").onchange = (e) => { anadirFotos(e.target.files); e.target.value = ""; };
     document.getElementById("igEvPedir").onclick = pedirEvento;
     document.getElementById("igResPedir").onclick = pedirResultados;
+    document.getElementById("igResConFotos").onchange = (e) => { resConFotos = e.target.checked; pintarResultados(); };
     ["igResDesde", "igResHasta"].forEach(i => document.getElementById(i).onchange = () => {
       const d = document.getElementById("igResDesde").value, h = document.getElementById("igResHasta").value;
       if (d && h && d <= h) cargarResultados({ desde: d, hasta: h });
@@ -906,6 +909,7 @@
   const MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   let resPartidos = [];   // [{ id, equipo, rival, fecha, marcador, tiene, blob, url }]
   let resRango = null;
+  let resConFotos = true;   // false: el reel se genera sin fotos, solo con los resultados
 
   function rangoResultados() {
     const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
@@ -985,17 +989,17 @@
   function pintarResultados() {
     const sel = resPartidos.filter(p => p.sel), faltan = sel.filter(p => !p.tiene && !p.blob).length;
     document.getElementById("igResInfo").textContent = !resPartidos.length ? "No hay partidos con resultado entre esas fechas."
-      : `${sel.length} de ${resPartidos.length} partidos en el reel. ` + (faltan
+      : `${sel.length} de ${resPartidos.length} partidos en el reel. ` + (!resConFotos ? "Sin fotos: solo los resultados." : faltan
       ? `${faltan} sin foto: puedes añadirlas ahora (es opcional), saldrán en su diapositiva.` : "Todos tienen foto.");
     const el = document.getElementById("igResLista");
     el.innerHTML = resPartidos.map((p, i) => `
       <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:10px;${p.sel ? "" : " opacity:.5;"}">
         <input type="checkbox" data-sel="${i}" ${p.sel ? "checked" : ""} title="Incluir en el reel" style="width:20px; height:20px; flex:none; accent-color:#2563eb;">
-        ${p.url ? `<img src="${p.url}" alt="" style="width:44px; height:44px; object-fit:cover; border-radius:6px;">` : ""}
+        ${p.url && resConFotos ? `<img src="${p.url}" alt="" style="width:44px; height:44px; object-fit:cover; border-radius:6px;">` : ""}
         <div style="flex:1; min-width:0; font-size:0.78rem; color:#1e293b;"><b>${esc(p.equipo)}</b> ${esc(p.marcador)} ${esc(p.rival)}<br>
-          <small style="color:#64748b;">${fmt(p.fecha)}${p.tiene ? " · 📸 ya tiene foto" : ""}</small></div>
-        <label class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 10px; font-size:0.72rem; cursor:pointer; background:${p.tiene || p.blob ? "#64748b" : "var(--btn-fondoVerde)"};">
-          ${p.blob ? "Cambiar" : p.tiene ? "Otra foto" : "➕ Foto"}<input type="file" accept="image/*" hidden data-res="${i}"></label>
+          <small style="color:#64748b;">${fmt(p.fecha)}${p.tiene && resConFotos ? " · 📸 ya tiene foto" : ""}</small></div>
+        ${resConFotos ? `<label class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 10px; font-size:0.72rem; cursor:pointer; background:${p.tiene || p.blob ? "#64748b" : "var(--btn-fondoVerde)"};">
+          ${p.blob ? "Cambiar" : p.tiene ? "Otra foto" : "➕ Foto"}<input type="file" accept="image/*" hidden data-res="${i}"></label>` : ""}
       </div>`).join("");
     el.querySelectorAll("[data-sel]").forEach(c => c.onchange = () => { resPartidos[+c.dataset.sel].sel = c.checked; pintarResultados(); });
     el.querySelectorAll("[data-res]").forEach(inp => inp.onchange = async () => {
@@ -1014,7 +1018,7 @@
     const boton = document.getElementById("igResPedir"), estado = document.getElementById("igResEstado");
     const elegidos = resPartidos.filter(p => p.sel);
     if (!elegidos.length) { alert("Marca al menos un partido."); return; }
-    const conFoto = elegidos.filter(p => p.blob);
+    const conFoto = resConFotos ? elegidos.filter(p => p.blob) : [];
     boton.disabled = true;
     const id = Date.now().toString(36);
     try {
@@ -1026,7 +1030,7 @@
         fotos[conFoto[i].id] = ruta;
       }
       estado.textContent = "";
-      await pedirPartidos("resultados", { desde: resRango.desde, hasta: resRango.hasta, fotos, id, partidos: elegidos.map(p => p.id) });
+      await pedirPartidos("resultados", { desde: resRango.desde, hasta: resRango.hasta, fotos, id, partidos: elegidos.map(p => p.id), conFotos: resConFotos });
     } catch (e) {
       estado.textContent = "";
       alert(e.message);

@@ -901,8 +901,21 @@
         email, nombre: caja.querySelector("#nvaInvNombre").value.trim(), rol: caja.querySelector("#nvaInvRol").value,
         equipos: rolConEquipos(rolInv.value) ? marcados(caja.querySelector("#nvaInvEquipos")) : [], redirectTo: location.origin + location.pathname
       } });
-      if (e || (data && data.error)) return alert("No se pudo invitar: " + ((data && data.error) || e.message));
-      alert(`Invitación enviada a ${email}.`);
+      if (e || (data && data.error)) {
+        let msg = (data && data.error) || e.message;
+        try { msg = (await e.context.json()).error || msg; } catch (x) {}
+        return alert("No se pudo invitar: " + msg);
+      }
+      if (data && data.enlace) {
+        const texto = `Te invito a la app de Nou Volei Alzira. Entra con este enlace para crear tu contraseña: ${data.enlace}`;
+        let copiado = false;
+        try { await navigator.clipboard.writeText(data.enlace); copiado = true; } catch (x) {}
+        if (confirm(`No se pudo mandar el email (${data.motivo}), pero la invitación está creada.\n\n`
+          + (copiado ? "El enlace está copiado. " : `Enlace: ${data.enlace}\n\n`)
+          + "¿Quieres enviarlo por WhatsApp?")) {
+          window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
+        }
+      } else alert(`Invitación enviada a ${email}.`);
       pintarPanelUsuarios();
     };
     caja.querySelector("#nvaGuardarUsuarios").onclick = async () => {

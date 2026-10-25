@@ -942,40 +942,28 @@
     } catch (e) { console.error("No se pudo guardar el PDF en GitHub:", e); return false; }
   }
 
-  const wait = (ms) => new Promise(r => setTimeout(r, ms));
-
-  // ---------- Actualizar automáticamente (tarea de GitHub) ----------
-  // La tarea .github/workflows/descargar-calendarios.yml del repositorio de datos baja los PDF
-  // desde la federación (el navegador no puede: fvbcv.com bloquea las descargas desde otras webs)
-  // y los deja en Calendarios/<Equipo>.pdf. La app escribe Calendarios/solicitud.json y eso
-  // arranca la tarea. Cuando termina escribe Calendarios/estado.json con el mismo id.
+  // ---------- Actualizar automáticamente (función de Supabase) ----------
+  // La función descargar-calendarios baja los PDF desde la federación (el navegador no puede:
+  // fvbcv.com bloquea las descargas desde otras webs) y los guarda en Calendarios/<Equipo>.pdf.
   function ghApi(path, opts) {
     const headers = Object.assign({ "Authorization": `token ${ghSettings.token}`, "Accept": "application/vnd.github+json" }, (opts && opts.headers) || {});
     return fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}${path}`, Object.assign({ cache: "no-store" }, opts || {}, { headers }));
   }
-  async function readServerState() {
-    const r = await ghApi(`/contents/${PDF_FOLDER}/estado.json`, { headers: { "Accept": "application/vnd.github.raw" } });
-    return r.ok ? r.json() : null;
-  }
-  // Devuelve { resultados } si la tarea terminó, o { error } con el motivo
+  // Devuelve { resultados } (por equipo: "ok" o el motivo del fallo) o { error }
   async function runServerDownload(teams) {
-    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !ghSettings.token) return { error: "no hay sesión iniciada" };
-    mostrarCargando("Pidiendo la descarga de los PDF...");
+    const sb = window.nva && window.nva.cliente;
+    if (!sb) return { error: "no hay conexión con Supabase" };
+    mostrarCargando(`Descargando ${teams.length === 1 ? "el PDF" : `los ${teams.length} PDF`} de la federación...`);
     try {
-      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const idens = {};
       teams.forEach(t => { idens[getTeamKey(t)] = cp.idens[getTeamKey(t)]; });
-      const ok = await writeGitHubFile(`${PDF_FOLDER}/solicitud.json`, { id, pedido: new Date().toISOString(), idens }, "Solicitar descarga de PDF de partidos");
-      if (!ok) return { error: "no se pudo guardar la solicitud" };
-      // Esperar a que la tarea termine (máx. 5 min)
-      for (let i = 0; i < 60; i++) {
-        await wait(5000);
-        mostrarCargando(`Descargando los PDF de la federación... (${(i + 1) * 5} s)`);
-        let st = null;
-        try { st = await readServerState(); } catch (e) {}
-        if (st && st.id === id) return { resultados: st.resultados || {} };
+      const { data, error } = await sb.functions.invoke("descargar-calendarios", { body: { idens } });
+      if (error) {
+        let msg = error.message;
+        try { msg = (await error.context.json()).error || msg; } catch (e) {}
+        return { error: msg };
       }
-      return { error: "la tarea de descarga no respondió en 5 minutos" };
+      return { resultados: (data && data.resultados) || {} };
     } catch (e) { console.error(e); return { error: "error de conexión" }; }
     finally { ocultarCargando(); }
   }

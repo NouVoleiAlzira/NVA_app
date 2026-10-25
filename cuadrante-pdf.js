@@ -1,8 +1,8 @@
 // =====================================================================
 //  PDF PARTIDOS Y RESULTADOS: cuadrante local × visitante de la liga
 //  de cada equipo, con la clasificación al lado.
-//  Los datos salen del PDF de la federación (fvbcv.com) que la tarea de
-//  GitHub deja en Calendarios/<Equipo>.pdf del repositorio de datos.
+//  Los datos salen del PDF de la federación (fvbcv.com) que «Actualizar
+//  automáticamente» deja en Calendarios/<Equipo>.pdf.
 //  Funciona como «PDF Entrenamientos»: se activa el modo PDF y se elige
 //  un equipo, todos los de un entrenador o todos los equipos.
 // =====================================================================

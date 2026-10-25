@@ -40,7 +40,23 @@
     calendario: ["#secHead_cal", "#secBody_cal"],
     direccion: ["#secHead_direccion", "#secBody_direccion"],
     carteles: ["[onclick^=\"cartelAuto\"]", "[onclick*=\"Partidos.html\"]", "[onclick*=\"Resultados.html\"]"],
-    opciones: ["[onclick=\"promptOwnerPassword()\"]"]
+    opciones: ["[onclick=\"promptOwnerPassword()\"]"],
+    // Subsecciones («menú.subsección»): solo se muestran u ocultan
+    "informes.pdf": ["[data-nva-menu=\"informes.pdf\"]"],
+    "informes.kilometraje": ["[data-nva-menu=\"informes.kilometraje\"]"],
+    "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],
+    "calendario.avisos": ["#cpSubHead_warn", "#cpSub_warn"],
+    "calendario.lista": ["#cpSubHead_list", "#cpSub_list"],
+    "calendario.equipos": ["#cpSubHead_teams", "#cpSub_teams"],
+    "direccion.avisos": ["#btnDireccionNVA", "#direccionTeamsContainer"],
+    "direccion.consultas": ["[data-nva-menu=\"direccion.consultas\"]"],
+    "direccion.horarios": ["[data-nva-menu=\"direccion.horarios\"]"],
+    "direccion.registros": ["#histSeccion"],
+    "instagram.reels": ["#igSubHead_reels", "#igSub_reels"],
+    "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
+    "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
+    "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"],
+    "opciones.ligas": [".tab-btn[onclick=\"switchTab(3)\"]", "#tabContent3"]
   };
 
   const origFetch = window.fetch.bind(window);
@@ -337,9 +353,10 @@
     .nva-pantalla .error{color:#b91c1c;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
     #nvaUsuario{font-size:.75rem;opacity:.85;margin-left:6px;cursor:pointer;white-space:nowrap}
     .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem;color:#0f172a;table-layout:fixed}
-    .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:8px 4px;text-align:left;vertical-align:bottom}
+    .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:8px 4px;text-align:left;vertical-align:top}
     .nva-tabla th{vertical-align:middle;font-size:.75rem;color:#475569}
-    .nva-tabla .nva-email{display:block;font-size:.72rem;color:#64748b;margin-bottom:4px;overflow-wrap:anywhere}
+    .nva-tabla .nva-email{display:block;font-size:.72rem;color:#64748b;margin-top:4px;overflow-wrap:anywhere}
+    .nva-tabla .nva-email[hidden]{display:none}
     .nva-tabla select,.nva-tabla input[type=text],.nva-multi summary{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.8rem;color:#0f172a;margin:0}
     .nva-tabla select:disabled{background:#f1f5f9;color:#94a3b8}
     .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
@@ -362,6 +379,30 @@
     .nva-equipos label:hover{background:#f1f5f9}
     .nva-equipos input{margin:0;flex:none}
     .nva-equipos p{margin:4px;font-size:.75rem;color:#64748b}
+    .nva-seccion{display:block;width:100%;box-sizing:border-box}
+    .nva-seccion > summary{cursor:pointer;list-style:none;user-select:none}
+    .nva-seccion > summary::-webkit-details-marker{display:none}
+    .nva-seccion > summary::after{content:"▸";color:#64748b;font-size:.9rem}
+    .nva-seccion[open] > summary::after{content:"▾"}
+    .nva-seccion:not([open]) > summary{margin-bottom:0}
+    .nva-nombre{display:flex;align-items:center;gap:4px}
+    .nva-nombre input{flex:1;min-width:0}
+    .nva-info{flex:none;width:24px;height:24px;border-radius:50%;border:1px solid #cbd5e1;background:#f1f5f9;color:#1e3a8a;font-weight:700;font-size:.75rem;padding:0;cursor:pointer}
+    .nva-nota{font-size:.75rem;color:#64748b;margin:4px 0}
+    .nva-subtitulo{font-size:.8rem;font-weight:700;color:#475569;margin:12px 0 6px}
+    .nva-linea{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#0f172a;margin:0 0 8px}
+    .nva-linea input{margin:0;width:18px;height:18px}
+    .nva-plegar{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:#1e3a8a;font-weight:600;text-align:left;cursor:pointer}
+    .nva-plegar::before{content:"▸";color:#64748b}
+    .nva-plegar[aria-expanded=true]::before{content:"▾"}
+    .nva-permisos .nva-hijo td{background:#f1f5f9}
+    .nva-permisos .nva-hijo td:first-child{padding-left:22px;color:#475569}
+    .nva-mostrar{display:flex;align-items:center;gap:6px;height:32px;font-size:.8rem;cursor:pointer}
+    .nva-mostrar input{margin:0;width:18px;height:18px}
+    .nva-roles td{vertical-align:middle}
+    .nva-tabla .nva-col-num{width:70px;text-align:center}
+    .nva-tabla .nva-col-borrar{width:40px;text-align:center}
+    .nva-borrar{background:none;border:0;font-size:1rem;cursor:pointer;padding:4px}
   `;
 
   function pintarLogin(modo, mensaje) {
@@ -640,7 +681,8 @@
     resolverListo();
   }
 
-  const acceso = menu => permisos[menu] || "ninguno";
+  // Una subsección sin permiso propio (aún no creada en la base de datos) sigue a su menú
+  const acceso = menu => permisos[menu] || (menu.includes(".") ? acceso(menu.split(".")[0]) : "ninguno");
 
   function aplicarPermisos() {
     Object.keys(MENU_ELEMENTOS).forEach(menu => {
@@ -661,6 +703,16 @@
     pintarUsuarioCabecera();
   }
 
+  // Si la pestaña activa de Opciones está oculta para el rol, se abre la primera visible
+  function abrirPrimeraPestana() {
+    const botones = Array.from(document.querySelectorAll("#modalOptions .tab-btn"));
+    const activa = botones.find(b => b.classList.contains("active"));
+    const visible = b => !b.hidden && !b.hasAttribute("data-nva-oculto");
+    if (activa && visible(activa)) return;
+    const primera = botones.find(visible);
+    if (primera) primera.click();
+  }
+
   function pintarUsuarioCabecera() {
     const engranaje = document.querySelector("[onclick=\"promptOwnerPassword()\"]");
     if (!engranaje || document.getElementById("nvaUsuario")) return;
@@ -678,10 +730,15 @@
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
 
   let cierreDesplegables = false;
+  let rolPermisosElegido = null;
+  const ROLES_BASE = ["propietario", "administrador", "entrenador", "lectura"];
   async function pintarPanelUsuarios() {
     const caja = document.getElementById("nvaPanelUsuarios");
     if (!caja) return;
     if (!perfil || perfil.rol !== "propietario") { caja.innerHTML = "<p>Solo el propietario gestiona usuarios.</p>"; return; }
+    // Al volver a pintar (tras guardar) se mantienen abiertas las secciones y menús que lo estaban
+    const abiertas = new Set(Array.from(caja.querySelectorAll("details.nva-seccion[open]")).map(d => d.dataset.seccion));
+    const desplegados = new Set(Array.from(caja.querySelectorAll(".nva-plegar[aria-expanded=true]")).map(b => b.dataset.menu));
     caja.innerHTML = "<p>Cargando...</p>";
     const [u, r, m, p, c] = await Promise.all([
       sb.from("perfiles").select("*").order("email"),
@@ -692,6 +749,8 @@
     ]);
     if (u.error || r.error || m.error || p.error) { caja.innerHTML = "<p>No se pudo cargar (¿sin conexión?).</p>"; return; }
     const roles = r.data, menus = m.data;
+    const principales = menus.filter(x => !x.padre);
+    const hijos = id => menus.filter(x => x.padre === id);
 
     // Equipos del club (Opciones › Equipos, en configuracion.json) con el mismo
     // nombre que usa la app: «Nombre (Categoría)». Se añaden los que ya tenga
@@ -708,22 +767,39 @@
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
-        <td><span class="nva-email">${esc(x.email)}</span><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"></td>
+        <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><span class="nva-email" hidden>${esc(x.email)}</span></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
         <td data-campo="equipos">${desplegableEquipos(x.equipos || [])}</td>
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
-    const nivel = (rol, menu) => (p.data.find(x => x.rol === rol && x.menu === menu) || {}).acceso || "ninguno";
+
+    // Permisos: cada menú tiene su nivel; sus subsecciones solo se muestran u ocultan.
+    // Una subsección sin fila propia sigue a su menú.
+    const nivel = (rol, menu) => (p.data.find(x => x.rol === rol && x.menu === menu) || {}).acceso;
     const opcAcceso = sel => [["ninguno", "—"], ["lectura", "Ver"], ["escritura", "Editar"]]
       .map(([v, t]) => `<option value="${v}"${v === sel ? " selected" : ""}>${t}</option>`).join("");
-    // Se pintan las filas de todos los roles y solo se ve el rol elegido
-    const rolInicial = (roles.find(x => x.id !== "propietario") || roles[0] || {}).id;
-    const filasPermisos = roles.map(ro => menus.map(mn => `<tr data-rol="${esc(ro.id)}"${ro.id === rolInicial ? "" : " hidden"}><td>${esc(mn.nombre)}</td>
-      <td><select data-rol="${esc(ro.id)}" data-menu="${esc(mn.id)}"${ro.id === "propietario" ? " disabled" : ""}>${opcAcceso(nivel(ro.id, mn.id))}</select></td></tr>`).join("")).join("");
+    if (!roles.some(x => x.id === rolPermisosElegido)) rolPermisosElegido = (roles.find(x => x.id !== "propietario") || roles[0] || {}).id;
+    const filasPermisos = roles.map(ro => principales.map(mn => {
+      const fijo = ro.id === "propietario";
+      const nivelMenu = nivel(ro.id, mn.id) || "ninguno";
+      const hs = hijos(mn.id);
+      const titulo = hs.length
+        ? `<button type="button" class="nva-plegar" data-menu="${esc(mn.id)}" aria-expanded="${desplegados.has(mn.id)}">${esc(mn.nombre)}</button>`
+        : esc(mn.nombre);
+      return `<tr data-rol="${esc(ro.id)}"><td>${titulo}</td>
+        <td><select data-rol="${esc(ro.id)}" data-menu="${esc(mn.id)}"${fijo ? " disabled" : ""}>${opcAcceso(nivelMenu)}</select></td></tr>` +
+        hs.map(h => `<tr class="nva-hijo" data-rol="${esc(ro.id)}" data-padre="${esc(mn.id)}"><td>${esc(h.nombre)}</td>
+        <td><label class="nva-mostrar"><input type="checkbox" data-rol="${esc(ro.id)}" data-menu="${esc(h.id)}" data-padre="${esc(mn.id)}"${(nivel(ro.id, h.id) || nivelMenu) !== "ninguno" ? " checked" : ""}${fijo || nivelMenu === "ninguno" ? " disabled" : ""}>Mostrar</label></td></tr>`).join("");
+    }).join("")).join("");
 
-    caja.innerHTML = `
-      <div class="config-section">
-        <div class="config-subtitle">Invitar a un usuario</div>
+    const usuariosDeRol = id => u.data.filter(x => x.rol === id).length;
+    const filasRoles = roles.map(x => `<tr><td>${esc(x.nombre)}${x.restringir_equipos ? "<br><span class=\"nva-nota\">Solo edita sus equipos</span>" : ""}</td>
+      <td class="nva-col-num">${usuariosDeRol(x.id)}</td>
+      <td class="nva-col-borrar">${ROLES_BASE.includes(x.id) ? "" : `<button type="button" class="nva-borrar" data-id="${esc(x.id)}" title="Borrar rol" aria-label="Borrar rol">🗑️</button>`}</td></tr>`).join("");
+
+    const seccion = (id, titulo, cuerpo) => `<details class="config-section nva-seccion" data-seccion="${id}"${abiertas.has(id) ? " open" : ""}>
+      <summary class="config-subtitle">${titulo}</summary>${cuerpo}</details>`;
+    caja.innerHTML = seccion("invitar", "Invitar a un usuario", `
         <input type="email" id="nvaInvEmail" class="app-input" placeholder="Email">
         <input type="text" id="nvaInvNombre" class="app-input" placeholder="Nombre">
         <select id="nvaInvRol" class="app-input">${roles.filter(x => x.id !== "propietario").map(x => `<option value="${esc(x.id)}"${x.id === "entrenador" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
@@ -732,23 +808,28 @@
           <div id="nvaInvEquipos">${desplegableEquipos([], "grande")}</div>
         </div>
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
-        <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>
-      </div>
-      <div class="config-section">
-        <div class="config-subtitle">Usuarios</div>
+        <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>`) +
+      seccion("usuarios", "Usuarios", `
         <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-equipos">Equipos</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
-        <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>
-      </div>
-      <div class="config-section">
-        <div class="config-subtitle">Permisos por rol</div>
-        <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolInicial ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
-        <p id="nvaPermFijo" style="font-size:.75rem;color:#64748b" hidden>El propietario siempre puede editarlo todo.</p>
+        <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
+      seccion("permisos", "Permisos por rol", `
+        <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
+        <p id="nvaPermFijo" class="nva-nota" hidden>El propietario siempre puede editarlo todo.</p>
         <table class="nva-tabla nva-permisos"><thead><tr><th>Menú</th><th class="nva-col-acceso">Acceso</th></tr></thead>
         <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
-        <p style="font-size:.75rem;color:#64748b">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados.</p>
-        <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>
-      </div>`;
+        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
+        <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>`) +
+      seccion("roles", "Roles", `
+        <table class="nva-tabla nva-roles"><thead><tr><th>Rol</th><th class="nva-col-num">Usuarios</th><th class="nva-col-borrar"></th></tr></thead>
+        <tbody>${filasRoles}</tbody></table>
+        <div class="nva-subtitulo">Crear un rol</div>
+        <input type="text" id="nvaRolNombre" class="app-input" placeholder="Nombre del rol (p. ej. Coordinador)">
+        <label class="nva-linea"><input type="checkbox" id="nvaRolEquipos">Solo puede editar los equipos que tenga asignados</label>
+        <div style="font-size:.8rem;color:#475569;margin-bottom:4px">Empezar con los permisos de:</div>
+        <select id="nvaRolCopia" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === "lectura" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
+        <button class="btn-save-session" id="nvaCrearRol">➕ Crear rol</button>
+        <p class="nva-nota">Después ajusta sus permisos en «Permisos por rol». Los roles de partida no se pueden borrar.</p>`);
 
     const marcados = nodo => Array.from(nodo.querySelectorAll("input[type=checkbox]:checked")).map(x => x.value);
     const rolInv = caja.querySelector("#nvaInvRol");
@@ -766,11 +847,33 @@
         if (!d.contains(e.target)) d.open = false;
       }));
     }
+    caja.querySelectorAll(".nva-info").forEach(b => b.onclick = () => {
+      const email = b.closest("td").querySelector(".nva-email");
+      email.hidden = !email.hidden;
+    });
+
+    // Permisos: solo se ven las filas del rol elegido y las subsecciones de los menús desplegados
     const rolPerm = caja.querySelector("#nvaPermRol");
-    rolPerm.onchange = () => {
-      caja.querySelectorAll("#nvaPermisos tr").forEach(tr => { tr.hidden = tr.dataset.rol !== rolPerm.value; });
+    const pintarFilasPermisos = () => {
+      const abiertos = new Set(Array.from(caja.querySelectorAll(".nva-plegar[aria-expanded=true]")).map(b => b.dataset.menu));
+      caja.querySelectorAll("#nvaPermisos tr").forEach(tr => {
+        tr.hidden = tr.dataset.rol !== rolPerm.value || (tr.dataset.padre && !abiertos.has(tr.dataset.padre));
+      });
       caja.querySelector("#nvaPermFijo").hidden = rolPerm.value !== "propietario";
     };
+    rolPerm.onchange = () => { rolPermisosElegido = rolPerm.value; pintarFilasPermisos(); };
+    caja.querySelectorAll(".nva-plegar").forEach(b => b.onclick = () => {
+      const abrir = b.getAttribute("aria-expanded") !== "true";
+      caja.querySelectorAll(`.nva-plegar[data-menu="${b.dataset.menu}"]`).forEach(x => x.setAttribute("aria-expanded", abrir));
+      pintarFilasPermisos();
+    });
+    caja.querySelectorAll("#nvaPermisos select").forEach(s => s.onchange = () => {
+      // Con el menú en «—» sus subsecciones no se ven, da igual lo que marquen
+      caja.querySelectorAll(`#nvaPermisos input[data-rol="${s.dataset.rol}"][data-padre="${s.dataset.menu}"]`)
+        .forEach(x => { x.disabled = s.value === "ninguno"; });
+    });
+    pintarFilasPermisos();
+
     caja.querySelector("#nvaInvitar").onclick = async () => {
       const email = caja.querySelector("#nvaInvEmail").value.trim();
       if (!email) return alert("Escribe el email.");
@@ -799,11 +902,43 @@
     };
     caja.querySelector("#nvaGuardarPermisos").onclick = async () => {
       const filas = Array.from(caja.querySelectorAll("#nvaPermisos select:not([disabled])"))
-        .map(s => ({ rol: s.dataset.rol, menu: s.dataset.menu, acceso: s.value }));
+        .map(s => ({ rol: s.dataset.rol, menu: s.dataset.menu, acceso: s.value }))
+        .concat(Array.from(caja.querySelectorAll("#nvaPermisos input[type=checkbox]"))
+          .filter(x => x.dataset.rol !== "propietario")
+          .map(x => ({ rol: x.dataset.rol, menu: x.dataset.menu, acceso: x.checked ? "lectura" : "ninguno" })));
       const { error: e } = await sb.from("permisos_rol").upsert(filas);
       if (e) return alert("Error guardando permisos: " + e.message);
       alert("Permisos guardados. Cada usuario los verá al volver a abrir la app.");
     };
+
+    caja.querySelector("#nvaCrearRol").onclick = async () => {
+      const nombre = caja.querySelector("#nvaRolNombre").value.trim();
+      if (!nombre) return alert("Escribe el nombre del rol.");
+      if (roles.some(x => x.nombre.toLowerCase() === nombre.toLowerCase())) return alert("Ya hay un rol con ese nombre.");
+      const base = nombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "rol";
+      let id = base;
+      for (let n = 2; roles.some(x => x.id === id); n++) id = `${base}_${n}`;
+      const { error: e1 } = await sb.from("roles").insert({ id, nombre, nivel: 30, gestiona_usuarios: false, restringir_equipos: caja.querySelector("#nvaRolEquipos").checked });
+      if (e1) return alert("No se pudo crear el rol: " + e1.message);
+      // Permisos de partida: los del rol elegido (el propietario no tiene filas «—»)
+      const copia = caja.querySelector("#nvaRolCopia").value;
+      const filas = menus.map(mn => ({ rol: id, menu: mn.id,
+        acceso: copia === "propietario" ? "escritura" : (nivel(copia, mn.id) || (mn.padre && nivel(copia, mn.padre)) || "ninguno") }));
+      const { error: e2 } = await sb.from("permisos_rol").upsert(filas);
+      if (e2) alert("El rol se creó, pero no sus permisos: " + e2.message);
+      rolPermisosElegido = id;
+      alert(`Rol «${nombre}» creado.`);
+      pintarPanelUsuarios();
+    };
+    caja.querySelectorAll(".nva-borrar").forEach(b => b.onclick = async () => {
+      const rol = roles.find(x => x.id === b.dataset.id);
+      const n = usuariosDeRol(rol.id);
+      if (n) return alert(`Hay ${n} usuario${n === 1 ? "" : "s"} con el rol «${rol.nombre}». Cámbiales el rol antes de borrarlo.`);
+      if (!confirm(`¿Borrar el rol «${rol.nombre}»?`)) return;
+      const { error: e } = await sb.from("roles").delete().eq("id", rol.id);
+      if (e) return alert("No se pudo borrar el rol: " + e.message);
+      pintarPanelUsuarios();
+    });
   }
 
   // ------------------------------------------------------------------
@@ -819,7 +954,9 @@
     // Opciones: ya no hay contraseña de propietario, decide el rol
     window.promptOwnerPassword = function () {
       if (acceso("opciones") === "ninguno") return alert("Tu rol no tiene acceso a Opciones.");
-      if (typeof window.openOptionsModal === "function") window.withLoading ? window.withLoading(window.openOptionsModal, "Sincronizando...") : window.openOptionsModal();
+      if (typeof window.openOptionsModal !== "function") return;
+      const abrir = async () => { await window.openOptionsModal(); abrirPrimeraPestana(); };
+      window.withLoading ? window.withLoading(abrir, "Sincronizando...") : abrir();
     };
     window.nvaPintarPanelUsuarios = pintarPanelUsuarios;
 

@@ -95,11 +95,6 @@
 
   <!-- PANTALLA 1: SELECCIÓN UNIFICADA -->
   <div class="screen active" id="screenCoachTeam">
-    <div id="pdfModeBanner" class="pdf-mode-banner" style="display: none;">
-      <span>📌 Modo PDF Activo: Selecciona Entrenador y Equipo</span>
-      <button onclick="togglePdfMode()" style="background:none; border:none; color:white; font-weight:700; cursor:pointer;">✕ Cancelar</button>
-    </div>
-
     <!-- ===== Sección plegable: Calendario semanal ===== -->
     <div class="section-title section-toggle" id="secHead_wk" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_wk" onclick="toggleSection('wk')" onkeydown="sectionKey(event,'wk')">Calendario semanal <span class="sec-arrow">▾</span></div>
     <div class="section-body" id="secBody_wk">
@@ -113,6 +108,11 @@
         <span><b class="wk-mark wk-v">V</b> con registro:&nbsp;<b id="wkCountV">0</b></span>
         <span><b class="wk-mark wk-x">X</b> sin registro:&nbsp;<b id="wkCountX">0</b></span>
       </div>
+    </div>
+
+    <div id="pdfModeBanner" class="pdf-mode-banner" style="display: none;">
+      <span>📌 Modo PDF Activo: Selecciona Entrenador y Equipo</span>
+      <button onclick="togglePdfMode()" style="background:none; border:none; color:white; font-weight:700; cursor:pointer;">✕ Cancelar</button>
     </div>
 
     <!-- ===== Sección plegable: Entrenamientos y Partidos ===== -->

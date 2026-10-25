@@ -33,7 +33,7 @@
     head.classList.toggle("collapsed", !open);
     body.classList.toggle("collapsed", !open);
     head.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) { render(); if (subState().teams) autoCheckPdfs(); }
+    if (open) render();
   }
   window.cpToggleSection = function () {
     const open = document.getElementById("secBody_cal").classList.contains("collapsed");
@@ -208,7 +208,7 @@
     st[id] = open;
     try { localStorage.setItem(SUB_KEY, JSON.stringify(st)); } catch (e) {}
     applySub(id, open);
-    if (open && id === "teams") { renderTeams(); autoCheckPdfs(); }
+    if (open && id === "teams") renderTeams();
   };
   function applySub(id, open) {
     const head = document.getElementById("cpSubHead_" + id), body = document.getElementById("cpSub_" + id);
@@ -551,7 +551,10 @@
     if (!box || box.closest(".collapsed")) return;
     const teams = (typeof appData !== "undefined" && appData.teams) || [];
     if (!teams.length) { box.innerHTML = `<div class="cp-empty">No hay equipos configurados.</div>`; return; }
-    box.innerHTML = (autoMsg ? `<div class="cp-auto-msg">${esc(autoMsg)}</div>` : "") + teams.map((t, i) => {
+    box.innerHTML = `<div class="cp-update-btns">
+        <button type="button" class="btn-save-session cp-update-all" onclick="cpUpdateAll()">🔄 Actualizar automáticamente</button>
+        <button type="button" class="btn-save-session cp-update-manual${manualMode ? " active" : ""}" aria-pressed="${manualMode}" onclick="cpToggleManual()">✋ Actualizar manualmente</button>
+      </div>` + teams.map((t, i) => {
       const key = getTeamKey(t);
       const info = cp.teams[key];
       let change = "";
@@ -566,23 +569,12 @@
         <label class="cp-iden"><span>Iden</span><input type="text" inputmode="numeric" maxlength="5" placeholder="0000" value="${esc(iden)}" data-key="${esc(key)}" onchange="cpSetIden(this)"></label>
         ${manualMode ? `<button class="cp-upload" onclick="cpPickPdf(${i})">📄 ${info ? "Cambiar" : "Subir"} PDF</button>` : ""}
       </div>`;
-    }).join("") + `<div class="cp-auto-note">🕗 Se actualiza automáticamente cada día a las ${autoHour()}</div>
-      <div class="cp-update-btns">
-        <button type="button" class="btn-save-session cp-update-all" onclick="cpUpdateAll()">🔄 Actualizar automáticamente</button>
-        <button type="button" class="btn-save-session cp-update-manual${manualMode ? " active" : ""}" aria-pressed="${manualMode}" onclick="cpToggleManual()">✋ Actualizar manualmente</button>
-      </div>`;
+    }).join("");
   }
 
   // Botones de subir/cambiar PDF a mano: solo visibles tras pulsar «Actualizar manualmente»
   let manualMode = false;
   window.cpToggleManual = function () { manualMode = !manualMode; renderTeams(); };
-
-  // Hora local de la actualización diaria de la tarea de GitHub (cron "0 6 * * *", en UTC)
-  const AUTO_UTC_HOUR = 6;
-  function autoHour() {
-    const d = new Date(); d.setUTCHours(AUTO_UTC_HOUR, 0, 0, 0);
-    return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-  }
 
   // Línea del resumen final: «- Equipo: x partidos» y debajo si hay cambios o no
   function fmtRes(key, res, extra) {
@@ -917,7 +909,6 @@
   }
 
   // ---------- Iden de cada equipo y actualización automática desde la federación ----------
-  const FED_URL = (iden) => `https://fvbcv.com/exportar_competiciones.php?idens=${encodeURIComponent(iden)}`;
   window.cpSetIden = function (inp) {
     const key = inp.getAttribute("data-key");
     const v = inp.value.replace(/\D/g, "").slice(0, 5);
@@ -928,66 +919,6 @@
     if (v) cp.idens[key] = v; else delete cp.idens[key];
     saveMoves();
   };
-
-  // Ventana para cuando el navegador no deja descargar el PDF directamente:
-  // se abre el enlace, se descarga y se elige el archivo. Devuelve File | "skip" | "stop".
-  function askManualPdf(key, iden, pos, total) {
-    return new Promise(resolve => {
-      const o = document.createElement("div");
-      o.className = "cp-modal";
-      o.innerHTML = `<div class="cp-modal-box">
-        <div class="cp-modal-title">Actualizar ${pos}/${total}: ${esc(key)}</div>
-        <div class="cp-modal-txt">El navegador no permite descargar el PDF de la federación automáticamente.<br>1. Pulsa <b>Abrir enlace</b> y descarga el PDF (iden ${esc(iden)}).<br>2. Vuelve aquí y pulsa <b>Elegir PDF descargado</b>.</div>
-        <a class="cp-modal-btn" href="${FED_URL(iden)}" target="_blank" rel="noopener">🔗 Abrir enlace</a>
-        <button type="button" class="cp-modal-btn cp-modal-main">📄 Elegir PDF descargado</button>
-        <div class="cp-modal-row"><button type="button" class="cp-modal-btn cp-modal-skip">Saltar este equipo</button><button type="button" class="cp-modal-btn cp-modal-stop">Parar</button></div>
-        <input type="file" accept="application/pdf,.pdf" style="display:none"></div>`;
-      document.body.appendChild(o);
-      const inp = o.querySelector("input");
-      const done = (v) => { o.remove(); resolve(v); };
-      o.querySelector(".cp-modal-main").onclick = () => inp.click();
-      inp.onchange = () => { if (inp.files && inp.files[0]) done(inp.files[0]); };
-      o.querySelector(".cp-modal-skip").onclick = () => done("skip");
-      o.querySelector(".cp-modal-stop").onclick = () => done("stop");
-    });
-  }
-
-  // La web de la federación no permite descargas desde otras webs (CORS), así que se prueba
-  // primero directo y, si el navegador lo bloquea, a través de pasarelas públicas que añaden
-  // ese permiso. Se recuerda la última que funcionó para empezar por ella.
-  const FED_ROUTES = [
-    { name: "directo", url: (u) => u },
-    { name: "corsproxy.io", url: (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}` },
-    { name: "allorigins", url: (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
-    { name: "codetabs", url: (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}` }
-  ];
-  const ROUTE_KEY = "NVA_FED_ROUTE";
-  async function fetchPdfFrom(url) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 25000);
-    try {
-      const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const blob = await res.blob();
-      const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
-      if (String.fromCharCode(...head) !== "%PDF-") throw new Error("La respuesta no es un PDF");
-      return blob;
-    } finally { clearTimeout(timer); }
-  }
-  async function downloadFedPdf(iden) {
-    let first = 0;
-    try { first = Math.max(0, FED_ROUTES.findIndex(r => r.name === localStorage.getItem(ROUTE_KEY))); } catch (e) {}
-    const order = FED_ROUTES.slice(first).concat(FED_ROUTES.slice(0, first));
-    let lastErr = null;
-    for (const r of order) {
-      try {
-        const blob = await fetchPdfFrom(r.url(FED_URL(iden)));
-        try { localStorage.setItem(ROUTE_KEY, r.name); } catch (e) {}
-        return blob;
-      } catch (e) { console.warn(`Descarga por ${r.name} fallida:`, e); lastErr = e; }
-    }
-    throw lastErr || new Error("No se pudo descargar");
-  }
 
   // Guarda el PDF en GitHub como Calendarios/<Equipo>.pdf (sobrescribe si ya existe)
   const PDF_FOLDER = "Calendarios";
@@ -1011,71 +942,13 @@
     } catch (e) { console.error("No se pudo guardar el PDF en GitHub:", e); return false; }
   }
 
-  // Busca al equipo dentro de un PDF ya leído: devuelve {fed, s} (s = parecido 0..1) o null
-  function teamInLines(lines, team) {
-    const prev = cp.teams[getTeamKey(team)];
-    if (prev && prev.fedName && lines.some(l => normalizeTeamName(l.text).includes(normalizeTeamName(prev.fedName)))) return { fed: prev.fedName, s: 2 };
-    const names = candidateNames(lines);
-    const club = names.filter(isClubName);
-    const wanted = [team.name, `${team.name} ${team.category}`];
-    let best = null;
-    (club.length ? club : names).forEach(n => {
-      const s = Math.max(...wanted.map(w => score(w, n)));
-      if (!best || s > best.s) best = { fed: n, s };
-    });
-    return best && best.s >= 0.5 ? best : null;
-  }
-
-  // Lanza la descarga del navegador (va a la carpeta Descargas). Como en el «Descargador masivo»:
-  // la web de la federación no deja leer el archivo desde otra web, pero sí descargarlo.
-  function browserDownload(url) {
-    const a = document.createElement("a");
-    a.href = url; a.target = "_blank"; a.rel = "noopener";
-    document.body.appendChild(a); a.click(); a.remove();
-  }
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
-  // Ventana para elegir de una vez todos los PDF descargados. Devuelve File[] | null
-  function askDownloadedPdfs(n) {
-    return new Promise(resolve => {
-      const o = document.createElement("div");
-      o.className = "cp-modal";
-      o.innerHTML = `<div class="cp-modal-box">
-        <div class="cp-modal-title">Elige los ${n} PDF descargados</div>
-        <div class="cp-modal-txt">La federación no deja que la app lea sus PDF directamente, así que se han descargado en tu carpeta <b>Descargas</b>.<br>Pulsa el botón y <b>selecciónalos todos a la vez</b>: la app reconoce sola de qué equipo es cada uno.</div>
-        <button type="button" class="cp-modal-btn cp-modal-main">📄 Elegir los PDF descargados</button>
-        <div class="cp-modal-row"><button type="button" class="cp-modal-btn cp-modal-retry">🔁 Volver a descargar</button><button type="button" class="cp-modal-btn cp-modal-stop">Cancelar</button></div>
-        <input type="file" accept="application/pdf,.pdf" multiple style="display:none"></div>`;
-      document.body.appendChild(o);
-      const inp = o.querySelector("input");
-      const done = (v) => { o.remove(); resolve(v); };
-      o.querySelector(".cp-modal-main").onclick = () => inp.click();
-      inp.onchange = () => { if (inp.files && inp.files.length) done(Array.from(inp.files)); };
-      o.querySelector(".cp-modal-retry").onclick = () => done("retry");
-      o.querySelector(".cp-modal-stop").onclick = () => done(null);
-    });
-  }
-
-  async function saveTeamPdf(team, file, fedHint, results) {
-    const key = getTeamKey(team);
-    const fname = `${sanitizeFileName(key)}.pdf`;
-    const res = await processPdf(file, fname, team, true, fedHint);
-    let saved = "";
-    if (/(con cambios|nuevo)$/.test(res)) {
-      mostrarCargando(`Guardando ${fname}...`);
-      saved = (await savePdfToGitHub(key, file)) ? "" : " (PDF no guardado)";
-      ocultarCargando();
-    }
-    results.push(fmtRes(key, res, saved));
-  }
-
-  // ---------- Descarga en el servidor (tarea automática de GitHub) ----------
+  // ---------- Actualizar automáticamente (tarea de GitHub) ----------
   // La tarea .github/workflows/descargar-calendarios.yml del repositorio de datos baja los PDF
-  // desde la federación (allí no hay bloqueo del navegador) y los deja en Calendarios/<Equipo>.pdf.
-  // Para no necesitar permisos nuevos en el TOKEN, la app no «lanza» la tarea: solo escribe
-  // Calendarios/solicitud.json (como cualquier otro dato) y la tarea arranca sola al verlo.
-  // Cuando termina escribe Calendarios/estado.json con el mismo id.
-  const WF_PATH = ".github/workflows/descargar-calendarios.yml";
+  // desde la federación (el navegador no puede: fvbcv.com bloquea las descargas desde otras webs)
+  // y los deja en Calendarios/<Equipo>.pdf. La app escribe Calendarios/solicitud.json y eso
+  // arranca la tarea. Cuando termina escribe Calendarios/estado.json con el mismo id.
   function ghApi(path, opts) {
     const headers = Object.assign({ "Authorization": `token ${ghSettings.token}`, "Accept": "application/vnd.github+json" }, (opts && opts.headers) || {});
     return fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}${path}`, Object.assign({ cache: "no-store" }, opts || {}, { headers }));
@@ -1084,29 +957,26 @@
     const r = await ghApi(`/contents/${PDF_FOLDER}/estado.json`, { headers: { "Accept": "application/vnd.github.raw" } });
     return r.ok ? r.json() : null;
   }
-  let serverResults = {};
+  // Devuelve { resultados } si la tarea terminó, o { error } con el motivo
   async function runServerDownload(teams) {
-    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !ghSettings.token) return "sin conexión con GitHub configurada";
-    mostrarCargando("Pidiendo a GitHub que descargue los PDF...");
+    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !ghSettings.token) return { error: "no hay sesión iniciada" };
+    mostrarCargando("Pidiendo la descarga de los PDF...");
     try {
-      const wf = await ghApi(`/contents/${WF_PATH}`);
-      if (wf.status === 404) return "la tarea automática no está instalada en el repositorio";
-      if (!wf.ok) return `GitHub respondió ${wf.status}`;
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const idens = {};
       teams.forEach(t => { idens[getTeamKey(t)] = cp.idens[getTeamKey(t)]; });
       const ok = await writeGitHubFile(`${PDF_FOLDER}/solicitud.json`, { id, pedido: new Date().toISOString(), idens }, "Solicitar descarga de PDF de partidos");
-      if (!ok) return "no se pudo escribir la solicitud";
+      if (!ok) return { error: "no se pudo guardar la solicitud" };
       // Esperar a que la tarea termine (máx. 5 min)
       for (let i = 0; i < 60; i++) {
         await wait(5000);
-        mostrarCargando(`GitHub está descargando los PDF... (${(i + 1) * 5} s)`);
+        mostrarCargando(`Descargando los PDF de la federación... (${(i + 1) * 5} s)`);
         let st = null;
         try { st = await readServerState(); } catch (e) {}
-        if (st && st.id === id) { serverResults = st.resultados || {}; return ""; }
+        if (st && st.id === id) return { resultados: st.resultados || {} };
       }
-      return "la tarea no respondió (¿está activada la pestaña Actions del repositorio?)";
-    } catch (e) { console.error(e); return "error al hablar con GitHub"; }
+      return { error: "la tarea de descarga no respondió en 5 minutos" };
+    } catch (e) { console.error(e); return { error: "error de conexión" }; }
     finally { ocultarCargando(); }
   }
   async function readServerPdf(key) {
@@ -1118,56 +988,8 @@
     return new File([blob], `${sanitizeFileName(key)}.pdf`, { type: "application/pdf" });
   }
 
-  // ---------- Lectura automática al desplegar «Equipos · PDF Competición» ----------
-  // Para cada equipo se mira la fecha del último cambio de su PDF en GitHub (Calendarios/<Equipo>.pdf).
-  // Solo se lee el PDF si es posterior a la última revisión de ese equipo.
-  const AUTO_SEEN = "NVA_CP_AUTO_SEEN";   // PDF ya intentados sin éxito (para no repetirlos cada vez)
-  let autoChecking = false, autoMsg = "";
-  function setAutoMsg(t) { autoMsg = t; renderTeams(); }
-  async function pdfDateInGitHub(key) {
-    const r = await ghApi(`/commits?path=${encodeURIComponent(`${PDF_FOLDER}/${sanitizeFileName(key)}.pdf`)}&per_page=1`);
-    if (!r.ok) return null;
-    const list = await r.json();
-    const c = list && list[0] && list[0].commit;
-    return c ? (c.committer || c.author).date : null;
-  }
-  async function autoCheckPdfs() {
-    if (autoChecking || updating) return;
-    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !ghSettings.token || !navigator.onLine) return;
-    const teams = ((typeof appData !== "undefined" && appData.teams) || []).slice();
-    if (!teams.length) return;
-    autoChecking = true;
-    let seen = {};
-    try { seen = JSON.parse(localStorage.getItem(AUTO_SEEN) || "{}") || {}; } catch (e) { seen = {}; }
-    const done = [];
-    try {
-      await fetchFromGitHub();   // primero los datos más recientes, para comparar con la última revisión real
-      for (let i = 0; i < teams.length; i++) {
-        const team = teams[i], key = getTeamKey(team);
-        setAutoMsg(`🔄 Revisando los PDF guardados (${i + 1}/${teams.length})...`);
-        let date = null;
-        try { date = await pdfDateInGitHub(key); } catch (e) { console.warn(e); }
-        if (!date) continue;
-        const info = cp.teams[key];
-        const last = info && (info.checkedAt || info.uploadedAt);
-        if (last && new Date(date) <= new Date(last)) continue;   // ya revisado después de ese PDF
-        if (seen[key] === date) continue;
-        let file = null;
-        try { file = await readServerPdf(key); } catch (e) { console.warn(`Sin PDF en GitHub para ${key}:`, e); }
-        if (!file) continue;
-        const res = await processPdf(file, file.name, team, true, null, true);
-        if (/partidos · /.test(res)) { delete seen[key]; done.push(fmtRes(key, res)); }
-        else { seen[key] = date; done.push(`- ${key}: ${res}`); }
-      }
-    } finally {
-      autoChecking = false;
-      ocultarCargando();
-      try { localStorage.setItem(AUTO_SEEN, JSON.stringify(seen)); } catch (e) {}
-    }
-    const when = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    setAutoMsg(done.length ? `✅ ${when} · ${done.length === 1 ? "leído 1 PDF nuevo" : `leídos ${done.length} PDF nuevos`}` : `✅ ${when} · los PDF guardados no han cambiado desde la última revisión`);
-  }
-
+  // Descarga en el servidor los PDF de todos los equipos con iden y, para cada uno,
+  // comprueba si los partidos han cambiado respecto a lo guardado (processPdf)
   let updating = false;
   window.cpUpdateAll = async function () {
     if (updating) return;
@@ -1175,70 +997,24 @@
     if (!teams.length) { alert("Escribe primero el iden (4 o 5 dígitos) de algún equipo."); return; }
     if (!navigator.onLine) { alert("Sin conexión: no se pueden descargar los PDF ahora."); return; }
     updating = true;
-    const results = [], pending = [];
-    let autoOk = null;   // se prueba la descarga automática con el primer equipo
+    const results = [];
     try {
-      // 0) Lo mejor: la tarea automática de GitHub descarga todos los PDF en el servidor
-      const why = await runServerDownload(teams);
-      let todo = teams;
-      if (!why) {
-        todo = [];
-        for (let i = 0; i < teams.length; i++) {
-          const team = teams[i], key = getTeamKey(team);
-          mostrarCargando(`Leyendo ${i + 1}/${teams.length}: ${key}...`);
-          let file = null;
-          if (serverResults[key] && serverResults[key] !== "ok") { results.push(`(GitHub no pudo bajar ${key}: ${serverResults[key]})`); ocultarCargando(); todo.push(team); continue; }
-          try { file = await readServerPdf(key); } catch (e) { console.warn(`Sin PDF en GitHub para ${key}:`, e); }
-          ocultarCargando();
-          if (!file) { todo.push(team); continue; }
-          results.push(fmtRes(key, await processPdf(file, file.name, team, true)));
-        }
-      } else console.warn("Descarga en GitHub no disponible:", why);
-      if (why && why !== "sin conexión con GitHub configurada") results.push(`(Descarga automática no disponible: ${why})`);
-
-      // 1) Descarga desde el navegador (directa o por pasarela), uno a uno
-      for (let i = 0; i < todo.length; i++) {
-        const team = todo[i], key = getTeamKey(team), iden = cp.idens[key];
-        if (autoOk === false) { pending.push(team); continue; }
-        mostrarCargando(`Descargando ${i + 1}/${todo.length}: ${key}...`);
-        let file = null;
-        try { file = await downloadFedPdf(iden); autoOk = true; }
-        catch (e) { console.warn("Descarga automática no disponible:", e); if (autoOk === null) autoOk = false; }
-        ocultarCargando();
-        if (!file) { pending.push(team); continue; }
-        await saveTeamPdf(team, file, null, results);
+      await fetchFromGitHub();   // comparar con los datos más recientes, no con los de este dispositivo
+      const run = await runServerDownload(teams);
+      if (run.error) {
+        alert(`No se pudo actualizar automáticamente: ${run.error}.\n\nPuedes subir los PDF a mano con «Actualizar manualmente».`);
+        return;
       }
-
-      // 2) Lo que no se pudo leer: se descarga con el navegador (a Descargas) y se eligen todos de una vez
-      while (pending.length) {
-        for (let i = 0; i < pending.length; i++) {
-          mostrarCargando(`Descargando en tu carpeta Descargas ${i + 1}/${pending.length}...`);
-          browserDownload(FED_URL(cp.idens[getTeamKey(pending[i])]));
-          await wait(1200);   // una a una, con pausa, para que el navegador no bloquee descargas seguidas
-        }
+      for (let i = 0; i < teams.length; i++) {
+        const team = teams[i], key = getTeamKey(team);
+        const st = run.resultados[key];
+        if (st !== "ok") { results.push(`- ${key}: no se pudo descargar (${st || "sin respuesta"})`); continue; }
+        mostrarCargando(`Comprobando ${i + 1}/${teams.length}: ${key}...`);
+        let file = null;
+        try { file = await readServerPdf(key); } catch (e) { console.warn(`Sin PDF guardado para ${key}:`, e); }
         ocultarCargando();
-        const files = await askDownloadedPdfs(pending.length);
-        if (files === "retry") continue;
-        if (!files) { pending.forEach(t => results.push(`- ${getTeamKey(t)}: cancelado`)); break; }
-
-        mostrarCargando("Leyendo los PDF...");
-        const parsed = [];
-        for (const f of files) { try { parsed.push({ f, lines: await pdfLines(f) }); } catch (e) { console.warn(e); } }
-        ocultarCargando();
-        for (const team of pending) {   // a cada equipo, el PDF donde mejor aparece
-          const key = getTeamKey(team);
-          let best = null;
-          parsed.forEach(p => { const m = teamInLines(p.lines, team); if (m && (!best || m.s > best.m.s)) best = { p, m }; });
-          if (!best && parsed.length) {
-            const menu = parsed.map((p, i) => `${i + 1}. ${p.f.name}`).join("\n");
-            const ans = prompt(`${key}: no lo encuentro en ningún PDF.\nEscribe el número del PDF que es suyo (vacío = saltar):\n\n${menu}`);
-            const n = parseInt(ans, 10);
-            if (n >= 1 && n <= parsed.length) best = { p: parsed[n - 1], m: null };
-          }
-          if (!best) { results.push(`- ${key}: no encontrado en los PDF elegidos`); continue; }
-          await saveTeamPdf(team, best.p.f, best.m ? best.m.fed : null, results);
-        }
-        break;
+        if (!file) { results.push(`- ${key}: no se encontró el PDF descargado`); continue; }
+        results.push(fmtRes(key, await processPdf(file, file.name, team, true)));
       }
     } finally {
       updating = false;
@@ -1264,7 +1040,7 @@
   // Acceso para otras partes de la app (carga automática de carteles)
   window.cpGetData = () => cp;
   window.cpGetRange = () => ({ from: (document.getElementById("cpFrom") || {}).value || "", to: (document.getElementById("cpTo") || {}).value || "" });
-  window.cpRefreshFromGitHub = () => autoCheckPdfs();
+  window.cpRefreshFromGitHub = () => fetchFromGitHub();
 
   function init() {
     const from = document.getElementById("cpFrom"), to = document.getElementById("cpTo");
@@ -1283,7 +1059,7 @@
     initDrag();
     setOpen(open);
     renderMatches();
-    if (!(open && subState().teams)) fetchFromGitHub();   // si no, ya lo hace autoCheckPdfs
+    fetchFromGitHub();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

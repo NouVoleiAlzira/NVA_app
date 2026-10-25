@@ -1734,9 +1734,7 @@
     .cp-chg-item.del { border-left-color: #ef4444; }
     .cp-chg-item.mod { border-left-color: #e0a100; }
     .cp-chg-item s { color: var(--niebla); }
-    .cp-auto-msg { font-size: 0.78rem; color: var(--niebla); padding: 4px 4px 8px; border-bottom: 1px solid var(--linea); }
-    .cp-auto-note { margin-top: 12px; font-size: 0.78rem; color: var(--niebla); text-align: center; }
-    .cp-update-btns { display: flex; gap: 8px; margin-top: 6px; }
+    .cp-update-btns { display: flex; gap: 8px; margin: 2px 0 10px; }
     .cp-update-btns .btn-save-session { flex: 1 1 0; width: auto; margin: 0; padding-left: 8px; padding-right: 8px; font-size: 0.85rem; }
     .cp-update-manual { background: var(--btn-fondorAzul); }
     .cp-update-manual.active { box-shadow: inset 0 0 0 2px #fff; }
@@ -1744,11 +1742,8 @@
     .cp-modal-box { background: var(--pista); border: 1px solid var(--linea); border-radius: 14px; max-width: 360px; width: 100%; padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; color: var(--tiza); }
     .cp-modal-title { font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; color: #fff; }
     .cp-modal-txt { font-size: 0.85rem; line-height: 1.4; }
-    .cp-modal-row { display: flex; gap: 8px; }
-    .cp-modal-row .cp-modal-btn { flex: 1; }
     .cp-modal-btn { display: block; text-align: center; text-decoration: none; border: 1px solid var(--linea); background: rgba(233,238,250,0.08); color: #fff; border-radius: 10px; padding: 11px; font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
     .cp-modal-main { background: var(--btn-fondoVerde); border-color: var(--btn-fondoVerde); }
-    .cp-modal-stop { border-color: var(--alzira); color: #fca5a5; }
 
 /* ---------- Importar datos (Excel de jugadores/as, ligas desde PDF) ---------- */
     .imp-btn { padding: 9px; margin: 0; }

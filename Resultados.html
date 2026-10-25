@@ -675,7 +675,7 @@
     <div id="historyModal" class="modal">
         <div class="modal-box">
             <h3>Cargar partidos guardados</h3>
-            <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">Selecciona uno de los últimos 6 partidos guardados en GitHub:</p>
+            <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">Selecciona uno de los últimos 6 partidos guardados:</p>
             <div id="historyAviso" style="color:#bbb; font-size:0.9em; margin-bottom:10px;">Cargando lista de archivos...</div>
             <div class="history-dates-list" id="historyDatesContainer"></div>
         </div>
@@ -685,7 +685,7 @@
     <div id="resultsHistoryModal" class="modal">
         <div class="modal-box">
             <h3>Historial de Resultados</h3>
-            <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">Selecciona uno de los últimos 10 resultados guardados en GitHub:</p>
+            <p style="font-size: 13px; color: #aaa; margin-bottom: 10px;">Selecciona uno de los últimos 10 resultados guardados:</p>
             <div id="resultsHistoryAviso" style="color:#bbb; font-size:0.9em; margin-bottom:10px;">Cargando lista de archivos...</div>
             <div class="history-dates-list" id="resultsHistoryContainer"></div>
         </div>
@@ -1316,7 +1316,7 @@
                     .slice(0, 6);
 
                 if (archivosTxt.length === 0) {
-                    historyAviso.textContent = 'No se ha encontrado ningún partido guardado en GitHub.';
+                    historyAviso.textContent = 'No se ha encontrado ningún partido guardado.';
                     return;
                 }
 
@@ -2293,7 +2293,7 @@
                 }
 
                 const nFotos = fotosUsadas.size;
-                showToast(`Resultados guardados en GitHub (${tarjetas.length} partido(s)${nFotos ? ', ' + nFotos + ' foto(s)' : ''}).`);
+                showToast(`Resultados guardados (${tarjetas.length} partido(s)${nFotos ? ', ' + nFotos + ' foto(s)' : ''}).`);
             } catch (err) {
                 console.error('Error al guardar los resultados en GitHub:', err);
                 showToast('No se han podido guardar los resultados: ' + (err && err.message ? err.message : err), true);
@@ -2322,7 +2322,7 @@
             try {
                 const resp = await fetch(ghContentsUrl(config), { headers: githubHeaders(config), cache: 'no-store' });
                 if (resp.status === 404) {
-                    resultsHistoryAviso.textContent = 'No se ha encontrado ningún resultado guardado en GitHub.';
+                    resultsHistoryAviso.textContent = 'No se ha encontrado ningún resultado guardado.';
                     return;
                 }
                 if (!resp.ok) throw new Error(`GitHub respondió con error ${resp.status}`);
@@ -2334,7 +2334,7 @@
                     .slice(0, 10);
 
                 if (lista.length === 0) {
-                    resultsHistoryAviso.textContent = 'No se ha encontrado ningún resultado guardado en GitHub.';
+                    resultsHistoryAviso.textContent = 'No se ha encontrado ningún resultado guardado.';
                     return;
                 }
 

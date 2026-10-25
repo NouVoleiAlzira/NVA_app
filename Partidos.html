@@ -3867,10 +3867,10 @@
             try {
                 const bloqueNuevo = histConstruirBloqueDatos();
                 const nombreArchivo = await guardarHistoricoEnGitHub(config, bloqueNuevo);
-                mostrarAviso(`✅ Partidos guardados en GitHub como "${nombreArchivo}".`, false);
+                mostrarAviso(`✅ Partidos guardados como "${nombreArchivo}".`, false);
             } catch (err) {
                 console.error('Error al guardar el histórico en GitHub:', err);
-                alert('No se ha podido guardar el histórico en GitHub. Comprueba la configuración y la conexión a internet.\n\n' + (err && err.message ? err.message : ''));
+                alert('No se ha podido guardar el histórico. Comprueba la configuración y la conexión a internet.\n\n' + (err && err.message ? err.message : ''));
             } finally {
                 boton.disabled = false;
                 if (textoBoton) textoBoton.textContent = textoOriginal;
@@ -4032,7 +4032,7 @@
                     .slice(0, 6);
 
                 if (archivosTxt.length === 0) {
-                    aviso.textContent = 'No se ha encontrado ningún archivo de partidos guardado en GitHub.';
+                    aviso.textContent = 'No se ha encontrado ningún archivo de partidos guardado.';
                     return;
                 }
 

@@ -340,9 +340,9 @@
 
     const success = await writeGitHubFile("Tablon.json", tablonData, "Actualizar texto del Tablón");
     if (success) {
-      alert("¡Tablón guardado y sincronizado en GitHub!");
+      alert("¡Tablón guardado y sincronizado!");
     } else {
-      alert("Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+      alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }
   }
 
@@ -2573,7 +2573,7 @@
     sessionData = JSON.parse(JSON.stringify(log.jugadores));
     renderPlayersMain();
     closeHistoryModal();
-    alert(`Se ha cargado el entrenamiento del ${log.fecha} para modificar. Al terminar pulsa "Guardar Entrenamiento en GitHub".`);
+    alert(`Se ha cargado el entrenamiento del ${log.fecha} para modificar. Al terminar pulsa "Guardar Entrenamiento".`);
   }
 
   function promptOwnerPassword() {
@@ -3052,7 +3052,7 @@
     renderWeekCalendar();
     alert(ok
       ? "Registro borrado."
-      : "Registro borrado en este dispositivo. Se eliminará de GitHub cuando recupere la conexión.");
+      : "Registro borrado en este dispositivo. Se eliminará del resto cuando recupere la conexión.");
   }
 
   async function processOfflineQueue() {
@@ -3191,13 +3191,13 @@
         localStorage.setItem("NVA_APP_DATA", JSON.stringify(appData));
 
         renderCoachTeamSelection();
-        if (!silent) alert("¡Configuración sincronizada desde GitHub correctamente!");
+        if (!silent) alert("¡Configuración sincronizada correctamente!");
       } else {
-        if (!silent) alert("No se pudo obtener la configuracion.json desde GitHub.");
+        if (!silent) alert("No se pudo obtener la configuración.");
       }
     } catch (e) { 
       console.error(e); 
-      if (!silent) alert("Error de conexión al sincronizar desde GitHub.");
+      if (!silent) alert("Error de conexión al sincronizar.");
     }
   }
 
@@ -3254,9 +3254,9 @@
     const success = await writeGitHubFile(sessionFileName, logEntry, `Registro entrenamiento ${currentTeam} - ${dateVal}`);
 
     if (success) {
-      alert("¡Entrenamiento guardado y sincronizado en GitHub!");
+      alert("¡Entrenamiento guardado y sincronizado!");
     } else {
-      alert("Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+      alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }
   }
 
@@ -3369,9 +3369,9 @@
     const fileName = `${WARNINGS_FOLDER}/warning_${sanitizeFileName(currentTeam)}.json`;
     const success = await writeGitHubFile(fileName, teamWarnings, `Actualizar warnings - ${currentTeam}`);
     if (success) {
-      alert("¡Warnings guardados y sincronizados en GitHub!");
+      alert("¡Warnings guardados y sincronizados!");
     } else {
-      alert("Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+      alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }
 
     // Vuelve a la pantalla principal y refresca el acordeón de "Gestión y
@@ -4626,9 +4626,9 @@
     const success = await writeGitHubFile(matchFileName, logEntry, `Registro partido ${currentTeam} - ${dateVal}`);
 
     if (success) {
-      alert("¡Partido guardado y sincronizado en GitHub!");
+      alert("¡Partido guardado y sincronizado!");
     } else {
-      alert("Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+      alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }
   }
 
@@ -4735,7 +4735,7 @@
     renderMatchScoreboard();
     renderMatchPlayers();
     closeMatchHistoryModal();
-    alert(`Se ha cargado el partido del ${log.fecha} para modificar. Al terminar pulsa "Guardar Partido en GitHub".`);
+    alert(`Se ha cargado el partido del ${log.fecha} para modificar. Al terminar pulsa "Guardar Partido".`);
   }
 
   // =====================================================================
@@ -4879,7 +4879,7 @@
     persistOtrosLocal();
     renderOtros();
     const ok = await writeGitHubFile(OTROS_FILE, { items: otrosData }, commitMessage);
-    if (!ok) alert("Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+    if (!ok) alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
   }
 
   // --- Pantalla ---
@@ -5109,12 +5109,12 @@
     await withLoading(async () => {
       try {
         await uploadFichaPdf(team, file);
-        alert("Ficha actualizada en GitHub. Puede tardar un minuto en verse publicada.");
+        alert("Ficha actualizada. Puede tardar un minuto en verse publicada.");
       } catch (err) {
         console.error("Error al subir la ficha:", err);
         alert("No se pudo subir el PDF. Revisa la conexión y el token de GitHub.");
       }
-    }, "Subiendo ficha a GitHub...");
+    }, "Subiendo ficha...");
   });
 
   function renderFichasFederacion(box) {
@@ -5319,7 +5319,7 @@
     const el = hzEl("hzStatus");
     if (!el) return;
     el.className = "hz-status" + (hzDirty ? " dirty" : "");
-    el.textContent = hzDirty ? "● Cambios sin guardar en GitHub" : "✔ Sin cambios pendientes de guardar";
+    el.textContent = hzDirty ? "● Cambios sin guardar" : "✔ Sin cambios pendientes de guardar";
   }
 
   // ---------- colores por defecto ----------
@@ -6167,8 +6167,8 @@
     const ok = await writeGitHubFile(HZ_FILE, hz, "Actualizar horarios de entrenamiento");
     // Si no hubo conexión, writeGitHubFile lo deja en la cola offline y se enviará al reconectar.
     hzSetDirty(false);
-    alert(ok ? "¡Horarios guardados y sincronizados en GitHub (Horarios.json)!"
-             : "Guardado localmente. Se sincronizará con GitHub cuando recupere la conexión.");
+    alert(ok ? "¡Horarios guardados y sincronizados!"
+             : "Guardado localmente. Se sincronizará cuando recupere la conexión.");
   }
 
   async function refreshHorarios() {
@@ -6177,10 +6177,10 @@
       return;
     }
     if (!navigator.onLine) { alert("Sin conexión: no se pueden refrescar los Horarios ahora mismo."); return; }
-    if (hzDirty && !confirm("Tienes cambios sin guardar. Si refrescas se perderán y se cargará la versión de GitHub. ¿Continuar?")) return;
+    if (hzDirty && !confirm("Tienes cambios sin guardar. Si refrescas se perderán y se cargará la versión guardada. ¿Continuar?")) return;
     if (hzDirty) hzSetDirty(false);
     if (offlineQueue.length > 0) await processOfflineQueue();
     const ok = await fetchHorariosFromGitHub();
     hzRenderAll();
-    if (!ok) alert("No se encontró Horarios.json en GitHub o no se pudo leer.");
+    if (!ok) alert("No se encontraron los horarios guardados o no se pudieron leer.");
   }

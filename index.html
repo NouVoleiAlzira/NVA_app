@@ -139,7 +139,7 @@
     <div class="section-body" id="secBody_tablon">
       <textarea id="tablonTextarea" class="comment-input-long" placeholder="Escribe aquí las noticias del club..." oninput="autoResizeTablon(this)" onchange="updateTablon(this.value)"></textarea>
       <div style="display:flex; gap:8px;">
-        <button class="btn-save-session" style="flex:1;" onclick="withLoading(saveTablon, 'Guardando Tablón en GitHub...')">💾 Guardar Tablón</button>
+        <button class="btn-save-session" style="flex:1;" onclick="withLoading(saveTablon, 'Guardando Tablón...')">💾 Guardar Tablón</button>
         <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; background: var(--btn-fondoVerde);" onclick="withLoading(refreshTablon, 'Refrescando Tablón...')">🔄 Refrescar</button>
         <button class="btn-save-session" style="flex:1; background: var(--btn-fondoAmarillo);" onclick="openOtros()">🗃️ OTROS</button>
       </div>
@@ -294,7 +294,7 @@
     </div>
 
     <div style="display:flex; gap:8px;">
-      <button class="btn-save-session" style="flex:1; padding:12px; font-size:0.9rem;" onclick="withLoading(saveHorarios, 'Guardando Horarios.json en GitHub...')">💾 Guardar Horarios.json en GitHub</button>
+      <button class="btn-save-session" style="flex:1; padding:12px; font-size:0.9rem;" onclick="withLoading(saveHorarios, 'Guardando Horarios...')">💾 Guardar Horarios</button>
       <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; padding:12px; font-size:0.9rem; background: var(--btn-fondoVerde);" onclick="withLoading(refreshHorarios, 'Refrescando Horarios...')">🔄 Refrescar</button>
     </div>
   </div>
@@ -327,7 +327,7 @@
     </div>
 
     <div id="playersContainer"></div>
-    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveSession, 'Guardando entrenamiento en GitHub...')">💾 Guardar Entrenamiento en GitHub</button>
+    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveSession, 'Guardando entrenamiento...')">💾 Guardar Entrenamiento</button>
   </div>
 
   <!-- PANTALLA: REGISTRO DE PARTIDO -->
@@ -347,14 +347,14 @@
     <div id="matchScoreboard" class="match-scoreboard"></div>
 
     <div id="matchPlayersContainer"></div>
-    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveMatch, 'Guardando partido en GitHub...')">💾 Guardar Partido en GitHub</button>
+    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveMatch, 'Guardando partido...')">💾 Guardar Partido</button>
   </div>
 
   <!-- PANTALLA 3: GESTIÓN DE WARNINGS POR EQUIPO -->
   <div class="screen" id="screenWarnings">
     <div class="section-title" id="warningTeamTitle">Dirección NVA - Equipo</div>
     <div id="warningPlayersContainer"></div>
-    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveWarningsToGitHub, 'Guardando amonestaciones en GitHub...')">💾 Guardar Warning en GitHub</button> 
+    <button class="btn-save-session" style="padding:12px; font-size:0.9rem;" onclick="withLoading(saveWarningsToGitHub, 'Guardando amonestaciones...')">💾 Guardar Warning</button> 
   </div>
 
   <!-- MODALES DE LA APLICACIÓN -->
@@ -462,7 +462,7 @@
         <button class="btn-close-modal" onclick="closeDeleteLogModal()">✕</button>
       </div>
       <p id="deleteLogText" style="font-size:0.9rem; color:#0f172a; line-height:1.4; margin-bottom:6px;"></p>
-      <p style="font-size:0.78rem; color:#b91c1c; font-weight:600; margin-bottom:12px;">Se eliminará también de GitHub y no se puede deshacer.</p>
+      <p style="font-size:0.78rem; color:#b91c1c; font-weight:600; margin-bottom:12px;">Se eliminará para todos y no se puede deshacer.</p>
       <div style="display:flex; gap:8px;">
         <button class="btn-save-session" style="flex:1; background:#64748b;" onclick="closeDeleteLogModal()">Cancelar</button>
         <button class="btn-save-session" style="flex:1; background:linear-gradient(135deg,#ef4444,#b91c1c);" onclick="withLoading(confirmDeleteLog, 'Borrando registro...')">🗑️ Borrar</button>

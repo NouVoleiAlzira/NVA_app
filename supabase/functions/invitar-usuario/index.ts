@@ -40,10 +40,30 @@ Deno.serve(async (req) => {
   if (rol === "propietario") return respuesta(400, { error: "El rol de propietario se asigna desde el panel de usuarios" });
 
   const admin = createClient(url, service);
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { nombre, rol, equipos },
-    redirectTo,
+  const datos = { nombre, rol, equipos };
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { data: datos, redirectTo });
+  if (!error) return respuesta(200, { id: data.user?.id, email, enviado: true });
+  console.error("inviteUserByEmail:", error.status, error.code, error.message);
+
+  if (yaRegistrado(error)) return respuesta(400, { error: "Ya hay una cuenta con ese email" });
+
+  // Si el email no sale (SMTP sin configurar, límite de envíos, dirección no
+  // autorizada...), se crea la invitación igualmente y se devuelve el enlace
+  // para que el propietario lo mande por WhatsApp o como quiera.
+  const { data: enlace, error: errEnlace } = await admin.auth.admin.generateLink({
+    type: "invite", email, options: { data: datos, redirectTo },
   });
-  if (error) return respuesta(400, { error: error.message });
-  return respuesta(200, { id: data.user?.id, email });
+  if (errEnlace) {
+    console.error("generateLink:", errEnlace.status, errEnlace.code, errEnlace.message);
+    if (yaRegistrado(errEnlace)) return respuesta(400, { error: "Ya hay una cuenta con ese email" });
+    return respuesta(400, { error: `${error.message} (${errEnlace.message})` });
+  }
+  return respuesta(200, {
+    id: enlace.user?.id, email, enviado: false,
+    enlace: enlace.properties?.action_link, motivo: error.message,
+  });
 });
+
+function yaRegistrado(e: { code?: string; message?: string }) {
+  return e.code === "email_exists" || /already been registered/i.test(e.message ?? "");
+}

@@ -861,7 +861,8 @@
     .tab-content.active { display: block; }
 
     .config-section {
-      background: #f8fafc;
+      background: #e9eef5;
+      border: 1px solid #dde4ee;
       border-radius: 10px;
       padding: 10px;
       margin-bottom: 10px;

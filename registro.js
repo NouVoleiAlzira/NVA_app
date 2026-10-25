@@ -1,13 +1,12 @@
 // ===== Historial de cambios (registro cronológico de acciones) =====
 // Anota cada cambio que crea, modifica o borra registros (guardados en GitHub) con
-// día, hora, descripción y quién la hizo. Se guarda primero en el dispositivo
-// y se envía a GitHub en Historial/historial_<AAAA-MM>.json para que se vea
-// lo de todos los entrenadores y dispositivos.
+// día, hora, descripción y el usuario que la hizo (el que ha iniciado sesión).
+// Se guarda primero en el dispositivo y se envía a GitHub en
+// Historial/historial_<AAAA-MM>.json para que se vea lo de todos los usuarios.
 (function () {
   "use strict";
   const PEND_KEY = "NVA_HISTORIAL_PEND";
   const CACHE_KEY = "NVA_HISTORIAL_CACHE";
-  const DEV_KEY = "NVA_DEVICE_ID";
   const FOLDER = "Historial";
   const MAX_CACHE = 800;
   const origFetch = window.fetch.bind(window);
@@ -15,9 +14,8 @@
   function lsGet(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch (e) { return def; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
-  let deviceId = "";
-  try { deviceId = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
-  if (!deviceId) { deviceId = "D" + Math.random().toString(36).slice(2, 7).toUpperCase(); try { localStorage.setItem(DEV_KEY, deviceId); } catch (e) {} }
+  // Restos de cuando el historial se identificaba por dispositivo
+  try { ["NVA_DEVICE_ID", "NVA_DISP_NOMBRES", "NVA_DISP_ENTRENADORES"].forEach(k => localStorage.removeItem(k)); } catch (e) {}
 
   function gh() { try { return typeof ghSettings !== "undefined" ? ghSettings : null; } catch (e) { return null; } }
 
@@ -32,6 +30,15 @@
     return "";
   }
 
+  // Usuario que ha iniciado sesión (nva-supabase.js): «Nombre (correo)»
+  function usuario() {
+    try {
+      const p = window.nva && window.nva.perfil;
+      if (p) return p.nombre ? `${p.nombre} (${p.email})` : p.email || "";
+    } catch (e) {}
+    return "";
+  }
+
   function pantalla() {
     const a = document.querySelector(".screen.active");
     if (!a || a.id === "screenCoachTeam") return "";
@@ -42,7 +49,7 @@
   function registrar(tipo, texto, extra) {
     texto = String(texto || "").replace(/\s+/g, " ").trim();
     if (!texto) return;
-    const e = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: new Date().toISOString(), tipo, texto: texto.slice(0, 200), quien: quien(), disp: deviceId, pant: pantalla() };
+    const e = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: new Date().toISOString(), tipo, texto: texto.slice(0, 200), quien: quien(), usuario: usuario(), pant: pantalla() };
     if (extra) e.extra = extra;
     const pend = lsGet(PEND_KEY, []); pend.push(e); lsSet(PEND_KEY, pend);
     programarEnvio(tipo === "anulacion" ? 3000 : undefined);
@@ -146,7 +153,7 @@
     if (!box) return;
     document.getElementById("histEstado").textContent = estado || "";
     const q = (document.getElementById("histBuscar").value || "").toLowerCase();
-    const items = lista.filter(e => (e.tipo === filtro || e.tipo === "anulacion") && (!q || (e.texto + " " + nombreDisp(e.disp)).toLowerCase().includes(q)));
+    const items = lista.filter(e => (e.tipo === filtro || e.tipo === "anulacion") && e.usuario && (!q || (e.texto + " " + autor(e)).toLowerCase().includes(q)));
     if (!items.length) { box.innerHTML = '<p class="hist-vacio">No hay cambios registrados.</p>'; return; }
     let html = "", dia = "";
     items.forEach(e => {
@@ -154,81 +161,19 @@
       const k = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
       if (k !== dia) { dia = k; html += `<div class="hist-dia">${esc(k.charAt(0).toUpperCase() + k.slice(1))}</div>`; }
       const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      html += `<div class="hist-item hist-${e.tipo}"><div class="hist-hora">${hora}</div><div class="hist-txt">${esc(e.texto)}<div class="hist-quien">${esc(nombreDisp(e.disp))}${e.pend ? " · ⏳ pendiente de enviar" : ""}</div>${deshacerHtml(e)}</div></div>`;
+      html += `<div class="hist-item hist-${e.tipo}"><div class="hist-hora">${hora}</div><div class="hist-txt">${esc(e.texto)}<div class="hist-quien">${esc(autor(e))}${e.pend ? " · ⏳ pendiente de enviar" : ""}</div>${deshacerHtml(e)}</div></div>`;
     });
     box.innerHTML = html;
   }
 
-  // --- Nombres de dispositivos (Historial/dispositivos.json, compartido) ---
-  const NOM_KEY = "NVA_DISP_NOMBRES";
-  const ENT_KEY = "NVA_DISP_ENTRENADORES";
-  let nombres = lsGet(NOM_KEY, {});
-  let entrenDisp = lsGet(ENT_KEY, {});   // código de dispositivo -> id del entrenador
-  function nombreDisp(c) { return nombres[c] || c || ""; }
-  // dispositivos.json: { <código>: <nombre>, ..., "__entrenadores": { <código>: <id entrenador> } }
-  function cargarDisp(data) {
-    data = Object.assign({}, data || {});
-    entrenDisp = data.__entrenadores || {};
-    delete data.__entrenadores;
-    nombres = data;
-    lsSet(NOM_KEY, nombres); lsSet(ENT_KEY, entrenDisp);
-  }
-  function coachesLista() { try { return (typeof appData !== "undefined" && appData.coaches) || []; } catch (e) { return []; } }
-  window.nvaDispositivo = () => deviceId;
-  window.nvaEntrenadorDelDispositivo = () => entrenDisp[deviceId];
-  window.nvaEntrenadoresAsignados = () => entrenDisp;
-  window.nvaRecargarDispositivos = async () => { const g = gh(); if (g && g.user && g.token) cargarDisp((await leerNombres(g)).data); };
-  function urlNombres(g) { return `https://api.github.com/repos/${g.user}/${g.repo}/contents/${FOLDER}/dispositivos.json`; }
-  async function leerNombres(g) {
-    const r = await origFetch(urlNombres(g), { headers: { Authorization: `token ${g.token}` }, cache: "no-store" });
-    if (r.status === 404) return { sha: "", data: {} };
-    if (!r.ok) throw new Error("GET " + r.status);
-    const j = await r.json();
-    let data = {};
-    try { data = JSON.parse(b64dec(j.content)) || {}; } catch (e) {}
-    return { sha: j.sha, data };
-  }
-
-  window.histConfig = function (abrir) {
-    document.getElementById("histConfig").hidden = !abrir;
-    document.getElementById("histPrincipal").hidden = abrir;
-    if (!abrir) return;
-    const cods = [...new Set(ultimaLista.map(e => e.disp).filter(Boolean).concat(Object.keys(nombres), Object.keys(entrenDisp), [deviceId]))].sort();
-    const coaches = coachesLista();
-    document.getElementById("histDispList").innerHTML = '<div class="hist-disp-cab"><span>Código</span><span>Nombre</span><span>Entrenador</span></div>' + cods.map(c =>
-      `<label class="hist-disp"><span class="hist-disp-cod">${esc(c)}${c === deviceId ? " (este)" : ""}</span><input class="app-input" data-cod="${esc(c)}" value="${esc(nombres[c] || "")}" placeholder="Nombre del dispositivo"><select class="app-input hist-disp-ent" data-cod="${esc(c)}"><option value="">— Entrenador —</option>${coaches.map(x => `<option value="${esc(x.id)}"${String(entrenDisp[c]) === String(x.id) ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>`).join("");
-    document.getElementById("histConfEstado").textContent = "";
-  };
-  window.histGuardarNombres = async function () {
-    const est = document.getElementById("histConfEstado");
-    const nuevos = {};
-    const ents = {};
-    document.querySelectorAll("#histDispList input").forEach(i => { const v = i.value.trim(); if (v) nuevos[i.dataset.cod] = v; });
-    document.querySelectorAll("#histDispList select").forEach(i => { if (i.value) ents[i.dataset.cod] = i.value; });
-    const g = gh();
-    est.textContent = "Guardando…";
-    try {
-      if (!navigator.onLine || !g || !g.user || !g.token) throw new Error("offline");
-      for (let intento = 0; intento < 3; intento++) {
-        const { sha, data } = await leerNombres(g);
-        const entPrev = data.__entrenadores || {};
-        document.querySelectorAll("#histDispList input").forEach(i => { delete data[i.dataset.cod]; delete entPrev[i.dataset.cod]; });
-        Object.assign(data, nuevos);
-        data.__entrenadores = Object.assign(entPrev, ents);
-        const body = { message: "Nombres de dispositivos del historial", content: b64enc(JSON.stringify(data, null, 1)) };
-        if (sha) body.sha = sha;
-        const r = await origFetch(urlNombres(g), { method: "PUT", headers: { Authorization: `token ${g.token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        if (r.ok) { cargarDisp(data); histConfig(false); pintar(ultimaLista, ""); return; }
-        if (r.status !== 409 && r.status !== 422) break;
-      }
-      est.textContent = "No se pudo guardar. Inténtalo de nuevo.";
-    } catch (e) { est.textContent = "Sin conexión: no se pudo guardar."; }
-  };
+  // Quién hizo el cambio. Los cambios anteriores al inicio de sesión no tienen
+  // usuario y no se muestran (el historial empieza de cero con los usuarios).
+  function autor(e) { return e.usuario || ""; }
+  window.nvaUsuario = usuario;
 
   let ultimaLista = [];
   window.openHistorial = async function () {
     document.getElementById("modalHistorial").classList.add("active");
-    histConfig(false);
     const pendientes = () => lsGet(PEND_KEY, []).map(e => Object.assign({}, e, { pend: true }));
     const mezclar = base => { const m = new Map(base.map(x => [x.id, x])); pendientes().forEach(x => m.set(x.id, x)); return [...m.values()].sort((a, b) => a.t < b.t ? 1 : -1); };
     ultimaLista = mezclar(lsGet(CACHE_KEY, []));
@@ -241,7 +186,6 @@
       const meses = [0, 1].map(i => { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); });
       let todos = [];
       for (const m of meses) todos = todos.concat((await leerMes(g, m)).items);
-      try { cargarDisp((await leerNombres(g)).data); } catch (e) {}
       try { if (window.nvaRecargarAnulaciones) await window.nvaRecargarAnulaciones(); } catch (e) {}
       ultimaLista = mezclar(guardarCache(todos));
       pintar(ultimaLista, "");

@@ -774,7 +774,7 @@
 
         <div class="config-section">
           <div class="config-subtitle">Sincronización y Mantenimiento</div>
-          <button class="btn-save-session" style="background: var(--azul-primary); padding:8px; margin-top:4px;" onclick="withLoading(syncConfigFromGitHub, 'Sincronizando...')">Sincronizar ahora</button>
+          <button class="btn-save-session" style="background: var(--azul-primary); padding:8px; margin-top:4px;" onclick="withLoading(() => fullSyncFromGitHub(false), 'Sincronizando...')">Sincronizar ahora</button>
           
           <button class="btn-danger-action" style="padding:8px; margin-top:12px;" onclick="clearAllLocalStorageData()">🗑️ Borrar Todos los Datos Locales (Storage)</button>
         </div>

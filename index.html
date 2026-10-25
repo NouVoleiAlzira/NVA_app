@@ -660,7 +660,7 @@
       </div>
 
       <div class="tabs-nav">
-        <button class="tab-btn active" onclick="switchTab(1)">Entrenadores</button>
+        <button class="tab-btn active" onclick="switchTab(1)">Entrenadores y equipos</button>
         <button class="tab-btn" onclick="switchTab(2)">Jugadores/as y Equipos</button>
         <button class="tab-btn" onclick="switchTab(3)">Ligas</button>
         <button class="tab-btn" data-nva-tab="usuarios" onclick="switchTab(4); nvaPintarPanelUsuarios()">Usuarios y permisos</button>
@@ -670,11 +670,8 @@
       <div class="tab-content active" id="tabContent1">
         <div class="config-section">
           <div class="config-subtitle">Entrenadores <span class="badge" id="coachCountBadge">0</span></div>
-          <div class="input-group">
-            <input type="text" id="newCoachName" class="app-input" placeholder="Nombre Entrenador/a">
-            <button class="btn-add" onclick="addCoach()">+</button>
-          </div>
           <div class="item-list" id="configCoachesList"></div>
+          <p style="font-size:0.72rem; color:#64748b; margin-top:6px;">Son los usuarios con el rol Entrenador. Se crean en la pestaña «Usuarios y permisos».</p>
         </div>
 
         <div class="config-section">

@@ -367,8 +367,7 @@
     .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
     .nva-check input{width:18px;height:18px;margin:0}
     .nva-tabla .nva-col-rol{width:30%}
-    .nva-tabla .nva-col-equipos{width:30%}
-    .nva-tabla .nva-col-activo{width:44px;text-align:center}
+        .nva-tabla .nva-col-activo{width:44px;text-align:center}
     .nva-permisos td{vertical-align:middle}
     .nva-permisos .nva-col-acceso{width:110px}
     .nva-seccion{display:block;width:100%;box-sizing:border-box}
@@ -746,32 +745,23 @@
     const abiertas = new Set(Array.from(caja.querySelectorAll("details.nva-seccion[open]")).map(d => d.dataset.seccion));
     const desplegados = new Set(Array.from(caja.querySelectorAll(".nva-plegar[aria-expanded=true]")).map(b => b.dataset.menu));
     caja.innerHTML = "<p>Cargando...</p>";
-    const [u, r, m, p, c] = await Promise.all([
+    const [u, r, m, p] = await Promise.all([
       sb.from("perfiles").select("*").order("email"),
       sb.from("roles").select("*").order("nivel", { ascending: false }),
       sb.from("menus").select("*").order("orden"),
-      sb.from("permisos_rol").select("*"),
-      sb.from("archivos").select("contenido").eq("ruta", "configuracion.json").maybeSingle()
+      sb.from("permisos_rol").select("*")
     ]);
     if (u.error || r.error || m.error || p.error) { caja.innerHTML = "<p>No se pudo cargar (¿sin conexión?).</p>"; return; }
     const roles = r.data, menus = m.data;
     const principales = menus.filter(x => !x.padre);
     const hijos = id => menus.filter(x => x.padre === id);
 
-    // Equipos de cada usuario: los del entrenador que se llama igual (Opciones › Entrenadores)
     const normNombre = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
-    let entrenadores = [];
-    try { entrenadores = JSON.parse(c.data.contenido).coaches || []; } catch (_) { }
-    const equiposDe = nombre => {
-      const en = normNombre(nombre) && entrenadores.find(x => normNombre(x.name) === normNombre(nombre));
-      return en ? (en.teams || []).length ? en.teams.join(", ") : "Sin equipos" : "—";
-    };
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
         <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><span class="nva-email" hidden>${esc(x.email)}</span></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
-        <td class="nva-nota">${esc(equiposDe(x.nombre))}</td>
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
 
@@ -808,16 +798,16 @@
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
         <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>`) +
       seccion("usuarios", "Usuarios", `
-        <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-equipos">Equipos</th><th class="nva-col-activo">Activo</th></tr></thead>
+        <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
-        <p class="nva-nota">Los equipos son los del entrenador que se llama igual que el usuario (Opciones › Entrenadores). Dos usuarios no pueden tener el mismo nombre.</p>
+        <p class="nva-nota">Los usuarios con rol Entrenador son los entrenadores de la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre.</p>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <p id="nvaPermFijo" class="nva-nota" hidden>El propietario siempre puede editarlo todo.</p>
         <table class="nva-tabla nva-permisos"><thead><tr><th>Menú</th><th class="nva-col-acceso">Acceso</th></tr></thead>
         <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
-        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
+        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores y equipos. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>`) +
       seccion("roles", "Roles", `
         <table class="nva-tabla nva-roles"><thead><tr><th>Rol</th><th class="nva-col-num">Usuarios</th><th class="nva-col-borrar"></th></tr></thead>
@@ -863,13 +853,14 @@
       const email = caja.querySelector("#nvaInvEmail").value.trim();
       const nombre = caja.querySelector("#nvaInvNombre").value.trim();
       if (!email) return alert("Escribe el email.");
-      if (!nombre) return alert("Escribe el nombre. Si es entrenador, el mismo que tiene en Opciones › Entrenadores.");
+      if (!nombre) return alert("Escribe el nombre del usuario.");
       if (repetido(u.data.map(x => x.nombre).concat(nombre))) return alert(`Ya hay un usuario que se llama «${nombre}».`);
       const { data, error: e } = await sb.functions.invoke("invitar-usuario", { body: {
         email, nombre, rol: caja.querySelector("#nvaInvRol").value, redirectTo: location.origin + location.pathname
       } });
       if (e || (data && data.error)) return alert("No se pudo invitar: " + ((data && data.error) || e.message));
       alert(`Invitación enviada a ${email}.`);
+      if (window.nvaSincronizarEntrenadores) await window.nvaSincronizarEntrenadores();
       pintarPanelUsuarios();
     };
     caja.querySelector("#nvaGuardarUsuarios").onclick = async () => {
@@ -886,6 +877,7 @@
         if (e) return alert("Error guardando usuarios: " + e.message);
       }
       alert("Usuarios guardados.");
+      if (window.nvaSincronizarEntrenadores) await window.nvaSincronizarEntrenadores();
       pintarPanelUsuarios();
     };
     caja.querySelector("#nvaGuardarPermisos").onclick = async () => {
@@ -964,8 +956,19 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "NVA_SUPABASE_AUTH" }
     });
   }
+  // Usuarios con rol Entrenador (son los entrenadores de Opciones › Entrenadores y equipos).
+  // Solo el propietario ve todos los perfiles; para el resto devuelve null.
+  async function entrenadores() {
+    if (!sb || !perfil || perfil.rol !== "propietario") return null;
+    const { data, error } = await sb.from("perfiles").select("id,email,nombre").eq("rol", "entrenador").eq("activo", true);
+    if (error || !data) return null;
+    return data.map(x => ({ id: x.id, email: x.email, nombre: (x.nombre || "").trim() || x.email.split("@")[0] }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+
   window.nva = {
     get cliente() { return sb; },
+    entrenadores,
     get perfil() { return perfil; },
     acceso,
     listo,

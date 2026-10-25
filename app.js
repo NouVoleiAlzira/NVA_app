@@ -2605,6 +2605,7 @@
       if (offlineQueue.length > 0) await processOfflineQueue();
       await syncConfigFromGitHub(true);
     }
+    await syncCoachesWithUsers();
     renderConfigTab1();
     renderConfigTab2Select();
     document.getElementById("modalOptions").classList.add("active");
@@ -2628,13 +2629,13 @@
     coachesList.innerHTML = "";
     document.getElementById("coachCountBadge").innerText = appData.coaches.length;
 
-    appData.coaches.forEach((c, idx) => {
+    appData.coaches.forEach(c => {
       const row = document.createElement("div");
       row.className = "item-row";
-      row.innerHTML = `<span><strong>${escapeHtml(c.name)}</strong> (${c.teams ? c.teams.length : 0} eq.)</span>
-                       <button class="btn-del" onclick="deleteCoach(${idx})">✕</button>`;
+      row.innerHTML = `<span><strong>${escapeHtml(coachLabel(c))}</strong> (${c.teams ? c.teams.length : 0} eq.)</span>`;
       coachesList.appendChild(row);
     });
+    if (!appData.coaches.length) coachesList.innerHTML = `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay entrenadores. Invítalos con el rol Entrenador en «Usuarios y permisos».</p>`;
 
     const teamsList = document.getElementById("configTeamsList");
     teamsList.innerHTML = "";
@@ -2653,22 +2654,37 @@
     appData.coaches.forEach(c => {
       const opt = document.createElement("option");
       opt.value = c.id;
-      opt.innerText = c.name;
+      opt.innerText = coachLabel(c);
       selectCoach.appendChild(opt);
     });
     renderCoachAssignments();
   }
 
-  function addCoach() {
-    const input = document.getElementById("newCoachName");
-    const name = input.value.trim();
-    if (!name) return;
-    appData.coaches.push({ id: Date.now(), name: name, teams: [] });
-    input.value = "";
+  function coachLabel(c) { return c.email ? `${c.name} (${c.email})` : c.name; }
+
+  // Los entrenadores son los usuarios con rol Entrenador (Opciones › Usuarios y permisos).
+  // Solo el propietario puede leerlos: al abrir Opciones o cambiar usuarios se rehace la
+  // lista conservando los equipos de cada uno (por usuario o, la primera vez, por nombre).
+  async function syncCoachesWithUsers() {
+    let users = null;
+    try { users = window.nva && window.nva.entrenadores ? await window.nva.entrenadores() : null; } catch (e) {}
+    if (!users) return;
+    const norm = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const usados = new Set();
+    const coaches = users.map((u, i) => {
+      const prev = appData.coaches.find(c => c.usuario === u.id && !usados.has(c))
+        || appData.coaches.find(c => !c.usuario && norm(c.name) === norm(u.nombre) && !usados.has(c));
+      if (prev) usados.add(prev);
+      return { id: prev ? prev.id : Date.now() + i, name: u.nombre, email: u.email, usuario: u.id, teams: prev ? prev.teams || [] : [] };
+    });
+    if (JSON.stringify(coaches) === JSON.stringify(appData.coaches)) return;
+    appData.coaches = coaches;
     saveDataAndSyncGitHub();
   }
-
-  function deleteCoach(idx) { appData.coaches.splice(idx, 1); saveDataAndSyncGitHub(); }
+  window.nvaSincronizarEntrenadores = async () => {
+    await syncCoachesWithUsers();
+    if (document.getElementById("modalOptions").classList.contains("active")) renderConfigTab1();
+  };
 
   function addTeam() {
     const inputName = document.getElementById("newTeamName");

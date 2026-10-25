@@ -362,7 +362,7 @@
     .nva-tabla th{vertical-align:middle;font-size:.75rem;color:#475569}
     .nva-tabla .nva-email{display:block;font-size:.72rem;color:#64748b;margin-top:4px;overflow-wrap:anywhere}
     .nva-tabla .nva-email[hidden]{display:none}
-    .nva-tabla select,.nva-tabla input[type=text],.nva-multi summary{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.8rem;color:#0f172a;margin:0}
+    .nva-tabla select,.nva-tabla input[type=text]{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.8rem;color:#0f172a;margin:0}
     .nva-tabla select:disabled{background:#f1f5f9;color:#94a3b8}
     .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
     .nva-check input{width:18px;height:18px;margin:0}
@@ -371,19 +371,6 @@
     .nva-tabla .nva-col-activo{width:44px;text-align:center}
     .nva-permisos td{vertical-align:middle}
     .nva-permisos .nva-col-acceso{width:110px}
-    .nva-multi{position:relative;margin:0 0 8px}
-    .nva-tabla .nva-multi{margin:0}
-    .nva-multi summary{display:flex;align-items:center;gap:6px;cursor:pointer;list-style:none;user-select:none}
-    .nva-multi summary::-webkit-details-marker{display:none}
-    .nva-multi summary span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .nva-multi summary::after{content:"▾";color:#64748b}
-    .nva-multi.grande summary{height:auto;padding:8px 10px;font-size:.82rem}
-    .nva-equipos{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(300px,85vw);box-sizing:border-box;display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(15,23,42,.18)}
-    .nva-tabla .nva-equipos{left:auto;right:0}
-    .nva-equipos label{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#0f172a;padding:6px;border-radius:6px;cursor:pointer}
-    .nva-equipos label:hover{background:#f1f5f9}
-    .nva-equipos input{margin:0;flex:none}
-    .nva-equipos p{margin:4px;font-size:.75rem;color:#64748b}
     .nva-seccion{display:block;width:100%;box-sizing:border-box}
     .nva-seccion > summary{cursor:pointer;list-style:none;user-select:none}
     .nva-seccion > summary::-webkit-details-marker{display:none}
@@ -749,7 +736,6 @@
   // ------------------------------------------------------------------
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
 
-  let cierreDesplegables = false;
   let rolPermisosElegido = null;
   const ROLES_BASE = ["propietario", "administrador", "entrenador", "lectura"];
   async function pintarPanelUsuarios() {
@@ -772,24 +758,20 @@
     const principales = menus.filter(x => !x.padre);
     const hijos = id => menus.filter(x => x.padre === id);
 
-    // Equipos del club (Opciones › Equipos, en configuracion.json) con el mismo
-    // nombre que usa la app: «Nombre (Categoría)». Se añaden los que ya tenga
-    // asignados algún usuario aunque ya no existan, para no perderlos al guardar.
-    let equiposClub = [];
-    try { equiposClub = (JSON.parse(c.data.contenido).teams || []).map(t => `${t.name} (${t.category})`); } catch (_) { }
-    u.data.forEach(x => (x.equipos || []).forEach(e => { if (!equiposClub.includes(e)) equiposClub.push(e); }));
-    equiposClub = [...new Set(equiposClub)].sort((a, b) => a.localeCompare(b, "es"));
-    const resumenEquipos = sel => sel.length ? sel.length === 1 ? sel[0] : `${sel.length} equipos` : "Ninguno";
-    // Desplegable con casillas para elegir varios equipos
-    const desplegableEquipos = (sel, clase = "") => `<details class="nva-multi ${clase}"><summary><span>${esc(resumenEquipos(sel))}</span></summary><div class="nva-equipos">${equiposClub.length
-      ? equiposClub.map(e => `<label><input type="checkbox" value="${esc(e)}"${sel.includes(e) ? " checked" : ""}>${esc(e)}</label>`).join("")
-      : "<p>No hay equipos. Créalos primero en Opciones.</p>"}</div></details>`;
+    // Equipos de cada usuario: los del entrenador que se llama igual (Opciones › Entrenadores)
+    const normNombre = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+    let entrenadores = [];
+    try { entrenadores = JSON.parse(c.data.contenido).coaches || []; } catch (_) { }
+    const equiposDe = nombre => {
+      const en = normNombre(nombre) && entrenadores.find(x => normNombre(x.name) === normNombre(nombre));
+      return en ? (en.teams || []).length ? en.teams.join(", ") : "Sin equipos" : "—";
+    };
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
         <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><span class="nva-email" hidden>${esc(x.email)}</span></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
-        <td data-campo="equipos">${desplegableEquipos(x.equipos || [])}</td>
+        <td class="nva-nota">${esc(equiposDe(x.nombre))}</td>
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
 
@@ -823,22 +805,19 @@
         <input type="email" id="nvaInvEmail" class="app-input" placeholder="Email">
         <input type="text" id="nvaInvNombre" class="app-input" placeholder="Nombre">
         <select id="nvaInvRol" class="app-input">${roles.filter(x => x.id !== "propietario").map(x => `<option value="${esc(x.id)}"${x.id === "entrenador" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
-        <div id="nvaInvEquiposCaja">
-          <div style="font-size:.8rem;color:#475569;margin-bottom:4px">Equipos que entrena:</div>
-          <div id="nvaInvEquipos">${desplegableEquipos([], "grande")}</div>
-        </div>
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
         <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>`) +
       seccion("usuarios", "Usuarios", `
         <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-equipos">Equipos</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
+        <p class="nva-nota">Los equipos son los del entrenador que se llama igual que el usuario (Opciones › Entrenadores). Dos usuarios no pueden tener el mismo nombre.</p>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <p id="nvaPermFijo" class="nva-nota" hidden>El propietario siempre puede editarlo todo.</p>
         <table class="nva-tabla nva-permisos"><thead><tr><th>Menú</th><th class="nva-col-acceso">Acceso</th></tr></thead>
         <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
-        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
+        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>`) +
       seccion("roles", "Roles", `
         <table class="nva-tabla nva-roles"><thead><tr><th>Rol</th><th class="nva-col-num">Usuarios</th><th class="nva-col-borrar"></th></tr></thead>
@@ -851,22 +830,8 @@
         <button class="btn-save-session" id="nvaCrearRol">➕ Crear rol</button>
         <p class="nva-nota">Después ajusta sus permisos en «Permisos por rol». Los roles de partida no se pueden borrar.</p>`);
 
-    const marcados = nodo => Array.from(nodo.querySelectorAll("input[type=checkbox]:checked")).map(x => x.value);
-    const rolInv = caja.querySelector("#nvaInvRol");
-    const rolConEquipos = id => !!(roles.find(x => x.id === id) || {}).restringir_equipos;
-    const verEquiposInv = () => { caja.querySelector("#nvaInvEquiposCaja").hidden = !rolConEquipos(rolInv.value); };
-    rolInv.onchange = verEquiposInv;
-    verEquiposInv();
-    caja.querySelectorAll("details.nva-multi").forEach(d => d.addEventListener("change", () => {
-      d.querySelector("summary span").textContent = resumenEquipos(marcados(d));
-    }));
-    if (!cierreDesplegables) {
-      // Un clic fuera cierra los desplegables de equipos abiertos
-      cierreDesplegables = true;
-      document.addEventListener("click", e => document.querySelectorAll("details.nva-multi[open]").forEach(d => {
-        if (!d.contains(e.target)) d.open = false;
-      }));
-    }
+    // Los nombres de usuario no se pueden repetir (sin contar mayúsculas ni espacios de más)
+    const repetido = (nombres) => nombres.map(normNombre).filter(Boolean).find((n, i, a) => a.indexOf(n) !== i);
     caja.querySelectorAll(".nva-info").forEach(b => b.onclick = () => {
       const email = b.closest("td").querySelector(".nva-email");
       email.hidden = !email.hidden;
@@ -896,10 +861,12 @@
 
     caja.querySelector("#nvaInvitar").onclick = async () => {
       const email = caja.querySelector("#nvaInvEmail").value.trim();
+      const nombre = caja.querySelector("#nvaInvNombre").value.trim();
       if (!email) return alert("Escribe el email.");
+      if (!nombre) return alert("Escribe el nombre. Si es entrenador, el mismo que tiene en Opciones › Entrenadores.");
+      if (repetido(u.data.map(x => x.nombre).concat(nombre))) return alert(`Ya hay un usuario que se llama «${nombre}».`);
       const { data, error: e } = await sb.functions.invoke("invitar-usuario", { body: {
-        email, nombre: caja.querySelector("#nvaInvNombre").value.trim(), rol: caja.querySelector("#nvaInvRol").value,
-        equipos: rolConEquipos(rolInv.value) ? marcados(caja.querySelector("#nvaInvEquipos")) : [], redirectTo: location.origin + location.pathname
+        email, nombre, rol: caja.querySelector("#nvaInvRol").value, redirectTo: location.origin + location.pathname
       } });
       if (e || (data && data.error)) return alert("No se pudo invitar: " + ((data && data.error) || e.message));
       alert(`Invitación enviada a ${email}.`);
@@ -907,11 +874,12 @@
     };
     caja.querySelector("#nvaGuardarUsuarios").onclick = async () => {
       const filas = Array.from(caja.querySelectorAll("#nvaUsuarios tr"));
+      const rep = repetido(filas.map(tr => tr.querySelector("[data-campo=nombre]").value));
+      if (rep) return alert(`Hay dos usuarios con el mismo nombre («${rep}»). Cambia uno de ellos.`);
       for (const tr of filas) {
         const cambios = {
           nombre: tr.querySelector("[data-campo=nombre]").value.trim() || null,
           rol: tr.querySelector("[data-campo=rol]").value,
-          equipos: marcados(tr.querySelector("[data-campo=equipos]")),
           activo: tr.querySelector("[data-campo=activo]").checked
         };
         const { error: e } = await sb.from("perfiles").update(cambios).eq("id", tr.dataset.id);

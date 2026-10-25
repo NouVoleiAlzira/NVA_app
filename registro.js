@@ -7,7 +7,6 @@
   "use strict";
   const PEND_KEY = "NVA_HISTORIAL_PEND";
   const CACHE_KEY = "NVA_HISTORIAL_CACHE";
-  const DEV_KEY = "NVA_DEVICE_ID";
   const FOLDER = "Historial";
   const MAX_CACHE = 800;
   const origFetch = window.fetch.bind(window);
@@ -15,9 +14,8 @@
   function lsGet(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch (e) { return def; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
-  let deviceId = "";
-  try { deviceId = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
-  if (!deviceId) { deviceId = "D" + Math.random().toString(36).slice(2, 7).toUpperCase(); try { localStorage.setItem(DEV_KEY, deviceId); } catch (e) {} }
+  // Restos de cuando el historial se identificaba por dispositivo
+  try { ["NVA_DEVICE_ID", "NVA_DISP_NOMBRES", "NVA_DISP_ENTRENADORES"].forEach(k => localStorage.removeItem(k)); } catch (e) {}
 
   function gh() { try { return typeof ghSettings !== "undefined" ? ghSettings : null; } catch (e) { return null; } }
 
@@ -32,11 +30,11 @@
     return "";
   }
 
-  // Usuario que ha iniciado sesión (nva-supabase.js)
+  // Usuario que ha iniciado sesión (nva-supabase.js): «Nombre (correo)»
   function usuario() {
     try {
       const p = window.nva && window.nva.perfil;
-      if (p) return p.nombre || (p.email || "").split("@")[0];
+      if (p) return p.nombre ? `${p.nombre} (${p.email})` : p.email || "";
     } catch (e) {}
     return "";
   }
@@ -51,7 +49,7 @@
   function registrar(tipo, texto, extra) {
     texto = String(texto || "").replace(/\s+/g, " ").trim();
     if (!texto) return;
-    const e = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: new Date().toISOString(), tipo, texto: texto.slice(0, 200), quien: quien(), usuario: usuario(), disp: deviceId, pant: pantalla() };
+    const e = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: new Date().toISOString(), tipo, texto: texto.slice(0, 200), quien: quien(), usuario: usuario(), pant: pantalla() };
     if (extra) e.extra = extra;
     const pend = lsGet(PEND_KEY, []); pend.push(e); lsSet(PEND_KEY, pend);
     programarEnvio(tipo === "anulacion" ? 3000 : undefined);
@@ -155,7 +153,7 @@
     if (!box) return;
     document.getElementById("histEstado").textContent = estado || "";
     const q = (document.getElementById("histBuscar").value || "").toLowerCase();
-    const items = lista.filter(e => (e.tipo === filtro || e.tipo === "anulacion") && (!q || (e.texto + " " + autor(e)).toLowerCase().includes(q)));
+    const items = lista.filter(e => (e.tipo === filtro || e.tipo === "anulacion") && e.usuario && (!q || (e.texto + " " + autor(e)).toLowerCase().includes(q)));
     if (!items.length) { box.innerHTML = '<p class="hist-vacio">No hay cambios registrados.</p>'; return; }
     let html = "", dia = "";
     items.forEach(e => {
@@ -168,10 +166,9 @@
     box.innerHTML = html;
   }
 
-  // Quién hizo el cambio: el usuario. Los cambios anteriores al inicio de sesión
-  // no lo tienen: se usa el nombre que tenía su dispositivo (si se le puso) o su código.
-  const nombresDisp = lsGet("NVA_DISP_NOMBRES", {});
-  function autor(e) { return e.usuario || nombresDisp[e.disp] || e.disp || ""; }
+  // Quién hizo el cambio. Los cambios anteriores al inicio de sesión no tienen
+  // usuario y no se muestran (el historial empieza de cero con los usuarios).
+  function autor(e) { return e.usuario || ""; }
   window.nvaUsuario = usuario;
 
   let ultimaLista = [];

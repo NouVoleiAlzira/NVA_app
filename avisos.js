@@ -2,8 +2,8 @@
 // Dirección elige días (esta semana o la anterior); se revisa, para cada
 // entrenador, qué entrenamientos (según Horarios.json) y partidos (según el
 // calendario) de sus equipos no tienen registro. Los avisos se guardan en
-// GitHub (Historial/avisos.json) y le salen al entrenador al abrir la app con
-// su usuario (mismo nombre que el entrenador o, si no, alguno de sus equipos).
+// GitHub (Historial/avisos.json) y le salen a cada entrenador del equipo al
+// abrir la app con su usuario (el usuario que se llama igual que el entrenador).
 (function () {
   "use strict";
   const AV_FILE = "Historial/avisos.json";
@@ -21,16 +21,11 @@
     try { if (typeof getCoachTeamEntries === "function") return getCoachTeamEntries(c); } catch (e) {}
     return (c.teams || []).map(t => ({ teamKey: t, name: t }));
   }
-  // Entrenadores que corresponden a un usuario de la app: los que se llaman como
-  // él; si ninguno, los que llevan alguno de sus equipos (Opciones › Usuarios).
-  function norm(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
-  function coachesDeUsuario(p) {
-    if (!p) return [];
-    const n = norm(p.nombre);
-    const porNombre = n ? coaches().filter(c => { const cn = norm(c.name); return cn === n || cn.startsWith(n + " ") || n.startsWith(cn + " "); }) : [];
-    if (porNombre.length) return porNombre;
-    const eqs = new Set(p.equipos || []);
-    return eqs.size ? coaches().filter(c => equiposDe(c).some(e => eqs.has(e.name) || eqs.has(e.teamKey))) : [];
+  // El entrenador de un usuario es el que se llama igual (los nombres de usuario no se repiten)
+  function norm(s) { return String(s || "").toLowerCase().replace(/\s+/g, " ").trim(); }
+  function coachDeUsuario(p) {
+    const n = norm(p && p.nombre);
+    return n ? coaches().find(c => norm(c.name) === n) || null : null;
   }
   // Ids de los entrenadores que tienen usuario (solo quien gestiona usuarios puede verlos todos)
   let conUsuario = null;
@@ -39,10 +34,10 @@
     try {
       const sb = window.nva && window.nva.cliente;
       if (!sb) return;
-      const { data, error } = await sb.from("perfiles").select("nombre,equipos,activo");
+      const { data, error } = await sb.from("perfiles").select("nombre,activo");
       if (error || !data || data.length < 2) return;
       conUsuario = new Set();
-      data.filter(p => p.activo).forEach(p => coachesDeUsuario(p).forEach(c => conUsuario.add(String(c.id))));
+      data.filter(p => p.activo).forEach(p => { const c = coachDeUsuario(p); if (c) conUsuario.add(String(c.id)); });
     } catch (e) {}
   }
 
@@ -206,20 +201,16 @@
     try {
       if (window.nva && window.nva.listo) await window.nva.listo;
       if (window.nvaRecargarAnulaciones) await window.nvaRecargarAnulaciones();
-      const mios = coachesDeUsuario(window.nva && window.nva.perfil);
-      if (!mios.length) return;
+      const c = coachDeUsuario(window.nva && window.nva.perfil);
+      if (!c) return;
       const { data } = await leer(g, AV_FILE);
-      let c = null, pend = [];
-      for (const x of mios) {
-        const av = data && data.avisos && data.avisos[x.id];
-        if (!av || !(av.items || []).length) continue;
-        const ok = await enLotes(av.items, it => registrado(g, it).catch(() => false), 6);
-        const p = av.items.filter((it, i) => !ok[i] && !(it.tipo === "match" ? anulP(it.team, it.date, it.rival || "") : anulE(it.team, it.date)));
-        if (p.length) { c = c || x; pend = pend.concat(p); }
-      }
+      const av = data && data.avisos && data.avisos[c.id];
+      if (!av || !(av.items || []).length) return;
+      const ok = await enLotes(av.items, it => registrado(g, it).catch(() => false), 6);
+      const pend = av.items.filter((it, i) => !ok[i] && !(it.tipo === "match" ? anulP(it.team, it.date, it.rival || "") : anulE(it.team, it.date)));
       if (!pend.length) return;
       document.getElementById("avAvisoTxt").innerHTML =
-        `<p><b>${esc(c.name || "")}</b>, no constan registrados:</p><ul>${pend.map(it => `<li>${esc(lineaItem(it))}</li>`).join("")}</ul><p>Por favor, regístralos lo antes posible. ¡Gracias!</p>`;
+        `<p><b>${esc(c.name || av.nombre || "")}</b>, no constan registrados:</p><ul>${pend.map(it => `<li>${esc(lineaItem(it))}</li>`).join("")}</ul><p>Por favor, regístralos lo antes posible. ¡Gracias!</p>`;
       document.getElementById("modalAvisoEntrenador").classList.add("active");
       try { sessionStorage.setItem("nvaAvisoVisto", "1"); } catch (e) {}
     } catch (e) {}

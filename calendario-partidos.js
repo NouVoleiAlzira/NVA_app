@@ -947,7 +947,8 @@
   }
 
   // ---------- Resultados en los registros de partido (Partidos/Partidos_<equipo>_<fecha>.json) ----------
-  // Tras leer los PDF, el marcador de cada partido jugado pasa al registro de ese equipo y ese día.
+  // Tras leer los PDF, el marcador de cada partido jugado pasa al registro de ese equipo y ese día,
+  // solo si el registro ya existe (no se crean registros nuevos).
   // Sin resultado grabado: se graba. Igual al grabado: no se toca. Distinto: se pregunta.
 
   // Resultado del texto de la fila del PDF: "LOCAL 3 - 1 (25-20/18-25/25-22/25-19) VISITANTE"
@@ -1018,12 +1019,7 @@
     });
   }
   async function saveResultToMatchLog(p, marcador) {
-    let log = findLog(p);
-    if (!log) {
-      const coach = (appData.coaches || []).find(c => (c.teams || []).includes(p.key));
-      log = { fecha: p.fecha, equipo: p.key, entrenador: coach ? coach.name : "", jugadores: [] };
-      allMatchLogs.push(log);
-    }
+    const log = findLog(p);
     log.marcador = marcador;
     localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
     return writeGitHubFile(`${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(p.key)}_${p.fecha}.json`, log, `Resultado partido ${p.key} - ${p.fecha}`);
@@ -1039,9 +1035,11 @@
         if (offlineQueue.length > 0) await processOfflineQueue();
         await fetchMatchLogsFromGitHub();
       }
+      const conRegistro = played.filter(findLog);
+      if (!conRegistro.length) return "";
       const nuevos = [], distintos = [];
-      played.forEach(p => {
-        const nuevo = buildMarcador(p), log = findLog(p), old = log && log.marcador;
+      conRegistro.forEach(p => {
+        const nuevo = buildMarcador(p), old = findLog(p).marcador;
         const oldTxt = marcadorTxt(old);
         if (!oldTxt) nuevos.push({ p, nuevo });
         else if (oldTxt !== marcadorTxt(nuevo)) distintos.push({ p, nuevo, old });
@@ -1049,8 +1047,8 @@
       let reescribir = [];
       if (distintos.length) { ocultarCargando(); reescribir = await askOverwrite(distintos); mostrarCargando("Guardando los resultados en los registros de partido..."); }
       for (const c of nuevos.concat(reescribir)) await saveResultToMatchLog(c.p, c.nuevo);
-      const iguales = played.length - nuevos.length - distintos.length;
-      return `Registros de partido: ${nuevos.length} nuevo(s), ${reescribir.length} reescrito(s), ${iguales} sin cambios` +
+      const iguales = conRegistro.length - nuevos.length - distintos.length;
+      return `Resultados en registros de partido: ${nuevos.length} grabado(s), ${reescribir.length} reescrito(s), ${iguales} sin cambios` +
         (distintos.length - reescribir.length ? `, ${distintos.length - reescribir.length} sin reescribir` : "") + ".";
     } catch (e) {
       console.error(e);

@@ -176,7 +176,7 @@
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
     const r = await fetch(api(path), { method: "PUT", headers: hdr({ "Content-Type": "application/json" }),
       body: JSON.stringify({ message: msg, content, ...(sha && { sha }) }) });
-    if (!r.ok) throw new Error(`No se ha podido guardar en GitHub (${r.status}).`);
+    if (!r.ok) throw new Error(`No se ha podido guardar (${r.status}).`);
   }
 
   async function blobUrl(path) {

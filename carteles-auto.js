@@ -210,7 +210,7 @@
     const range = await askDates(tipo, range0);
     if (!range) return;
     if (window.cpRefreshFromGitHub && typeof ghSettings !== "undefined" && ghSettings.token && navigator.onLine) {
-      mostrarCargando("Revisando los PDF guardados en GitHub...");
+      mostrarCargando("Revisando los PDF guardados...");
       // La revisión oculta la pantalla de carga entre PDF y PDF: se mantiene visible hasta terminar
       const ov = document.getElementById("loadingOverlay");
       const keep = new MutationObserver(() => { if (ov && !ov.classList.contains("active")) ov.classList.add("active"); });

@@ -74,7 +74,7 @@
     usarMatriz(d);
     try { localStorage.setItem("NVA_KM_MATRIZ", JSON.stringify(d)); } catch (e) {}
     const ok = await writeGitHubFile(MATRIZ_GH, d, "Actualizar matriz de distancias");
-    alert(ok ? "Distancias actualizadas y guardadas en GitHub." : "Distancias actualizadas en este dispositivo. Se subirán a GitHub cuando haya conexión.");
+    alert(ok ? "Distancias actualizadas y guardadas." : "Distancias actualizadas en este dispositivo. Se subirán cuando haya conexión.");
     return true;
   }
   function campoDe(m) {
@@ -169,7 +169,7 @@
     try { localStorage.setItem(claveLocal(), JSON.stringify(d)); } catch (e) {}
     st.guardado = d.guardado; pintar(o);
     const ok = await writeGitHubFile(archivo(), d, `Kilometraje ${etiquetaRango()}`);
-    alert(ok ? "Reporte de kilometraje guardado y sincronizado en GitHub." : "Guardado en este dispositivo. Se sincronizará con GitHub cuando haya conexión.");
+    alert(ok ? "Reporte de kilometraje guardado y sincronizado." : "Guardado en este dispositivo. Se sincronizará cuando haya conexión.");
   }
 
   const datosEvento = (f) => ({ evento: true, date: f.date, time: f.time, concepto: f.concepto, ciudad: f.ciudad, equipo: "Otro evento", rival: f.concepto, venue: f.ciudad, home: false, coach: f.coach, sust: false });

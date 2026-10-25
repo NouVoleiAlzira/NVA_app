@@ -159,7 +159,7 @@
       const s = await sha(p);
       const r = await fetch(url(p), { method: "PUT", headers: h({ "Content-Type": "application/json" }),
         body: JSON.stringify({ message: msg, content, ...(s && { sha: s }) }) });
-      if (!r.ok) throw new Error(`No se ha podido guardar en GitHub (${r.status}).`);
+      if (!r.ok) throw new Error(`No se ha podido guardar (${r.status}).`);
     }
     return {
       async json(p) {

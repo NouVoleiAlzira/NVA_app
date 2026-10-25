@@ -352,8 +352,8 @@
       <span id="ghStatusText">Comprobando conexión GitHub...</span>
     </div>
     <div class="toolbar-actions">
-      <button class="btn-secondary" id="ghLoadBtn" type="button" style="padding: 5px 10px; font-size: 12px;">⬇ Cargar de GitHub</button>
-      <button class="btn-github" id="ghSaveBtn" type="button" style="padding: 5px 10px; font-size: 12px;">☁️ Guardar en GitHub</button>
+      <button class="btn-secondary" id="ghLoadBtn" type="button" style="padding: 5px 10px; font-size: 12px;">⬇ Cargar</button>
+      <button class="btn-github" id="ghSaveBtn" type="button" style="padding: 5px 10px; font-size: 12px;">☁️ Guardar</button>
     </div>
   </div>
 
@@ -547,16 +547,16 @@
       });
 
       if (putRes.ok) {
-        showExportMsg('✔ Horarios guardados con éxito en GitHub.', true);
+        showExportMsg('✔ Horarios guardados con éxito.', true);
       } else {
         throw new Error('Error al responder GitHub API (' + putRes.status + ')');
       }
     } catch (err) {
       console.error(err);
-      showExportMsg('Error al guardar en GitHub: ' + err.message);
+      showExportMsg('Error al guardar: ' + err.message);
     } finally {
       saveBtn.disabled = false;
-      saveBtn.textContent = '☁️ Guardar en GitHub';
+      saveBtn.textContent = '☁️ Guardar';
     }
   }
 
@@ -580,17 +580,17 @@
           state = normalizeState(parsed);
           saveState();
           renderAll();
-          showExportMsg('✔ Datos cargados correctamente desde GitHub.', true);
+          showExportMsg('✔ Datos cargados correctamente.', true);
         }
       } else {
-        showExportMsg('No se encontró el archivo de horarios en GitHub.');
+        showExportMsg('No se encontró el archivo de horarios.');
       }
     } catch (err) {
       console.error(err);
-      showExportMsg('Error al cargar de GitHub: ' + err.message);
+      showExportMsg('Error al cargar: ' + err.message);
     } finally {
       loadBtn.disabled = false;
-      loadBtn.textContent = '⬇ Cargar de GitHub';
+      loadBtn.textContent = '⬇ Cargar';
     }
   }
 

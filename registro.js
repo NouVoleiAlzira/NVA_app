@@ -221,8 +221,8 @@
         if (r.ok) { cargarDisp(data); histConfig(false); pintar(ultimaLista, ""); return; }
         if (r.status !== 409 && r.status !== 422) break;
       }
-      est.textContent = "No se pudo guardar en GitHub. Inténtalo de nuevo.";
-    } catch (e) { est.textContent = "Sin conexión: no se pudo guardar en GitHub."; }
+      est.textContent = "No se pudo guardar. Inténtalo de nuevo.";
+    } catch (e) { est.textContent = "Sin conexión: no se pudo guardar."; }
   };
 
   let ultimaLista = [];
@@ -232,7 +232,7 @@
     const pendientes = () => lsGet(PEND_KEY, []).map(e => Object.assign({}, e, { pend: true }));
     const mezclar = base => { const m = new Map(base.map(x => [x.id, x])); pendientes().forEach(x => m.set(x.id, x)); return [...m.values()].sort((a, b) => a.t < b.t ? 1 : -1); };
     ultimaLista = mezclar(lsGet(CACHE_KEY, []));
-    pintar(ultimaLista, "Cargando desde GitHub…");
+    pintar(ultimaLista, "Cargando…");
     const g = gh();
     if (!navigator.onLine || !g || !g.user || !g.token) { pintar(ultimaLista, "Sin conexión: se muestra lo guardado en este dispositivo."); return; }
     try {
@@ -245,7 +245,7 @@
       try { if (window.nvaRecargarAnulaciones) await window.nvaRecargarAnulaciones(); } catch (e) {}
       ultimaLista = mezclar(guardarCache(todos));
       pintar(ultimaLista, "");
-    } catch (e) { pintar(ultimaLista, "No se pudo leer GitHub: se muestra lo guardado en este dispositivo."); }
+    } catch (e) { pintar(ultimaLista, "No se pudieron leer los datos: se muestra lo guardado en este dispositivo."); }
   };
   window.closeHistorial = function () { document.getElementById("modalHistorial").classList.remove("active"); };
   window.histBuscar = function () { pintar(ultimaLista, document.getElementById("histEstado").textContent); };

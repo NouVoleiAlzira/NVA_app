@@ -262,7 +262,7 @@
 
   async function importLeagues() {
     if (!(ghSettings.user && ghSettings.repo)) { alert("Configura primero la conexión con GitHub (pestaña Conexión GitHub)."); return; }
-    if (!navigator.onLine) { alert("Hace falta conexión para leer los PDF de GitHub."); return; }
+    if (!navigator.onLine) { alert("Hace falta conexión para leer los PDF guardados."); return; }
     const teams = appData.teams.slice();
     if (!teams.length) { alert("No hay equipos configurados."); return; }
     let cpData = {};

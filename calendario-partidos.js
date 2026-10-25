@@ -1063,7 +1063,7 @@
     let saved = "";
     if (/(con cambios|nuevo)$/.test(res)) {
       mostrarCargando(`Guardando ${fname}...`);
-      saved = (await savePdfToGitHub(key, file)) ? "" : " (PDF no guardado en GitHub)";
+      saved = (await savePdfToGitHub(key, file)) ? "" : " (PDF no guardado)";
       ocultarCargando();
     }
     results.push(fmtRes(key, res, saved));
@@ -1096,7 +1096,7 @@
       const idens = {};
       teams.forEach(t => { idens[getTeamKey(t)] = cp.idens[getTeamKey(t)]; });
       const ok = await writeGitHubFile(`${PDF_FOLDER}/solicitud.json`, { id, pedido: new Date().toISOString(), idens }, "Solicitar descarga de PDF de partidos");
-      if (!ok) return "no se pudo escribir la solicitud en GitHub";
+      if (!ok) return "no se pudo escribir la solicitud";
       // Esperar a que la tarea termine (máx. 5 min)
       for (let i = 0; i < 60; i++) {
         await wait(5000);
@@ -1144,7 +1144,7 @@
       await fetchFromGitHub();   // primero los datos más recientes, para comparar con la última revisión real
       for (let i = 0; i < teams.length; i++) {
         const team = teams[i], key = getTeamKey(team);
-        setAutoMsg(`🔄 Revisando los PDF de GitHub (${i + 1}/${teams.length})...`);
+        setAutoMsg(`🔄 Revisando los PDF guardados (${i + 1}/${teams.length})...`);
         let date = null;
         try { date = await pdfDateInGitHub(key); } catch (e) { console.warn(e); }
         if (!date) continue;
@@ -1165,7 +1165,7 @@
       try { localStorage.setItem(AUTO_SEEN, JSON.stringify(seen)); } catch (e) {}
     }
     const when = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    setAutoMsg(done.length ? `✅ ${when} · ${done.length === 1 ? "leído 1 PDF nuevo" : `leídos ${done.length} PDF nuevos`} de GitHub` : `✅ ${when} · los PDF de GitHub no han cambiado desde la última revisión`);
+    setAutoMsg(done.length ? `✅ ${when} · ${done.length === 1 ? "leído 1 PDF nuevo" : `leídos ${done.length} PDF nuevos`}` : `✅ ${when} · los PDF guardados no han cambiado desde la última revisión`);
   }
 
   let updating = false;
@@ -1194,7 +1194,7 @@
           results.push(fmtRes(key, await processPdf(file, file.name, team, true)));
         }
       } else console.warn("Descarga en GitHub no disponible:", why);
-      if (why && why !== "sin conexión con GitHub configurada") results.push(`(Descarga en GitHub no disponible: ${why})`);
+      if (why && why !== "sin conexión con GitHub configurada") results.push(`(Descarga automática no disponible: ${why})`);
 
       // 1) Descarga desde el navegador (directa o por pasarela), uno a uno
       for (let i = 0; i < todo.length; i++) {

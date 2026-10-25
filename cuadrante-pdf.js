@@ -66,7 +66,7 @@
       cache: "no-store",
       headers: { "Authorization": `token ${ghSettings.token}`, "Accept": "application/vnd.github.raw" }
     });
-    if (r.status === 404) throw new Error("no hay PDF de competición en GitHub");
+    if (r.status === 404) throw new Error("no hay PDF de competición guardado");
     if (!r.ok) throw new Error("GitHub respondió " + r.status);
     return r.arrayBuffer();
   }

@@ -1744,6 +1744,9 @@
     .cp-modal-txt { font-size: 0.85rem; line-height: 1.4; }
     .cp-modal-btn { display: block; text-align: center; text-decoration: none; border: 1px solid var(--linea); background: rgba(233,238,250,0.08); color: #fff; border-radius: 10px; padding: 11px; font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
     .cp-modal-main { background: var(--btn-fondoVerde); border-color: var(--btn-fondoVerde); }
+    .cp-modal-row { display: flex; gap: 8px; }
+    .cp-modal-row .cp-modal-btn { flex: 1; }
+    .cp-modal-stop { border-color: var(--alzira); color: #fca5a5; }
 
 /* ---------- Importar datos (Excel de jugadores/as, ligas desde PDF) ---------- */
     .imp-btn { padding: 9px; margin: 0; }

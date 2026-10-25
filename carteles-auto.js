@@ -5,8 +5,8 @@
    Antes de abrir la página del cartel se muestra una ventana con los
    partidos para elegir cuáles se pasan. Los datos viajan a Partidos.html /
    Resultados.html por localStorage (NVA_CARTEL_AUTO).
-   Al cargar resultados también se rellena el marcador del registro del
-   partido (carpeta Partidos/ de GitHub) de ese equipo y ese día.
+   El marcador de los registros de partido se rellena al actualizar los
+   PDF en «Calendario de partidos», no aquí.
    ===================================================================== */
 (function () {
   "use strict";
@@ -19,15 +19,6 @@
   const fmtDay = (s) => { const [y, m, d] = s.split("-"); return `${d}/${m}/${y}`; };
   const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   const dayName = (s) => DIAS[new Date(s + "T12:00:00").getDay()];
-
-  // Resultado del texto de la fila del PDF: "LOCAL 3 - 1 (25-20/18-25/25-22/25-19) VISITANTE"
-  function parseResult(raw) {
-    const m = String(raw || "").match(/\s(\d)\s*-\s*(\d)\s*\(([\d\s\-\/]+)\)/);
-    if (!m) return null;
-    const sets = m[3].split("/").map(x => x.trim().match(/^(\d+)\s*-\s*(\d+)$/)).filter(Boolean)
-      .map(x => ({ local: parseInt(x[1], 10), visitante: parseInt(x[2], 10) }));
-    return { setsL: parseInt(m[1], 10), setsV: parseInt(m[2], 10), sets };
-  }
 
   // Fin de semana anterior (o el actual si hoy es sábado o domingo) para los resultados
   function lastWeekend() {
@@ -56,7 +47,7 @@
         if (!m.date || m.date < from || m.date > to) return;
         const mk = [key, m.date, m.rival, m.jornada].join("|");
         const home = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
-        const res = results ? parseResult(m.raw) : null;
+        const res = results && window.cpParseResult ? window.cpParseResult(m.raw) : null;
         out.push({ key, team: { name: team.name, category: team.category }, fecha: m.date, hora: m.time && m.time !== "00:00" ? m.time : "",
           rival: m.rival || "", home, campo: m.venue || "", res });
       });
@@ -95,7 +86,7 @@
         items = from && to ? collect(from, to, results) : [];
         const ok = items.filter(p => !results || p.res).length;
         info.innerHTML = items.length
-          ? `${ok} partido${ok === 1 ? "" : "s"}${results && ok < items.length ? ` con resultado (${items.length - ok} todavía sin resultado)` : ""}. Marca los que quieras pasar al cartel${results ? " y al registro del partido" : ""}.`
+          ? `${ok} partido${ok === 1 ? "" : "s"}${results && ok < items.length ? ` con resultado (${items.length - ok} todavía sin resultado)` : ""}. Marca los que quieras pasar al cartel.`
           : `No hay partidos de los equipos del club entre esas fechas en «Calendario de partidos».`;
         list.innerHTML = items.map((p, i) => {
           const local = p.home ? p.key : apos(p.rival), visit = p.home ? apos(p.rival) : p.key;
@@ -116,61 +107,6 @@
         done({ sel, from: o.querySelector(".ca-from").value, to: o.querySelector(".ca-to").value });
       };
     });
-  }
-
-  // ---------- Resultado en el registro del partido (Partidos/Partidos_<equipo>_<fecha>.json) ----------
-  function buildMarcador(p) {
-    return {
-      local: p.home ? p.key : p.rival,
-      visitante: p.home ? p.rival : p.key,
-      sets: Array.from({ length: MATCH_SETS_COUNT }, (_, i) => p.res.sets[i] || { local: null, visitante: null }),
-      setsLocal: p.res.setsL,
-      setsVisitante: p.res.setsV
-    };
-  }
-  const findLog = (p) => allMatchLogs.find(l => l.equipo === p.key && l.fecha === p.fecha);
-  const numOrNull = (v) => (v === "" || v == null || isNaN(+v)) ? null : +v;
-  // Texto del marcador para comparar y para enseñarlo: "3-1 (25-20, 18-25, 25-22, 25-19)"
-  function marcadorTxt(m) {
-    if (!m) return "";
-    const sets = (m.sets || []).map(x => [numOrNull(x && x.local), numOrNull(x && x.visitante)])
-      .filter(x => x[0] != null || x[1] != null).map(x => `${x[0] ?? "-"}-${x[1] ?? "-"}`);
-    const tot = numOrNull(m.setsLocal) == null && numOrNull(m.setsVisitante) == null ? "" : `${numOrNull(m.setsLocal) ?? "-"}-${numOrNull(m.setsVisitante) ?? "-"}`;
-    return (tot + (sets.length ? ` (${sets.join(", ")})` : "")).trim();
-  }
-  // Partidos cuyo resultado ya estaba grabado y es distinto: se pregunta cuáles se reescriben
-  function askOverwrite(list) {
-    return new Promise((resolve) => {
-      const o = document.createElement("div");
-      o.className = "cp-modal";
-      o.innerHTML = `<div class="cp-modal-box imp-box">
-        <div class="cp-modal-title">✏️ Resultados distintos a los grabados</div>
-        <div class="cp-modal-txt">Estos partidos ya tienen un resultado grabado en su registro que no coincide con el del PDF. Marca los que quieras reescribir.</div>
-        <div class="imp-list">${list.map((c, i) => `<label class="imp-item ca-item"><input type="checkbox" data-i="${i}" checked>
-          <span><b>${fmtDay(c.p.fecha)} · ${esc(c.p.key)}</b> ${c.p.home ? "🏠" : "✈️"} ${esc(apos(c.p.rival))}<br>
-          Grabado: <s>${esc(marcadorTxt(c.old))}</s><br>Nuevo: <b class="ca-score">${esc(marcadorTxt(c.nuevo))}</b></span></label>`).join("")}</div>
-        <div class="cp-modal-row">
-          <button class="cp-modal-btn cp-modal-stop">No reescribir</button>
-          <button class="cp-modal-btn cp-modal-main">Reescribir marcados</button>
-        </div>
-      </div>`;
-      document.body.appendChild(o);
-      const done = (v) => { o.remove(); resolve(v); };
-      o.querySelector(".cp-modal-stop").onclick = () => done([]);
-      o.querySelector(".cp-modal-main").onclick = () => done(Array.from(o.querySelectorAll("input:checked")).map(c => list[+c.dataset.i]));
-    });
-  }
-
-  async function saveResultToMatchLog(p, marcador) {
-    let log = findLog(p);
-    if (!log) {
-      const coach = (appData.coaches || []).find(c => (c.teams || []).includes(p.key));
-      log = { fecha: p.fecha, equipo: p.key, entrenador: coach ? coach.name : "", jugadores: [] };
-      allMatchLogs.push(log);
-    }
-    log.marcador = marcador;
-    localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
-    return writeGitHubFile(`${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(p.key)}_${p.fecha}.json`, log, `Resultado partido ${p.key} - ${p.fecha}`);
   }
 
   // ---------- Primero solo las fechas (sin leer nada todavía) ----------
@@ -217,37 +153,8 @@
     const ans = await askMatches(tipo, range);
     if (!ans) return;
 
-    let resumenRegistro = "";
-    if (results) {
-      // Registros de partido: se sincronizan antes para no pisar datos de otros dispositivos
-      mostrarCargando("Guardando los resultados en los registros de partido...");
-      try {
-        if (ghSettings.user && ghSettings.repo && navigator.onLine) {
-          if (offlineQueue.length > 0) await processOfflineQueue();
-          await fetchMatchLogsFromGitHub();
-        }
-        // Sin resultado grabado: se graba. Igual al grabado: no se toca. Distinto: se pregunta.
-        const nuevos = [], distintos = [];
-        ans.sel.forEach(p => {
-          const nuevo = buildMarcador(p), log = findLog(p), old = log && log.marcador;
-          const oldTxt = marcadorTxt(old);
-          if (!oldTxt) nuevos.push({ p, nuevo });
-          else if (oldTxt !== marcadorTxt(nuevo)) distintos.push({ p, nuevo, old });
-        });
-        let reescribir = [];
-        if (distintos.length) { ocultarCargando(); reescribir = await askOverwrite(distintos); mostrarCargando("Guardando los resultados en los registros de partido..."); }
-        for (const c of nuevos.concat(reescribir)) await saveResultToMatchLog(c.p, c.nuevo);
-        const iguales = ans.sel.length - nuevos.length - distintos.length;
-        resumenRegistro = `Registros de partido: ${nuevos.length} nuevo(s), ${reescribir.length} reescrito(s), ${iguales} sin cambios` +
-          (distintos.length - reescribir.length ? `, ${distintos.length - reescribir.length} sin reescribir` : "") + ".";
-      } catch (e) {
-        console.error(e);
-        alert("No se pudieron guardar todos los resultados en los registros de partido: " + e.message);
-      } finally { ocultarCargando(); }
-    }
-
     const datos = {
-      tipo, creado: new Date().toISOString(), desde: ans.from, hasta: ans.to, resumenRegistro,
+      tipo, creado: new Date().toISOString(), desde: ans.from, hasta: ans.to,
       partidos: ans.sel.map(p => ({ team: p.team, key: p.key, fecha: p.fecha, hora: p.hora, rival: p.rival, home: p.home, campo: p.campo,
         setsL: p.res ? p.res.setsL : null, setsV: p.res ? p.res.setsV : null }))
     };

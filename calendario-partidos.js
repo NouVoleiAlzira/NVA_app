@@ -747,6 +747,10 @@
     const key = getTeamKey(team);
     const res = await processPdf(file, `${sanitizeFileName(key)}.pdf`, team, false);
     if (/(con cambios|nuevo)$/.test(res)) savePdfToGitHub(key, file);   // copia del PDF en Calendarios/<Equipo>.pdf
+    if (/partidos · /.test(res)) {
+      const reg = await syncResults([key]);
+      if (reg) alert(`${key}\n${reg}`);
+    }
   }
 
   // Analiza un PDF y guarda los partidos del equipo. batch = actualización automática
@@ -942,6 +946,116 @@
     } catch (e) { console.error("No se pudo guardar el PDF en GitHub:", e); return false; }
   }
 
+  // ---------- Resultados en los registros de partido (Partidos/Partidos_<equipo>_<fecha>.json) ----------
+  // Tras leer los PDF, el marcador de cada partido jugado pasa al registro de ese equipo y ese día,
+  // solo si el registro ya existe (no se crean registros nuevos).
+  // Sin resultado grabado: se graba. Igual al grabado: no se toca. Distinto: se pregunta.
+
+  // Resultado del texto de la fila del PDF: "LOCAL 3 - 1 (25-20/18-25/25-22/25-19) VISITANTE"
+  function parseResult(raw) {
+    const m = String(raw || "").match(/\s(\d)\s*-\s*(\d)\s*\(([\d\s\-\/]+)\)/);
+    if (!m) return null;
+    const sets = m[3].split("/").map(x => x.trim().match(/^(\d+)\s*-\s*(\d+)$/)).filter(Boolean)
+      .map(x => ({ local: parseInt(x[1], 10), visitante: parseInt(x[2], 10) }));
+    return { setsL: parseInt(m[1], 10), setsV: parseInt(m[2], 10), sets };
+  }
+  window.cpParseResult = parseResult;
+  // En los PDF el apóstrofo sale como coma: "L,ILLA" -> "L'ILLA"
+  const apos = (t) => String(t || "").replace(/([A-Za-zÀ-ÿ]),(?=[A-Za-zÀ-ÿ])/g, "$1'");
+
+  // Partidos con resultado de esos equipos (con el cambio local/visitante aplicado)
+  function playedMatches(keys) {
+    const out = [];
+    keys.forEach(key => {
+      ((cp.teams[key] || {}).matches || []).forEach(m => {
+        const res = parseResult(m.raw);
+        if (!res || !m.date) return;
+        const mk = moveKey(key, m);
+        const home = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
+        out.push({ key, fecha: m.date, rival: m.rival || "", home, res });
+      });
+    });
+    return out;
+  }
+  function buildMarcador(p) {
+    return {
+      local: p.home ? p.key : p.rival,
+      visitante: p.home ? p.rival : p.key,
+      sets: Array.from({ length: MATCH_SETS_COUNT }, (_, i) => p.res.sets[i] || { local: null, visitante: null }),
+      setsLocal: p.res.setsL,
+      setsVisitante: p.res.setsV
+    };
+  }
+  const findLog = (p) => allMatchLogs.find(l => l.equipo === p.key && l.fecha === p.fecha);
+  const numOrNull = (v) => (v === "" || v == null || isNaN(+v)) ? null : +v;
+  // Texto del marcador para comparar y para enseñarlo: "3-1 (25-20, 18-25, 25-22, 25-19)"
+  function marcadorTxt(m) {
+    if (!m) return "";
+    const sets = (m.sets || []).map(x => [numOrNull(x && x.local), numOrNull(x && x.visitante)])
+      .filter(x => x[0] != null || x[1] != null).map(x => `${x[0] ?? "-"}-${x[1] ?? "-"}`);
+    const tot = numOrNull(m.setsLocal) == null && numOrNull(m.setsVisitante) == null ? "" : `${numOrNull(m.setsLocal) ?? "-"}-${numOrNull(m.setsVisitante) ?? "-"}`;
+    return (tot + (sets.length ? ` (${sets.join(", ")})` : "")).trim();
+  }
+  // Partidos cuyo resultado ya estaba grabado y es distinto: se pregunta cuáles se reescriben
+  function askOverwrite(list) {
+    return new Promise((resolve) => {
+      const o = document.createElement("div");
+      o.className = "cp-modal";
+      o.innerHTML = `<div class="cp-modal-box imp-box">
+        <div class="cp-modal-title">✏️ Resultados distintos a los grabados</div>
+        <div class="cp-modal-txt">Estos partidos ya tienen un resultado grabado en su registro que no coincide con el del PDF. Marca los que quieras reescribir.</div>
+        <div class="imp-list">${list.map((c, i) => `<label class="imp-item ca-item"><input type="checkbox" data-i="${i}" checked>
+          <span><b>${fmtDay(c.p.fecha)} · ${esc(c.p.key)}</b> ${c.p.home ? "🏠" : "✈️"} ${esc(apos(c.p.rival))}<br>
+          Grabado: <s>${esc(marcadorTxt(c.old))}</s><br>Nuevo: <b class="ca-score">${esc(marcadorTxt(c.nuevo))}</b></span></label>`).join("")}</div>
+        <div class="cp-modal-row">
+          <button class="cp-modal-btn cp-modal-stop">No reescribir</button>
+          <button class="cp-modal-btn cp-modal-main">Reescribir marcados</button>
+        </div>
+      </div>`;
+      document.body.appendChild(o);
+      const done = (v) => { o.remove(); resolve(v); };
+      o.querySelector(".cp-modal-stop").onclick = () => done([]);
+      o.querySelector(".cp-modal-main").onclick = () => done(Array.from(o.querySelectorAll("input:checked")).map(c => list[+c.dataset.i]));
+    });
+  }
+  async function saveResultToMatchLog(p, marcador) {
+    const log = findLog(p);
+    log.marcador = marcador;
+    localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
+    return writeGitHubFile(`${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(p.key)}_${p.fecha}.json`, log, `Resultado partido ${p.key} - ${p.fecha}`);
+  }
+  // Devuelve el resumen para enseñarlo, o "" si no había resultados que pasar
+  async function syncResults(keys) {
+    const played = playedMatches(keys);
+    if (!played.length) return "";
+    mostrarCargando("Guardando los resultados en los registros de partido...");
+    try {
+      // Registros de partido: se sincronizan antes para no pisar datos de otros dispositivos
+      if (ghSettings.user && ghSettings.repo && navigator.onLine) {
+        if (offlineQueue.length > 0) await processOfflineQueue();
+        await fetchMatchLogsFromGitHub();
+      }
+      const conRegistro = played.filter(findLog);
+      if (!conRegistro.length) return "";
+      const nuevos = [], distintos = [];
+      conRegistro.forEach(p => {
+        const nuevo = buildMarcador(p), old = findLog(p).marcador;
+        const oldTxt = marcadorTxt(old);
+        if (!oldTxt) nuevos.push({ p, nuevo });
+        else if (oldTxt !== marcadorTxt(nuevo)) distintos.push({ p, nuevo, old });
+      });
+      let reescribir = [];
+      if (distintos.length) { ocultarCargando(); reescribir = await askOverwrite(distintos); mostrarCargando("Guardando los resultados en los registros de partido..."); }
+      for (const c of nuevos.concat(reescribir)) await saveResultToMatchLog(c.p, c.nuevo);
+      const iguales = conRegistro.length - nuevos.length - distintos.length;
+      return `Resultados en registros de partido: ${nuevos.length} grabado(s), ${reescribir.length} reescrito(s), ${iguales} sin cambios` +
+        (distintos.length - reescribir.length ? `, ${distintos.length - reescribir.length} sin reescribir` : "") + ".";
+    } catch (e) {
+      console.error(e);
+      return "No se pudieron guardar todos los resultados en los registros de partido: " + e.message;
+    } finally { ocultarCargando(); }
+  }
+
   // ---------- Actualizar automáticamente (función de Supabase) ----------
   // La función descargar-calendarios baja los PDF desde la federación (el navegador no puede:
   // fvbcv.com bloquea las descargas desde otras webs) y los guarda en Calendarios/<Equipo>.pdf.
@@ -985,7 +1099,7 @@
     if (!teams.length) { alert("Escribe primero el iden (4 o 5 dígitos) de algún equipo."); return; }
     if (!navigator.onLine) { alert("Sin conexión: no se pueden descargar los PDF ahora."); return; }
     updating = true;
-    const results = [];
+    const results = [], leidos = [];
     try {
       await fetchFromGitHub();   // comparar con los datos más recientes, no con los de este dispositivo
       const run = await runServerDownload(teams);
@@ -1002,8 +1116,12 @@
         try { file = await readServerPdf(key); } catch (e) { console.warn(`Sin PDF guardado para ${key}:`, e); }
         ocultarCargando();
         if (!file) { results.push(`- ${key}: no se encontró el PDF descargado`); continue; }
-        results.push(fmtRes(key, await processPdf(file, file.name, team, true)));
+        const res = await processPdf(file, file.name, team, true);
+        if (/partidos · /.test(res)) leidos.push(key);
+        results.push(fmtRes(key, res));
       }
+      const reg = await syncResults(leidos);
+      if (reg) results.push(reg);
     } finally {
       updating = false;
       ocultarCargando();

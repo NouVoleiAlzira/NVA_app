@@ -6036,6 +6036,11 @@
         };
         c.avail.forEach(([a, b]) => { if (a > cursor) gray(cursor, a); cursor = Math.max(cursor, b); });
         if (cursor < model.rangeEnd) gray(cursor, model.rangeEnd);
+        // Día anulado entero: también se rayan los huecos libres con pista
+        if (opts.diaAnulado && opts.diaAnulado(di + 1)) c.avail.forEach(([a, b]) => {
+          const from = Math.max(a, model.rangeStart), to = Math.min(b, model.rangeEnd);
+          if (to > from) wkStripes(ctx, [[x, yOf(from)], [x + colW, yOf(from)], [x + colW, yOf(to)], [x, yOf(to)]]);
+        });
       });
       ci += colsPerDay[di];
     });

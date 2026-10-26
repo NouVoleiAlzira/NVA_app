@@ -185,8 +185,28 @@
     // El tipo hace falta para que el móvil (sobre todo iPhone) reproduzca el vídeo
     const tipo = /\.mp4$/.test(path) ? "video/mp4" : /\.jpe?g$/.test(path) ? "image/jpeg" : "";
     const datos = await r.blob();
-    return URL.createObjectURL(tipo ? new Blob([datos], { type: tipo }) : datos);
+    const blob = tipo ? new Blob([datos], { type: tipo }) : datos;
+    const url = URL.createObjectURL(blob);
+    blobs[url] = blob;
+    return url;
   }
+  const blobs = {};   // objectURL -> Blob, para poder descargarlos o compartirlos
+
+  // Descarga imágenes y vídeos ya bajados: [{ url, nombre }]. En el móvil abre el menú de
+  // compartir (desde ahí se guardan en Fotos/Galería); si no se puede, los descarga uno a uno
+  async function descargar(lista) {
+    const files = lista.filter(a => blobs[a.url]).map(a => new File([blobs[a.url]], a.nombre, { type: blobs[a.url].type }));
+    if (files.length && navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files }); return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    for (const a of lista) {
+      const el = document.createElement("a");
+      el.href = a.url; el.download = a.nombre; document.body.appendChild(el); el.click(); el.remove();
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  const BOTON_DESCARGA = (txt) => `<button type="button" class="btn-save-session ig-descargar" style="width:100%; margin-top:8px; background:#0f766e;">${txt}</button>`;
 
   function box() { return document.getElementById("igReelsList"); }
 
@@ -261,7 +281,7 @@
       det.innerHTML = `
         <video class="ig-video" src="${videos[id]}" controls playsinline preload="metadata"></video>
         <p class="ig-info ig-video-err" hidden style="color:#b91c1c;">Este navegador no puede reproducir el vídeo aquí. Descárgalo para verlo.</p>
-        <a class="ig-info" href="${videos[id]}" download="reel-${esc(id)}.mp4">⬇️ Descargar el vídeo</a>
+        ${BOTON_DESCARGA("⬇️ Descargar el vídeo")}
         <label class="ig-label">Texto del post${editable ? " (puedes cambiarlo)" : ""}</label>
         <textarea class="ig-texto" rows="8" ${editable ? "" : "readonly"}>${esc(meta.texto)}</textarea>
         <small class="ig-info">Música: ${esc(meta.musica || "sin música")}${meta.confirmadoPor ? ` · Confirmado por ${esc(meta.confirmadoPor)}` : ""}</small>
@@ -269,6 +289,7 @@
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
           <button class="btn-save-session ig-confirmar" style="flex:2;">✅ Confirmar y publicar</button></div>` : ""}`;
+      det.querySelector(".ig-descargar").onclick = () => descargar([{ url: videos[id], nombre: `reel-${id}.mp4` }]);
       const v = det.querySelector(".ig-video");
       v.onerror = () => { det.querySelector(".ig-video-err").hidden = false; console.error("Vídeo", v.error); };
       if (meta.enlace) det.insertAdjacentHTML("beforeend", `<p class="ig-info"><a href="${esc(meta.enlace)}" target="_blank" rel="noopener">📲 Ver en Instagram</a></p>`);
@@ -307,18 +328,24 @@
       <div class="ig-slides" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; scroll-snap-type:x mandatory;">
         ${Array.from({ length: n }, (_, i) => `<img data-i="${i + 1}" alt="Diapositiva ${i + 1}" style="flex:0 0 auto; width:46%; aspect-ratio:9/16; object-fit:cover; border-radius:8px; background:#0b163a; scroll-snap-align:start; cursor:zoom-in;">`).join("")}
       </div>
+      ${BOTON_DESCARGA("⬇️ Descargar las imágenes")}
       <label class="ig-label">Texto del post (puedes cambiarlo)</label>
       <textarea class="ig-texto" rows="6">${esc(meta.texto)}</textarea>
       <button class="btn-save-session ig-estilo" style="width:100%; margin-top:10px; background:#7c3aed;">🎨 Cambiar estilo</button>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
         <button class="btn-save-session ig-video" style="flex:2; background:var(--btn-fondoVerde);">🎬 Crear vídeo</button></div>`;
-    det.querySelectorAll(".ig-slides img").forEach(async img => {
+    const slides = [...det.querySelectorAll(".ig-slides img")].map(async img => {
       try {
         img.src = await blobUrl(`${DIR}/${id}/slides/${String(img.dataset.i).padStart(2, "0")}.jpg`);
         img.onclick = () => window.open(img.src, "_blank");
       } catch (e) { img.alt = "No disponible"; }
     });
+    const bajar = det.querySelector(".ig-descargar");
+    bajar.disabled = true;
+    Promise.all(slides).then(() => { bajar.disabled = false; });
+    bajar.onclick = () => descargar([...det.querySelectorAll(".ig-slides img")].filter(im => im.src)
+      .map(im => ({ url: im.src, nombre: `reel-${id}-${String(im.dataset.i).padStart(2, "0")}.jpg` })));
     const texto = () => det.querySelector(".ig-texto").value.trim();
     det.querySelector(".ig-descartar").onclick = () => cambiarEstado(id, meta, "descartado");
     det.querySelector(".ig-estilo").onclick = async () => {
@@ -1211,9 +1238,10 @@
           ${(meta.historias || []).map(h => `<div style="position:relative;">
             <img src="${fotosH[`${DIR_H}/${id}/${h}`]}" alt="Story" data-h="${esc(h)}" style="width:100%; border-radius:8px; display:block; ${puedeAjustar ? "cursor:pointer;" : ""}">
             ${puedeAjustar ? `<span style="position:absolute; bottom:4px; left:4px; font-size:.7rem; background:rgba(0,0,0,.6); color:#fff; border-radius:6px; padding:1px 5px; pointer-events:none;">✏️ Ajustar</span>` : ""}
-            <a href="${fotosH[`${DIR_H}/${id}/${h}`]}" download="story-${esc(id)}-${esc(h)}" title="Descargar" style="position:absolute; top:4px; right:4px; text-decoration:none; background:rgba(0,0,0,.6); border-radius:6px; padding:0 4px;">⬇️</a>
+            <button type="button" data-bajar="${esc(h)}" title="Descargar esta story" aria-label="Descargar esta story" style="position:absolute; top:4px; right:4px; border:0; cursor:pointer; background:rgba(0,0,0,.6); border-radius:6px; padding:2px 5px;">⬇️</button>
           </div>`).join("")}
         </div>
+        ${BOTON_DESCARGA((meta.historias || []).length > 1 ? "⬇️ Descargar las stories" : "⬇️ Descargar la story")}
         <label class="ig-label" style="display:flex; align-items:center; gap:8px; margin-top:8px;">⏱️ Duración de cada story
           <select class="ig-duracion app-input" style="width:auto; flex:none;" ${puedeAjustar ? "" : "disabled"}>
             ${window.nvaStory.DURACIONES.map(d => `<option value="${d}" ${d === dur ? "selected" : ""}>${d} s</option>`).join("")}
@@ -1227,6 +1255,12 @@
         ${puedeAjustar ? `<div style="display:flex; gap:8px; margin-top:10px;">
           <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
           <button class="btn-save-session ig-confirmar" style="flex:2;">✅ Confirmar y publicar</button></div>` : ""}`;
+      det.querySelector(".ig-descargar").onclick = () => descargar((meta.historias || [])
+        .map(h => ({ url: fotosH[`${DIR_H}/${id}/${h}`], nombre: `story-${id}-${h}` })));
+      det.querySelectorAll("[data-bajar]").forEach(b => b.onclick = (e) => {
+        e.stopPropagation();
+        descargar([{ url: fotosH[`${DIR_H}/${id}/${b.dataset.bajar}`], nombre: `story-${id}-${b.dataset.bajar}` }]);
+      });
       if (meta.estado === "error") {
         det.insertAdjacentHTML("beforeend", `<p class="ig-info" style="color:#b91c1c;">${esc(meta.error)}</p>
           <button class="btn-save-session ig-reintentar" style="width:100%;">🔁 Reintentar publicación</button>`);
@@ -1265,8 +1299,9 @@
       meta.ajustes = Object.assign({}, meta.ajustes, { [h]: r.ajuste });
       await putJson(`${DIR_H}/${id}/meta.json`, meta, `Stories ${id}: ajustar ${h}`);
       const ruta = `${DIR_H}/${id}/${h}`;
-      if (fotosH[ruta]) URL.revokeObjectURL(fotosH[ruta]);
+      if (fotosH[ruta]) { URL.revokeObjectURL(fotosH[ruta]); delete blobs[fotosH[ruta]]; }
       fotosH[ruta] = URL.createObjectURL(r.blob);
+      blobs[fotosH[ruta]] = r.blob;
       imgEl.src = fotosH[ruta]; imgEl.style.opacity = "";
       const portada = imgEl.closest(".ig-reel").querySelector(".ig-portada");
       if (portada && h === "historia_01.jpg") portada.src = fotosH[ruta];

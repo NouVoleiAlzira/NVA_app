@@ -354,6 +354,8 @@
   window.cpSwapHome = function (btn) {
     cp.homeOv = cp.homeOv || {};
     cp.homeOv[btn.getAttribute("data-mk")] = btn.getAttribute("data-home") === "1";
+    cp.homeBy = cp.homeBy || {};
+    cp.homeBy[btn.getAttribute("data-mk")] = quienSoy();
     saveMoves();
     renderMatches();
   };
@@ -364,6 +366,11 @@
 
   // ---------- Mover partidos propuestos (mantener pulsado y arrastrar) ----------
   const drag = { timer: null, el: null, active: false, justDropped: false, x0: 0, y0: 0, dx: 0 };
+  // Quién hace el cambio (usuario con el que se ha entrado en la app)
+  function quienSoy() {
+    const p = window.nva && window.nva.perfil;
+    return p ? ((p.nombre || "").trim() || String(p.email || "").split("@")[0]) : "";
+  }
   function saveMoves() {
     cp.updated = new Date().toISOString();
     saveLocal();
@@ -396,8 +403,9 @@
       const mv = (cp.moved || {})[mk], hv = (cp.homeOv || {})[mk];
       const vs = `${m.team} vs ${m.rival || "?"}`;
       const items = [];
-      if (mv) items.push(`Horario: ${whenTxt(m.date, hasTime(m) ? m.time : "")} → ${whenTxt(mv.date, toHHMM(mv.start))}`);
-      if (hv !== undefined) items.push(`Campo: ${hv ? "visitante → local" : "local → visitante"}`);
+      const by = (q) => q ? ` (${q})` : "";
+      if (mv) items.push(`Horario: ${whenTxt(m.date, hasTime(m) ? m.time : "")} → ${whenTxt(mv.date, toHHMM(mv.start))}${by(mv.by)}`);
+      if (hv !== undefined) items.push(`Campo: ${hv ? "visitante → local" : "local → visitante"}${by((cp.homeBy || {})[mk])}`);
       out.push({ mk, vs, items, sort: (mv ? mv.date : m.date) + (mv ? toHHMM(mv.start) : (m.time || "")) });
     });
     return out.sort((a, b) => a.sort.localeCompare(b.sort));
@@ -419,11 +427,12 @@
     const mk = btn.getAttribute("data-mk");
     if (cp.moved) delete cp.moved[mk];
     if (cp.homeOv) delete cp.homeOv[mk];
+    if (cp.homeBy) delete cp.homeBy[mk];
     saveMoves(); renderMatches();
   };
   window.cpResetMoves = function () {
     if (!confirm("¿Deshacer todos los cambios (movimientos y cambios de campo)?")) return;
-    cp.moved = {}; cp.homeOv = {}; saveMoves(); renderMatches();
+    cp.moved = {}; cp.homeOv = {}; cp.homeBy = {}; saveMoves(); renderMatches();
   };
   window.cpChangesPdf = async function () {
     const ch = changeList();
@@ -555,7 +564,7 @@
     document.body.classList.remove("cp-dragging");
     const mk = drag.el.getAttribute("data-mk"), tg = drag.target;
     drag.el = null; drag.target = null; drag.lastRow = null;
-    if (mk && tg) { cp.moved = cp.moved || {}; cp.moved[mk] = { date: tg.day, start: tg.start }; saveMoves(); }
+    if (mk && tg) { cp.moved = cp.moved || {}; cp.moved[mk] = { date: tg.day, start: tg.start, by: quienSoy() }; saveMoves(); }
     renderMatches();
   }
   function initDrag() {
@@ -930,7 +939,7 @@
     pairMatches(oldList, newList).pairs.forEach(([o, n]) => {
       const a = moveKey(key, o), b = moveKey(key, n);
       if (a === b) return;
-      [cp.moved, cp.homeOv].forEach(map => { if (map && a in map && !(b in map)) { map[b] = map[a]; delete map[a]; } });
+      [cp.moved, cp.homeOv, cp.homeBy].forEach(map => { if (map && a in map && !(b in map)) { map[b] = map[a]; delete map[a]; } });
     });
   }
 

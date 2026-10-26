@@ -414,7 +414,7 @@
   }
 
   // Parciales de los sets ("25-20  23-25 …"); los que gana el club van resaltados en una píldora
-  // o: { gana, texto, pierde, align }
+  // o: { gana, texto, pierde, align, borde }
   function sets(ctx, p, x, cy, maxW, px, o) {
     if (!p.res || !p.sets.length) return;
     const lista = p.sets.map(s => ({ t: `${s.local}-${s.visitante}`, club: p.nvaLocal ? s.local > s.visitante : s.visitante > s.local }));
@@ -429,7 +429,10 @@
     ctx.textBaseline = "middle"; ctx.textAlign = "center";
     lista.forEach((l, i) => {
       const w = anchos[i], hh = tam * 1.45;
-      if (l.club) { ctx.fillStyle = o.gana; rr(ctx, cx, cy - hh / 2, w, hh, hh / 2); ctx.fill(); }
+      if (l.club) {
+        ctx.fillStyle = o.gana; rr(ctx, cx, cy - hh / 2, w, hh, hh / 2); ctx.fill();
+        if (o.borde) { ctx.lineWidth = Math.max(1.5, tam * 0.1); ctx.strokeStyle = o.borde; ctx.stroke(); }
+      }
       ctx.fillStyle = l.club ? (o.texto || sobre(o.gana)) : o.pierde;
       ctx.fillText(l.t, cx + w / 2, cy + tam * 0.05);
       cx += w + gap;
@@ -469,7 +472,7 @@
       if (p.res) tanteo(ctx, p, ax + aw / 2, top + lado * 0.5, Math.min(hz * 0.5, 150));
       else texto(ctx, "VS", ax + aw / 2, top + lado / 2 + h * 0.08, aw * 0.2, h * 0.24, (s) => F(s, 800, true), "#9aa0a6", "center");
       if (p.res) {
-        sets(ctx, p, ax + aw / 2, y + h - banda / 2 - 4, aw - 20, Math.min(30, banda * 0.5), { gana: colGana, pierde: "#9aa0a6" });
+        sets(ctx, p, ax + aw / 2, y + h - banda / 2 - 4, aw - 20, Math.min(30, banda * 0.5), { gana: p.color, pierde: "#9aa0a6" });
       } else {
         const ix = x + w - info - 10;
         ctx.fillStyle = p.color; ctx.fillRect(ix, y + h * 0.16, 6, h * 0.68);
@@ -494,7 +497,7 @@
       ctx.fillStyle = p.color; ctx.fillRect(x, y + cab * 0.42, 18, 18);
       ctx.font = FB(Math.min(24, cab * 0.6), 700);
       espaciado(ctx, p.cat, x + 30, y + cab * 0.42 + 16, 4, "#14161c");
-      if (p.res) sets(ctx, p, x + w, y + cab * 0.42 + 9, w * 0.55, Math.min(24, cab * 0.55), { gana: "#14161c", texto: "#f1ece2", pierde: "#8a857b", align: "right" });
+      if (p.res) sets(ctx, p, x + w, y + cab * 0.42 + 9, w * 0.55, Math.min(24, cab * 0.55), { gana: p.color, pierde: "#8a857b", align: "right", borde: "#14161c" });
       else { ctx.font = FB(Math.min(24, cab * 0.6), 600); espaciado(ctx, [p.dia, p.hora && `${p.hora} H`].filter(Boolean).join(" · "), x + w, y + cab * 0.42 + 16, 3, "#555", "right"); }
       const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.42, 80);
       const numW = p.res ? 90 : 0;
@@ -580,7 +583,7 @@
         contener(ctx, eq.logo, cx + lado / 2 - off, cy, lado * 0.82);
         ctx.textBaseline = "middle"; texto(ctx, eq.nombre, cx + lado + 18 - off, cy + 2, cw - lado - 10, nPx, (s) => F(s, 800, true), "#ffffff"); ctx.textBaseline = "alphabetic";
       });
-      if (p.res) sets(ctx, p, cx + lado + 18 - sk * 0.3, y + h - Math.min(22, h * 0.1), cw - lado - 30, Math.min(22, h * 0.085), { gana: "#ffc400", pierde: "rgba(255,255,255,.7)", align: "left" });
+      if (p.res) sets(ctx, p, cx + lado + 18 - sk * 0.3, y + h - Math.min(22, h * 0.1), cw - lado - 30, Math.min(22, h * 0.085), { gana: p.color, pierde: "rgba(255,255,255,.7)", align: "left" });
       if (!p.res && p.campo) texto(ctx, p.campo, cx + lado + 18 - sk * 0.3, y + h - Math.min(12, h * 0.05), cw - lado - 30, Math.min(22, h * 0.09), (s) => FB(s, 600), "rgba(255,255,255,.7)");
     });
   }
@@ -616,8 +619,8 @@
           p.sets.slice(0, 5).forEach((s, j) => {
             const v = k ? s.visitante : s.local, o = k ? s.local : s.visitante, sx = bx - 16 - (p.sets.slice(0, 5).length - j) * caja * 0.55;
             const delClub = (k === 0) === p.nvaLocal && v > o;
-            if (delClub) { ctx.fillStyle = amb; rr(ctx, sx + 2, cy - caja * 0.3, caja * 0.5, caja * 0.6, 8); ctx.fill(); }
-            texto(ctx, String(v), sx + caja * 0.27, cy + 2, caja * 0.5, caja * 0.4, (s2) => F(s2, 800), delClub ? "#050505" : v > o ? "#e8e8e8" : "#6b6b6b", "center");
+            if (delClub) { ctx.fillStyle = p.color; rr(ctx, sx + 2, cy - caja * 0.3, caja * 0.5, caja * 0.6, 8); ctx.fill(); }
+            texto(ctx, String(v), sx + caja * 0.27, cy + 2, caja * 0.5, caja * 0.4, (s2) => F(s2, 800), delClub ? sobre(p.color) : v > o ? "#e8e8e8" : "#6b6b6b", "center");
           });
         }
         ctx.textBaseline = "alphabetic";
@@ -655,7 +658,7 @@
       const banda = p.res ? Math.min(56, h * 0.18) : 0;
       const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.52, 120), nPx = Math.min(36, zh * 0.15);
       const top = zt + (zh - lado - nPx * 2.2) / 2;
-      if (p.res) sets(ctx, p, x + iw / 2, y + h - banda / 2 - 8, iw - 40, Math.min(26, banda * 0.48), { gana: colGana, pierde: "#b9bcc2" });
+      if (p.res) sets(ctx, p, x + iw / 2, y + h - banda / 2 - 8, iw - 40, Math.min(26, banda * 0.48), { gana: p.color, pierde: "#b9bcc2" });
       equipo(ctx, p.local, x + iw * 0.2, top, lado, iw * 0.32, nPx, "#fff", true);
       equipo(ctx, p.visit, x + iw * 0.8, top, lado, iw * 0.32, nPx, "#fff", true);
       if (p.res) tanteo(ctx, p, x + iw / 2, top + lado * 0.55, Math.min(lado * 1.25, 130, iw * 0.17));
@@ -696,7 +699,7 @@
         texto(ctx, p.hora || "VS", x + w / 2, zt + lado * 0.8, w * 0.26, lado * 0.5, (s) => F(s, 800, true), "#fff", "center");
         texto(ctx, p.dia, x + w / 2, zt + lado * 0.22, w * 0.26, lado * 0.26, (s) => FB(s, 700), "#7cc4ff", "center");
       }
-      if (p.res) sets(ctx, p, x + w / 2, y + h - 30, w - 40, Math.min(24, nPx * 0.8), { gana: colGana, pierde: "rgba(255,255,255,.8)" });
+      if (p.res) sets(ctx, p, x + w / 2, y + h - 30, w - 40, Math.min(24, nPx * 0.8), { gana: p.color, pierde: "rgba(255,255,255,.8)" });
       const pie = p.res ? "" : p.campo;
       if (pie) texto(ctx, pie, x + w / 2, y + h - 22, w - 40, Math.min(22, nPx * 0.75), (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
     });
@@ -729,7 +732,7 @@
       const sube = p.res ? pie * 0.12 : 0;
       texto(ctx, linea, 0, cy - pie * 0.02 - sube, centro, Math.min(pie * 0.34, 80), (s) => F(s, 800, true), "#1d1d1d", "center");
       texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25 - sube, pw - m * 2 - 20, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
-      if (p.res) sets(ctx, p, 0, Math.min(cy + pie * 0.25 - sube + nPx * 1.2, y + ph - nPx * 0.75), pw - m * 2 - 20, nPx * 0.72, { gana: "#1d1d1d", texto: "#f8f6f0", pierde: "#8a8a8a" });
+      if (p.res) sets(ctx, p, 0, Math.min(cy + pie * 0.25 - sube + nPx * 1.2, y + ph - nPx * 0.75), pw - m * 2 - 20, nPx * 0.72, { gana: p.color, pierde: "#8a8a8a", borde: "#1d1d1d" });
       else texto(ctx, `${p.cat} · ${p.dia}`, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
       ctx.restore();
     });
@@ -753,7 +756,7 @@
       ctx.restore();
       const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.4, 96), cab = Math.min(30, h * 0.12);
       ctx.font = FB(cab * 0.85, 700); const catW = espaciado(ctx, p.cat, ax, y + cab + 12, 4, tc);
-      if (p.res) sets(ctx, p, cw - 34, y + cab * 0.62 + 12, cw - 34 - ax - catW - 30, cab * 0.85, { gana: tc, texto: p.color, pierde: rgba(tc === "#ffffff" ? "#ffffff" : "#111111", 0.6), align: "right" });
+      if (p.res) sets(ctx, p, cw - 34, y + cab * 0.62 + 12, cw - 34 - ax - catW - 30, cab * 0.85, { gana: p.color, pierde: rgba(tc === "#ffffff" ? "#ffffff" : "#111111", 0.6), align: "right", borde: tc });
       const cy = y + h * 0.53;
       contener(ctx, p.local.logo, ax + lado / 2, cy, lado);
       contener(ctx, p.visit.logo, ax + aw - lado / 2 + sk * 0.35, cy, lado);
@@ -791,7 +794,7 @@
       else texto(ctx, p.hora || "VS", cx + cw / 2, ly + h * 0.09, cw - lado * 2 - 20, Math.min(h * 0.26, 70), (s) => F(s, 800, true), "#fff", "center");
       const nombres = `${p.local.nombre}  ·  ${p.visit.nombre}`;
       texto(ctx, nombres, cx + cw / 2, y + h - Math.min(18, h * 0.08) - nPx * 0.8, cw, nPx * 0.8, (s) => F(s, 700, true), "#fff", "center");
-      if (p.res) sets(ctx, p, cx + cw / 2, y + h - Math.min(14, h * 0.06) - nPx * 0.25, cw, nPx * 0.62, { gana: colGana, pierde: "rgba(255,255,255,.75)" });
+      if (p.res) sets(ctx, p, cx + cw / 2, y + h - Math.min(14, h * 0.06) - nPx * 0.25, cw, nPx * 0.62, { gana: p.color, pierde: "rgba(255,255,255,.75)" });
       if (!p.res) texto(ctx, [p.dia, p.campo].filter(Boolean).join(" · "), cx + cw / 2, y + h - Math.min(14, h * 0.06), cw, nPx * 0.62, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
     });
   }

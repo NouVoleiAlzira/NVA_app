@@ -6,7 +6,7 @@
 //  mismo archivo: al actualizar se cambia su contenido, no el enlace, así
 //  que a los jugadores/as se les pasa una sola vez.
 //  Los enlaces se guardan en DrivePDFs/enlaces.json.
-//  «Programar Autom.»: la función de Supabase actualizar-drive hace lo
+//  «Programar»: la función de Supabase actualizar-drive hace lo
 //  mismo a la hora y los días elegidos (DrivePDFs/programada.json).
 // =====================================================================
 (function () {
@@ -128,7 +128,7 @@
   }
   window.verVinculosDrive = () => verVinculos();
 
-  // ---------- Programar Autom. (función de Supabase actualizar-drive) ----------
+  // ---------- Programar (función de Supabase actualizar-drive) ----------
   // Cada hora el servidor mira si está activada, si hoy es uno de los días elegidos y si es
   // la hora elegida (hora de España); entonces hace lo mismo que «Actualizar vínculos».
   const PROG_FILE = "DrivePDFs/programada.json";
@@ -153,7 +153,7 @@
     box.classList.toggle("off", !prog.activa);
     box.innerHTML = `
       <div class="drv-prog-row">
-        <label class="drv-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="drvSetProg({ activa: this.checked })"> Programar Autom.</label>
+        <label class="drv-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="drvSetProg({ activa: this.checked })"> Programar</label>
         <select aria-label="Hora (de España)" onchange="drvSetProg({ hora: +this.value })">${horas}</select>
         <div class="drv-dias" role="group" aria-label="Días">${DIAS.map((d, i) => {
           const on = prog.dias.includes(d);

@@ -406,12 +406,14 @@
   // Foto del partido con su ajuste (zoom z y desplazamiento ox, oy libres); se apunta el hueco para el editor.
   // Si la foto no llena el hueco, debajo se ve el fondo del equipo
   const huecos = {};
-  function foto(ctx, p, x, y, w, h, fy) {
+  // vis: parte del hueco que queda a la vista (fracciones x0, x1, y0, y1), para encajar el grupo de jugadoras
+  function foto(ctx, p, x, y, w, h, fy, vis) {
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
     if (p.foto) {
       const a = p.ajuste || {};
       if ((a.z || 1) < 1 || a.ox || a.oy) sinFoto(ctx, p, x, y, w, h);
-      huecos[p.id] = cubrir(ctx, p.foto, x, y, w, h, 0.5, fy, a.z, a.ox, a.oy);
+      huecos[p.id] = Object.assign(cubrir(ctx, p.foto, x, y, w, h, 0.5, fy, a.z, a.ox, a.oy),
+        { fy: fy == null ? 0.35 : fy, vis: Object.assign({ x0: 0, x1: 1, y0: 0, y1: 1 }, vis || {}) });
     } else sinFoto(ctx, p, x, y, w, h);
     ctx.restore();
   }
@@ -681,7 +683,7 @@
     ps.forEach((p, i) => {
       const { x, y, w, h } = T[i], r = 22;
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip();
-      foto(ctx, p, x, y, w, h, 0.3);
+      foto(ctx, p, x, y, w, h, 0.3, { y0: Math.min(0.16, 70 / h), y1: 1 - Math.min(0.46, 260 / h) });
       const g = ctx.createLinearGradient(0, y + h * 0.35, 0, y + h); g.addColorStop(0, "rgba(5,10,30,0)"); g.addColorStop(1, "rgba(5,10,30,.94)");
       ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = p.color; ctx.fillRect(x, y + h - 8, w, 8);
@@ -749,7 +751,7 @@
     ps.forEach((p, i) => {
       const { y, h } = R[i], sk = h * 0.35, cw = W * 0.56;
       ctx.save(); ctx.beginPath(); ctx.rect(0, y, W, h); ctx.clip();
-      foto(ctx, p, W * 0.3, y, W * 0.7, h, 0.35);
+      foto(ctx, p, W * 0.3, y, W * 0.7, h, 0.35, { x0: 0.42 });
       const g = ctx.createLinearGradient(W * 0.3, 0, W * 0.62, 0); g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = g; ctx.fillRect(W * 0.3, y, W * 0.33, h);
       ctx.fillStyle = "#000"; ctx.fillRect(0, y, W * 0.3, h);
@@ -786,7 +788,7 @@
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.fillStyle = "rgba(255,255,255,.13)"; ctx.fill();
       ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.stroke(); ctx.restore();
       const d = h - 28, fx = x + 14 + d / 2, fy = y + h / 2;
-      ctx.save(); ctx.beginPath(); ctx.arc(fx, fy, d / 2, 0, Math.PI * 2); ctx.clip(); foto(ctx, p, fx - d / 2, fy - d / 2, d, d, 0.3); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.arc(fx, fy, d / 2, 0, Math.PI * 2); ctx.clip(); foto(ctx, p, fx - d / 2, fy - d / 2, d, d, 0.3, { x0: 0.12, x1: 0.88, y0: 0.12, y1: 0.88 }); ctx.restore();
       ctx.lineWidth = 6; ctx.strokeStyle = p.color; ctx.beginPath(); ctx.arc(fx, fy, d / 2 + 1, 0, Math.PI * 2); ctx.stroke();
       const cx = x + d + 44, cw = w - d - 70, cab = Math.min(26, h * 0.12), lado = Math.min(h * 0.42, 100), nPx = Math.min(34, h * 0.15);
       ctx.font = FB(cab * 0.9, 700); espaciado(ctx, p.cat, cx, y + cab + Math.min(20, h * 0.1), 4, mezcla(p.color, "#ffffff", 0.3));
@@ -876,6 +878,7 @@
         <div data-s="previa" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;"></div>
         <div data-s="ajustes" hidden>
           <label class="ig-label" style="margin-top:8px;">🔍 Encajar las fotos en este estilo</label>
+          <button class="btn-save-session" type="button" data-s="encajarTodas" style="width:100%; margin:0 0 6px; padding:8px; font-size:.8rem; background:var(--azul-primary);">✨ Encajar todas (busca al grupo de jugadoras)</button>
           <div data-s="ajustesLista" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
         </div>
         <small class="ig-info" data-s="estado"></small>
@@ -1009,6 +1012,85 @@
     });
   }
 
+  /* ---------- Encajar todas: se busca a las personas de cada foto (MediaPipe, en el propio móvil) ---------- */
+  const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21";
+  let detectorPromesa = null;
+  function detector() {
+    if (!detectorPromesa) detectorPromesa = (async () => {
+      const mp = await import(`${MP}/vision_bundle.mjs`);
+      const archivos = await mp.FilesetResolver.forVisionTasks(`${MP}/wasm`);
+      return mp.ObjectDetector.createFromOptions(archivos, {
+        baseOptions: { modelAssetPath: "vendor/efficientdet_lite0.tflite", delegate: "CPU" },
+        runningMode: "IMAGE", scoreThreshold: 0.25, maxResults: 40, categoryAllowlist: ["person"]
+      });
+    })().catch(e => { detectorPromesa = null; throw e; });
+    return detectorPromesa;
+  }
+
+  // Rectángulo (en píxeles de la foto) que reúne al grupo; null si no se encuentra a nadie
+  async function grupo(img) {
+    const det = await detector();
+    const cajas = (det.detect(img).detections || []).map(d => d.boundingBox).filter(Boolean);
+    const mayor = Math.max(0, ...cajas.map(b => b.width * b.height));
+    const buenas = cajas.filter(b => b.width * b.height >= mayor * 0.12);   // fuera la gente pequeña del fondo
+    if (!buenas.length) return null;
+    const x0 = Math.max(0, Math.min(...buenas.map(b => b.originX))), y0 = Math.max(0, Math.min(...buenas.map(b => b.originY)));
+    const x1 = Math.min(img.width, Math.max(...buenas.map(b => b.originX + b.width))), y1 = Math.min(img.height, Math.max(...buenas.map(b => b.originY + b.height)));
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+
+  // Ajuste para que el grupo quepa entero y centrado en la parte visible del hueco
+  function ajusteGrupo(img, g, hu) {
+    const { w, h, fy, vis } = hu;
+    const vx = vis.x0 * w, vy = vis.y0 * h, vw = (vis.x1 - vis.x0) * w, vh = (vis.y1 - vis.y0) * h;
+    const k0 = Math.max(w / img.width, h / img.height);
+    const z = Math.min(4, Math.max(0.4, Math.min(vw / (g.w * k0), vh / (g.h * k0)) * 0.94));
+    const k = k0 * z, iw = img.width * k, ih = img.height * k;
+    let dx = vx + vw / 2 - (g.x + g.w / 2) * k, dy = vy + vh / 2 - (g.y + g.h / 2) * k;   // esquina de la foto
+    // Si la foto es más grande que el hueco, que no queden huecos vacíos mientras el grupo siga a la vista
+    const acotar = (v, tam, hueco, ini, ancho, g0, gt) => {
+      const lo = Math.max(hueco - tam, ini - g0 * k), hi = Math.min(0, ini + ancho - (g0 + gt) * k);
+      return tam >= hueco && lo <= hi ? Math.min(hi, Math.max(lo, v)) : v;
+    };
+    dx = acotar(dx, iw, w, vx, vw, g.x, g.w);
+    dy = acotar(dy, ih, h, vy, vh, g.y, g.h);
+    const lim = (v) => Math.min(1.5, Math.max(-1.5, v));
+    return { z, ox: lim((dx - (w - iw) * 0.5) / w), oy: lim((dy - (h - ih) * fy) / h) };
+  }
+
+  // Recalcula el ajuste de las fotos encajadas solas (al cambiar de estilo también)
+  function reencajar() {
+    paginas().forEach(pg => dibujarPagina(estado.estilo, pg, 0.05));   // apunta los huecos de este estilo
+    elegidos().forEach(it => {
+      if (it.auto && it.grupo && it.foto && huecos[it.p.id]) it.ajuste = ajusteGrupo(it.foto, it.grupo, huecos[it.p.id]);
+    });
+  }
+
+  async function encajarTodas(m, boton) {
+    const est = $(m, "estado"), lista = elegidos().filter(it => it.foto);
+    boton.disabled = true;
+    try {
+      est.textContent = "Preparando el detector de personas (la primera vez tarda un poco)…";
+      await detector();
+      for (let i = 0; i < lista.length; i++) {
+        est.textContent = `Buscando a las jugadoras: foto ${i + 1} de ${lista.length}…`;
+        await new Promise(r => setTimeout(r, 0));
+        if (lista[i].grupo === undefined || lista[i].grupo === null) lista[i].grupo = await grupo(lista[i].foto);
+        lista[i].auto = !!lista[i].grupo;
+      }
+      reencajar();
+      const sin = lista.filter(it => !it.grupo).length;
+      est.textContent = sin ? `En ${sin} foto${sin === 1 ? "" : "s"} no se ha encontrado a nadie: encájala${sin === 1 ? "" : "s"} a mano.` : "";
+      marcarEstilo(m);
+    } catch (e) {
+      console.error(e);
+      est.textContent = "";
+      alert("No se han podido encajar las fotos solas: " + e.message);
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
   // Editor: la story donde va la foto, arrastrar para moverla y barra (o rueda / pellizco) para el zoom
   function ajustarFoto(it) {
     const pag = paginas().find(pg => pg.partidos.some(p => p.id === it.p.id));
@@ -1072,7 +1154,7 @@
       const soltar = (e) => { dedos.delete(e.pointerId); distancia = 0; };
       lienzoV.addEventListener("pointerup", soltar);
       lienzoV.addEventListener("pointercancel", soltar);
-      const cerrar = (ok) => { capa.remove(); if (!ok) it.ajuste = antes; resolver(ok); };
+      const cerrar = (ok) => { capa.remove(); if (!ok) it.ajuste = antes; else it.auto = false; resolver(ok); };
       capa.querySelector('[data-e="reset"]').onclick = () => { Object.assign(a, { z: 1, ox: 0, oy: 0 }); cambiarZoom(1); };
       capa.querySelector('[data-e="no"]').onclick = () => cerrar(false);
       capa.querySelector('[data-e="si"]').onclick = () => cerrar(true);
@@ -1119,12 +1201,13 @@
       if (ev.target === m) return m.remove();
       const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar]");
       if (!b) return;
-      if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; marcarEstilo(m); return; }
+      if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; reencajar(); marcarEstilo(m); return; }
       if (b.dataset.ajustar != null) { if (await ajustarFoto(estado.items[+b.dataset.ajustar])) marcarEstilo(m); return; }
       const a = b.dataset.s;
       if (a === "cerrar") m.remove();
       else if (a === "volver") verPaso(1);
       else if (a === "crear") crear(m);
+      else if (a === "encajarTodas") encajarTodas(m, b);
       else if (a === "siguiente") {
         if (!elegidos().length) { alert("Marca al menos un partido."); return; }
         b.disabled = true;
@@ -1154,7 +1237,7 @@
         const it = estado.items[+t.dataset.foto], f = t.files && t.files[0];
         if (!f) return;
         if (it.fotoUrl && it.fotoUrl.startsWith("blob:")) URL.revokeObjectURL(it.fotoUrl);
-        it.fotoUrl = URL.createObjectURL(f); it.foto = await cargarImg(it.fotoUrl); it.ajuste = null;
+        it.fotoUrl = URL.createObjectURL(f); it.foto = await cargarImg(it.fotoUrl); it.ajuste = null; it.grupo = null; it.auto = false;
         pintarLista(m);
       }
     });

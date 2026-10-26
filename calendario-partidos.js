@@ -939,10 +939,10 @@
       : "Todavía no se ha hecho ninguna actualización programada.";
     box.innerHTML = `
       <label class="cp-prog-row cp-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="cpSetProg({ activa: this.checked })"> Actualizar los PDF automáticamente cada día</label>
-      <label class="cp-prog-row"><span>Hora</span><select onchange="cpSetProg({ hora: +this.value })"${prog.activa ? "" : " disabled"}>${horas}</select><span class="cp-prog-txt">hora de España</span></label>
+      <div class="cp-prog-row"><label class="cp-prog-hora"><span>Hora</span><select onchange="cpSetProg({ hora: +this.value })"${prog.activa ? "" : " disabled"}>${horas}</select><span class="cp-prog-txt">hora de España</span></label>
+        <button type="button" class="btn-save-session cp-prog-probar" onclick="cpProbarProg()">▶️ Probar ahora</button></div>
       <div class="cp-prog-txt">Hace lo mismo que «Actualizar automáticamente»: descarga los PDF de los equipos con iden, marca los cambios de fecha, hora o pabellón y pasa los resultados a los registros de partido que ya existen. Si un registro ya tiene otro resultado, no se toca: se decide al pulsar «Actualizar automáticamente».</div>
-      <div class="cp-prog-last">${last}</div>
-      <div class="cp-prog-btns"><button type="button" class="btn-save-session" onclick="cpProbarProg()">▶️ Probar ahora</button></div>`;
+      <div class="cp-prog-last">${last}</div>`;
   }
   window.cpSetProg = async function (cambio) {
     if (!navigator.onLine) { alert("Sin conexión: no se puede cambiar ahora."); renderProg(); return; }

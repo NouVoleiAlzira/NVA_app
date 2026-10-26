@@ -1754,6 +1754,7 @@
     .cp-prog-check input { width: 20px; height: 20px; accent-color: var(--btn-fondoVerde); }
     .cp-prog-row select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: rgba(233,238,250,0.08); color: #fff; font: inherit; font-size: 0.9rem; color-scheme: dark; }
     .cp-prog-row select:disabled { opacity: .5; }
+    .cp-prog-row select option { background: var(--pista); color: #fff; }   /* la lista desplegable no hereda el fondo: sin esto sale blanco sobre blanco */
     .cp-prog-txt { color: var(--niebla); font-size: 0.75rem; line-height: 1.4; }
     .cp-prog-last { color: var(--tiza); font-size: 0.8rem; line-height: 1.4; }
     .cp-prog-btns { display: flex; gap: 8px; }

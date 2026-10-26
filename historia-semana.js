@@ -727,6 +727,17 @@
       ctx.save(); ctx.beginPath(); ctx.rect(x + m, y + m, pw - m * 2, ph - pie - m); ctx.clip();
       foto(ctx, p, x + m, y + m, pw - m * 2, ph - pie - m, 0.3); ctx.restore();
       ctx.fillStyle = p.color; ctx.fillRect(x + m, y + ph - pie - 2, pw - m * 2, 6);
+      // Categoría y división en una etiqueta del color del equipo, abajo a la izquierda de la foto
+      if (p.cat) {
+        const cPx = Math.min(30, pw * 0.055, (ph - pie) * 0.08), padX = cPx * 0.6, eh = cPx * 1.5;
+        ajustar(ctx, p.cat, pw - m * 2 - 40 - padX * 2, cPx, (s) => FB(s, 700));
+        const ew = ctx.measureText(p.cat).width + padX * 2, ex = x + m + 14, ey = y + ph - pie - 2 - 14 - eh;
+        ctx.fillStyle = p.color; ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(ex, ey, ew, eh, eh / 2); else ctx.rect(ex, ey, ew, eh);
+        ctx.fill();
+        ctx.fillStyle = sobre(p.color); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(p.cat, ex + padX, ey + eh / 2 + 1); ctx.textBaseline = "alphabetic";
+      }
       // Cinta
       ctx.save(); ctx.translate(0, y + 4); ctx.rotate(-ang * 2); ctx.fillStyle = "rgba(255,248,220,.6)"; ctx.fillRect(-pw * 0.14, -16, pw * 0.28, 34); ctx.restore();
       const cy = y + ph - pie / 2, lado = Math.min(pie * 0.58, 140), nPx = Math.min(38, pie * 0.17, pw * 0.065);
@@ -738,7 +749,7 @@
       texto(ctx, linea, 0, cy - pie * 0.02 - sube, centro, Math.min(pie * 0.34, 80), (s) => F(s, 800, true), "#1d1d1d", "center");
       texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25 - sube, pw - m * 2 - lado * 2 - 24, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
       if (p.res) sets(ctx, p, 0, Math.min(cy + pie * 0.25 - sube + nPx * 1.2, y + ph - nPx * 0.75), pw - m * 2 - 20, nPx * 0.72, { gana: p.color, pierde: "#8a8a8a", borde: "#1d1d1d" });
-      else texto(ctx, `${p.cat} · ${p.dia}`, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
+      else texto(ctx, p.dia, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
       ctx.restore();
     });
   }
@@ -1110,6 +1121,33 @@
 
   const $ = (m, s) => m.querySelector(`[data-s="${s}"]`);
 
+  // Resultado escrito a mano: "3-1", "3-1 (25-20 23-25 …)" o solo los parciales "25-20 23-25 …" (primero el local)
+  function leerResultado(txt) {
+    const pares = (String(txt).match(/\d+\s*[-–:]\s*\d+/g) || []).map(t => t.split(/\s*[-–:]\s*/).map(n => parseInt(n, 10)));
+    if (!pares.length) return null;
+    const resumen = pares[0][0] <= 3 && pares[0][1] <= 3 ? pares.shift() : null;
+    const sets = pares.map(([a, b]) => ({ local: a, visitante: b }));
+    if (sets.some(s => s.local === s.visitante)) return null;
+    const setsL = resumen ? resumen[0] : sets.filter(s => s.local > s.visitante).length;
+    const setsV = resumen ? resumen[1] : sets.filter(s => s.visitante > s.local).length;
+    if (setsL === setsV) return null;
+    return { setsL, setsV, sets };
+  }
+  function ponerResultado(p, r) {
+    Object.assign(p, { res: true, setsL: r.setsL, setsV: r.setsV, sets: r.sets, gana: p.nvaLocal ? r.setsL > r.setsV : r.setsV > r.setsL });
+  }
+  function quitarResultado(p) { Object.assign(p, { res: false, setsL: null, setsV: null, sets: [], gana: null }); }
+  function resultadoAMano(it) {
+    const p = it.p, antes = it.manual ? `${it.manual.setsL}-${it.manual.setsV}${it.manual.sets.length ? " (" + it.manual.sets.map(s => `${s.local}-${s.visitante}`).join(" ") + ")" : ""}` : "";
+    const txt = prompt(`Resultado de ${p.local.nombre} vs ${p.visit.nombre} (primero el local).\nEjemplos: 3-1  ·  3-1 (25-20 23-25 25-18 25-22)  ·  25-20 23-25 25-18 25-22\nDéjalo vacío para quitarlo.`, antes);
+    if (txt == null) return false;
+    if (!txt.trim()) { it.manual = null; quitarResultado(p); return true; }
+    const r = leerResultado(txt);
+    if (!r) { alert("No entiendo ese resultado. Escribe por ejemplo 3-1 o los parciales 25-20 23-25 25-18 25-22."); return false; }
+    it.manual = r; ponerResultado(p, r); it.sel = true;
+    return true;
+  }
+
   function elegidos() { return estado.items.filter(it => it.sel && (estado.tipo !== "resultados" || it.p.res)); }
 
   // Páginas con sus partidos (vacías fuera)
@@ -1131,15 +1169,17 @@
   function pintarLista(m) {
     const t = estado.tipo, sel = elegidos();
     const sinRes = t === "resultados" ? estado.items.filter(it => !it.p.res).length : 0;
+    const aMano = (it) => t === "resultados" && (it.manual || !it.p.res) ? `<button type="button" data-mano="${estado.items.indexOf(it)}" class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 8px; font-size:0.7rem; cursor:pointer; background:${it.manual ? "#64748b" : "#2563eb"};">${it.manual ? "✏️" : "✏️ Resultado"}</button>` : "";
     $(m, "info").textContent = !estado.items.length ? "No hay partidos de los equipos del club entre esas fechas en «Calendario de partidos»."
-      : `${sel.length} de ${estado.items.length - sinRes} partidos en la story${sinRes ? ` (${sinRes} todavía sin resultado)` : ""}.` + (t === "resultados" ? " Las fotos solo salen en los estilos con fotos." : "");
+      : `${sel.length} de ${estado.items.length - sinRes} partidos en la story${sinRes ? ` (${sinRes} todavía sin resultado: con ✏️ Resultado lo puedes escribir a mano)` : ""}.` + (t === "resultados" ? " Las fotos solo salen en los estilos con fotos." : "");
     $(m, "lista").innerHTML = estado.items.map((it, i) => {
       const p = it.p, off = t === "resultados" && !p.res;
       return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:10px;${it.sel && !off ? "" : " opacity:.5;"}">
         <input type="checkbox" data-sel="${i}" ${it.sel && !off ? "checked" : ""} ${off ? "disabled" : ""} style="width:20px; height:20px; flex:none; accent-color:#2563eb;">
         ${it.fotoUrl ? `<img src="${it.fotoUrl}" alt="" style="width:40px; height:40px; object-fit:cover; border-radius:6px; flex:none;">` : ""}
         <div style="flex:1; min-width:0; font-size:0.76rem; color:#1e293b;"><b>${esc(p.local.nombre)}</b> ${p.res ? esc(marcador(p)) : "vs"} <b>${esc(p.visit.nombre)}</b><br>
-          <small style="color:#64748b;">${esc(p.dia)}${p.hora ? " · " + esc(p.hora) : ""} · ${esc(p.cat)}${off ? " · sin resultado" : ""}</small></div>
+          <small style="color:#64748b;">${esc(p.dia)}${p.hora ? " · " + esc(p.hora) : ""} · ${esc(p.cat)}${off ? " · sin resultado" : it.manual ? " · resultado a mano" : ""}</small></div>
+        ${aMano(it)}
         ${estado.dividir && it.sel && !off ? `<select data-pag="${i}" class="app-input" style="width:auto; flex:none; padding:4px 6px; font-size:.75rem;">
           ${Array.from({ length: estado.paginas }, (_, k) => `<option value="${k + 1}" ${it.pag === k + 1 ? "selected" : ""}>Story ${k + 1}</option>`).join("")}</select>` : ""}
         ${off || t !== "resultados" ? "" : `<label class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 8px; font-size:0.7rem; cursor:pointer; background:${it.foto ? "#64748b" : "var(--btn-fondoVerde)"};">
@@ -1160,6 +1200,7 @@
       const nuevos = [];
       for (const c of crudos) {
         const p = await prepararPartido(c, fichas), v = previos.get(p.id);
+        if (v && v.manual) { if (p.res) v.manual = null; else ponerResultado(p, v.manual); }
         nuevos.push(v ? Object.assign(v, { p }) : { p, sel: true, pag: 1, foto: null, fotoUrl: "" });
       }
       if (estado.carga !== tok) return;
@@ -1415,8 +1456,9 @@
     const verPaso = (n) => { $(m, "paso1").hidden = n !== 1; $(m, "paso2").hidden = n !== 2; };
     m.addEventListener("click", async (ev) => {
       if (ev.target === m) return m.remove();
-      const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar]");
+      const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar],[data-mano]");
       if (!b) return;
+      if (b.dataset.mano != null) { if (resultadoAMano(estado.items[+b.dataset.mano])) { if (estado.dividir) repartir(); pintarLista(m); } return; }
       if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; reencajar(); marcarEstilo(m); return; }
       if (b.dataset.ajustar != null) { if (await ajustarFoto(estado.items[+b.dataset.ajustar])) marcarEstilo(m); return; }
       const a = b.dataset.s;

@@ -228,9 +228,10 @@
   }
 
   // Imagen recortada para llenar el hueco
-  function cubrir(ctx, img, x, y, w, h, fx, fy) {
-    const k = Math.max(w / img.width, h / img.height), iw = img.width * k, ih = img.height * k;
+  function cubrir(ctx, img, x, y, w, h, fx, fy, z) {
+    const k = Math.max(w / img.width, h / img.height) * (z || 1), iw = img.width * k, ih = img.height * k;
     ctx.drawImage(img, x + (w - iw) * (fx == null ? 0.5 : fx), y + (h - ih) * (fy == null ? 0.35 : fy), iw, ih);
+    return { w, h, iw, ih };
   }
   // Imagen entera dentro del hueco
   function contener(ctx, img, cx, cy, lado) {
@@ -401,10 +402,39 @@
     const club = p.nvaLocal ? p.local : p.visit;
     ctx.save(); ctx.globalAlpha = 0.28; contener(ctx, club.logo, x + w / 2, y + h / 2, Math.min(w, h) * 0.8); ctx.restore();
   }
+  // Foto del partido con su ajuste (zoom z ≥ 1 y posición fx, fy de 0 a 1); se apunta el hueco para el editor
+  const huecos = {};
   function foto(ctx, p, x, y, w, h, fy) {
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-    if (p.foto) cubrir(ctx, p.foto, x, y, w, h, 0.5, fy); else sinFoto(ctx, p, x, y, w, h);
+    if (p.foto) {
+      const a = p.ajuste || {};
+      huecos[p.id] = cubrir(ctx, p.foto, x, y, w, h, a.fx == null ? 0.5 : a.fx, a.fy == null ? fy : a.fy, a.z);
+    } else sinFoto(ctx, p, x, y, w, h);
     ctx.restore();
+  }
+
+  // Parciales de los sets ("25-20  23-25 …"); los que gana el club van resaltados en una píldora
+  // o: { gana, texto, pierde, align }
+  function sets(ctx, p, x, cy, maxW, px, o) {
+    if (!p.res || !p.sets.length) return;
+    const lista = p.sets.map(s => ({ t: `${s.local}-${s.visitante}`, club: p.nvaLocal ? s.local > s.visitante : s.visitante > s.local }));
+    let tam = px, pad, gap, anchos, total;
+    for (; tam >= 9; tam -= 1) {
+      ctx.font = FB(tam, 700); pad = tam * 0.42; gap = tam * 0.3;
+      anchos = lista.map(l => ctx.measureText(l.t).width + pad * 2);
+      total = anchos.reduce((a, b) => a + b, 0) + gap * (lista.length - 1);
+      if (total <= maxW) break;
+    }
+    let cx = o.align === "left" ? x : o.align === "right" ? x - total : x - total / 2;
+    ctx.textBaseline = "middle"; ctx.textAlign = "center";
+    lista.forEach((l, i) => {
+      const w = anchos[i], hh = tam * 1.45;
+      if (l.club) { ctx.fillStyle = o.gana; rr(ctx, cx, cy - hh / 2, w, hh, hh / 2); ctx.fill(); }
+      ctx.fillStyle = l.club ? (o.texto || sobre(o.gana)) : o.pierde;
+      ctx.fillText(l.t, cx + w / 2, cy + tam * 0.05);
+      cx += w + gap;
+    });
+    ctx.textBaseline = "alphabetic";
   }
 
   /* =====================================================================
@@ -431,14 +461,15 @@
       texto(ctx, p.cat.replace(/\s*\d.*$/, ""), 0, tab * 0.22, h - 24, tab * 0.62, (s) => F(s, 800, true), sobre(p.color), "center");
       ctx.restore();
       const info = p.res ? 0 : Math.min(330, w * 0.36), ax = x + tab + 16, aw = w - tab - 16 - info - (info ? 26 : 16);
-      const lado = Math.min(h * 0.52, aw * 0.22), nPx = Math.max(20, Math.min(40, h * 0.13));
-      const top = y + (h - lado - nPx * 2.1) / 2;
+      const banda = p.res ? Math.min(64, h * 0.22) : 0, hz = h - banda;
+      const lado = Math.min(hz * 0.52, aw * 0.22), nPx = Math.max(18, Math.min(40, hz * 0.14));
+      const top = y + (hz - lado - nPx * 2.1) / 2 + (banda ? 4 : 0);
       equipo(ctx, p.local, ax + aw * 0.2, top, lado, aw * 0.38, nPx, "#fff", true);
       equipo(ctx, p.visit, ax + aw * 0.8, top, lado, aw * 0.38, nPx, "#fff", true);
-      if (p.res) tanteo(ctx, p, ax + aw / 2, y + h * 0.42, Math.min(h * 0.5, 150));
+      if (p.res) tanteo(ctx, p, ax + aw / 2, top + lado * 0.5, Math.min(hz * 0.5, 150));
       else texto(ctx, "VS", ax + aw / 2, top + lado / 2 + h * 0.08, aw * 0.2, h * 0.24, (s) => F(s, 800, true), "#9aa0a6", "center");
       if (p.res) {
-        texto(ctx, p.dia, ax + aw / 2, y + h - Math.max(16, h * 0.1), aw * 0.22, Math.min(28, h * 0.1), (s) => FB(s, 700), "#9aa0a6", "center");
+        sets(ctx, p, ax + aw / 2, y + h - banda / 2 - 4, aw - 20, Math.min(30, banda * 0.5), { gana: colGana, pierde: "#9aa0a6" });
       } else {
         const ix = x + w - info - 10;
         ctx.fillStyle = p.color; ctx.fillRect(ix, y + h * 0.16, 6, h * 0.68);
@@ -463,8 +494,8 @@
       ctx.fillStyle = p.color; ctx.fillRect(x, y + cab * 0.42, 18, 18);
       ctx.font = FB(Math.min(24, cab * 0.6), 700);
       espaciado(ctx, p.cat, x + 30, y + cab * 0.42 + 16, 4, "#14161c");
-      const meta = p.res ? p.dia : [p.dia, p.hora && `${p.hora} H`].filter(Boolean).join(" · ");
-      ctx.font = FB(Math.min(24, cab * 0.6), 600); espaciado(ctx, meta, x + w, y + cab * 0.42 + 16, 3, "#555", "right");
+      if (p.res) sets(ctx, p, x + w, y + cab * 0.42 + 9, w * 0.55, Math.min(24, cab * 0.55), { gana: "#14161c", texto: "#f1ece2", pierde: "#8a857b", align: "right" });
+      else { ctx.font = FB(Math.min(24, cab * 0.6), 600); espaciado(ctx, [p.dia, p.hora && `${p.hora} H`].filter(Boolean).join(" · "), x + w, y + cab * 0.42 + 16, 3, "#555", "right"); }
       const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.42, 80);
       const numW = p.res ? 90 : 0;
       [[p.local, l1, p.setsL, true], [p.visit, l2, p.setsV, false]].forEach(([eq, cy, sets, loc]) => {
@@ -499,8 +530,8 @@
       ctx.shadowBlur = 0; ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,.55)"; rr(ctx, x + 7, y + 7, w - 14, h - 14, r - 6); ctx.stroke(); ctx.restore();
       const pie = Math.min(34, h * 0.13), cab = Math.min(30, h * 0.12);
       ctx.font = FB(cab * 0.8, 700); espaciado(ctx, p.cat, W / 2, y + cab + 14, 6, p.color, "center");
-      const info = p.res ? p.dia : [p.dia, p.hora && `${p.hora} H`, p.campo].filter(Boolean).join("  ·  ");
-      texto(ctx, info, W / 2, y + h - 18, w - 80, pie * 0.75, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
+      if (p.res) sets(ctx, p, W / 2, y + h - 12 - pie * 0.45, w - 120, pie * 0.72, { gana: p.color, pierde: "rgba(255,255,255,.6)" });
+      else texto(ctx, [p.dia, p.hora && `${p.hora} H`, p.campo].filter(Boolean).join("  ·  "), W / 2, y + h - 18, w - 80, pie * 0.75, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
       const zt = y + cab + 26, zh = h - cab - 26 - pie - 18, lado = Math.min(h * 0.5, 150), nPx = Math.min(40, h * 0.17);
       const top = zt + (zh - lado - nPx * 2) / 2;
       ctx.save(); ctx.shadowColor = rgba(p.color, 0.8); ctx.shadowBlur = 24;
@@ -543,12 +574,13 @@
       }
       const cx = x + bw + sk + 26, cw = w - bw - sk * 2 - 40, lado = Math.min(h * 0.3, 74), nPx = Math.min(40, h * 0.17);
       ctx.font = FB(Math.min(22, h * 0.1), 700); espaciado(ctx, p.cat, cx + 8, y + Math.min(34, h * 0.17), 4, p.color === "#ffffff" ? "#ffc400" : mezcla(p.color, "#ffffff", 0.35));
-      [[p.local, y + h * (p.res ? 0.43 : 0.38)], [p.visit, y + h * (p.res ? 0.43 : 0.38) + lado * 1.1]].forEach(([eq, cy], k) => {
+      [[p.local, y + h * 0.38], [p.visit, y + h * 0.38 + lado * 1.1]].forEach(([eq, cy], k) => {
         const off = k * sk * 0.3;
         ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(cx + lado / 2 - off, cy, lado / 2 + 4, 0, Math.PI * 2); ctx.fill();
         contener(ctx, eq.logo, cx + lado / 2 - off, cy, lado * 0.82);
         ctx.textBaseline = "middle"; texto(ctx, eq.nombre, cx + lado + 18 - off, cy + 2, cw - lado - 10, nPx, (s) => F(s, 800, true), "#ffffff"); ctx.textBaseline = "alphabetic";
       });
+      if (p.res) sets(ctx, p, cx + lado + 18 - sk * 0.3, y + h - Math.min(22, h * 0.1), cw - lado - 30, Math.min(22, h * 0.085), { gana: "#ffc400", pierde: "rgba(255,255,255,.7)", align: "left" });
       if (!p.res && p.campo) texto(ctx, p.campo, cx + lado + 18 - sk * 0.3, y + h - Math.min(12, h * 0.05), cw - lado - 30, Math.min(22, h * 0.09), (s) => FB(s, 600), "rgba(255,255,255,.7)");
     });
   }
@@ -583,7 +615,9 @@
           texto(ctx, String(sets), bx + caja / 2, cy + 3, caja, caja * 0.78, (s) => F(s, 800), (k ? p.setsV > p.setsL : p.setsL > p.setsV) ? amb : "#7a5a1a", "center"); ctx.restore();
           p.sets.slice(0, 5).forEach((s, j) => {
             const v = k ? s.visitante : s.local, o = k ? s.local : s.visitante, sx = bx - 16 - (p.sets.slice(0, 5).length - j) * caja * 0.55;
-            texto(ctx, String(v), sx + caja * 0.27, cy + 2, caja * 0.5, caja * 0.36, (s2) => F(s2, 700), v > o ? "#e8e8e8" : "#6b6b6b", "center");
+            const delClub = (k === 0) === p.nvaLocal && v > o;
+            if (delClub) { ctx.fillStyle = amb; rr(ctx, sx + 2, cy - caja * 0.3, caja * 0.5, caja * 0.6, 8); ctx.fill(); }
+            texto(ctx, String(v), sx + caja * 0.27, cy + 2, caja * 0.5, caja * 0.4, (s2) => F(s2, 800), delClub ? "#050505" : v > o ? "#e8e8e8" : "#6b6b6b", "center");
           });
         }
         ctx.textBaseline = "alphabetic";
@@ -618,8 +652,10 @@
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.moveTo(x, y + 10); ctx.lineTo(x + iw * 0.86, y + 10); ctx.lineTo(x + iw * 0.8, y + 10 + cab); ctx.lineTo(x, y + 10 + cab); ctx.fill();
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.fillStyle = p.color; ctx.fillRect(x, y, iw * 0.86, 12); ctx.restore();
       texto(ctx, p.cat, x + 22, y + 10 + cab * 0.76, iw * 0.7, cab * 0.72, (s) => F(s, 800, true), sobre(p.color));
-      const zt = y + cab + 16, zh = h - cab - 24, lado = Math.min(zh * 0.52, 120), nPx = Math.min(36, zh * 0.15);
+      const banda = p.res ? Math.min(56, h * 0.18) : 0;
+      const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.52, 120), nPx = Math.min(36, zh * 0.15);
       const top = zt + (zh - lado - nPx * 2.2) / 2;
+      if (p.res) sets(ctx, p, x + iw / 2, y + h - banda / 2 - 8, iw - 40, Math.min(26, banda * 0.48), { gana: colGana, pierde: "#b9bcc2" });
       equipo(ctx, p.local, x + iw * 0.2, top, lado, iw * 0.32, nPx, "#fff", true);
       equipo(ctx, p.visit, x + iw * 0.8, top, lado, iw * 0.32, nPx, "#fff", true);
       if (p.res) tanteo(ctx, p, x + iw / 2, top + lado * 0.55, Math.min(lado * 1.25, 130, iw * 0.17));
@@ -660,7 +696,8 @@
         texto(ctx, p.hora || "VS", x + w / 2, zt + lado * 0.8, w * 0.26, lado * 0.5, (s) => F(s, 800, true), "#fff", "center");
         texto(ctx, p.dia, x + w / 2, zt + lado * 0.22, w * 0.26, lado * 0.26, (s) => FB(s, 700), "#7cc4ff", "center");
       }
-      const pie = p.res ? p.dia : p.campo;
+      if (p.res) sets(ctx, p, x + w / 2, y + h - 30, w - 40, Math.min(24, nPx * 0.8), { gana: colGana, pierde: "rgba(255,255,255,.8)" });
+      const pie = p.res ? "" : p.campo;
       if (pie) texto(ctx, pie, x + w / 2, y + h - 22, w - 40, Math.min(22, nPx * 0.75), (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
     });
   }
@@ -689,9 +726,11 @@
       contener(ctx, p.visit.logo, x + pw - m - lado / 2 - 6, cy - pie * 0.12, lado);
       const centro = pw - m * 2 - lado * 2 - 30;
       const linea = p.res ? marcador(p) : (p.hora ? p.hora : "VS");
-      texto(ctx, linea, 0, cy - pie * 0.02, centro, Math.min(pie * 0.34, 80), (s) => F(s, 800, true), "#1d1d1d", "center");
-      texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25, pw - m * 2 - 20, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
-      texto(ctx, p.res ? `${p.cat} · ${p.dia}` : `${p.cat} · ${p.dia}`, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
+      const sube = p.res ? pie * 0.12 : 0;
+      texto(ctx, linea, 0, cy - pie * 0.02 - sube, centro, Math.min(pie * 0.34, 80), (s) => F(s, 800, true), "#1d1d1d", "center");
+      texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25 - sube, pw - m * 2 - 20, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
+      if (p.res) sets(ctx, p, 0, Math.min(cy + pie * 0.25 - sube + nPx * 1.2, y + ph - nPx * 0.75), pw - m * 2 - 20, nPx * 0.72, { gana: "#1d1d1d", texto: "#f8f6f0", pierde: "#8a8a8a" });
+      else texto(ctx, `${p.cat} · ${p.dia}`, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
       ctx.restore();
     });
   }
@@ -713,7 +752,8 @@
       ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(cw + 10, y); ctx.lineTo(cw + 22, y); ctx.lineTo(cw + 22 - sk, y + h); ctx.lineTo(cw + 10 - sk, y + h); ctx.fill();
       ctx.restore();
       const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.4, 96), cab = Math.min(30, h * 0.12);
-      ctx.font = FB(cab * 0.85, 700); espaciado(ctx, p.cat, ax, y + cab + 12, 4, tc);
+      ctx.font = FB(cab * 0.85, 700); const catW = espaciado(ctx, p.cat, ax, y + cab + 12, 4, tc);
+      if (p.res) sets(ctx, p, cw - 34, y + cab * 0.62 + 12, cw - 34 - ax - catW - 30, cab * 0.85, { gana: tc, texto: p.color, pierde: rgba(tc === "#ffffff" ? "#ffffff" : "#111111", 0.6), align: "right" });
       const cy = y + h * 0.53;
       contener(ctx, p.local.logo, ax + lado / 2, cy, lado);
       contener(ctx, p.visit.logo, ax + aw - lado / 2 + sk * 0.35, cy, lado);
@@ -750,7 +790,8 @@
       if (p.res) tanteo(ctx, p, cx + cw / 2, ly + 2, Math.min(h * 0.38, 96));
       else texto(ctx, p.hora || "VS", cx + cw / 2, ly + h * 0.09, cw - lado * 2 - 20, Math.min(h * 0.26, 70), (s) => F(s, 800, true), "#fff", "center");
       const nombres = `${p.local.nombre}  ·  ${p.visit.nombre}`;
-      texto(ctx, nombres, cx + cw / 2, y + h - Math.min(18, h * 0.08) - (p.res ? 0 : nPx * 0.8), cw, nPx * 0.8, (s) => F(s, 700, true), "#fff", "center");
+      texto(ctx, nombres, cx + cw / 2, y + h - Math.min(18, h * 0.08) - nPx * 0.8, cw, nPx * 0.8, (s) => F(s, 700, true), "#fff", "center");
+      if (p.res) sets(ctx, p, cx + cw / 2, y + h - Math.min(14, h * 0.06) - nPx * 0.25, cw, nPx * 0.62, { gana: colGana, pierde: "rgba(255,255,255,.75)" });
       if (!p.res) texto(ctx, [p.dia, p.campo].filter(Boolean).join(" · "), cx + cw / 2, y + h - Math.min(14, h * 0.06), cw, nPx * 0.62, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
     });
   }
@@ -820,11 +861,17 @@
       <div data-s="paso2" hidden>
         <label class="ig-label">Sin fotos</label>
         <div data-s="estilosSin" style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px;"></div>
+        <div data-s="conFotos">
         <label class="ig-label" style="margin-top:8px;">Con fotos</label>
         <div data-s="estilosCon" style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px;"></div>
         <small class="ig-info" data-s="avisoFoto"></small>
+        </div>
         <label class="ig-label" style="margin-top:8px;">Vista previa</label>
         <div data-s="previa" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;"></div>
+        <div data-s="ajustes" hidden>
+          <label class="ig-label" style="margin-top:8px;">🔍 Encajar las fotos en este estilo</label>
+          <div data-s="ajustesLista" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        </div>
         <small class="ig-info" data-s="estado"></small>
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button class="btn-save-session" type="button" data-s="volver" style="flex:1; background:#64748b;">← Volver</button>
@@ -844,7 +891,7 @@
   function paginas() {
     const sel = elegidos(), n = estado.dividir ? estado.paginas : 1, out = [];
     for (let k = 1; k <= n; k++) {
-      const ps = sel.filter(it => (estado.dividir ? it.pag : 1) === k).map(it => Object.assign({}, it.p, { foto: it.foto || null }));
+      const ps = sel.filter(it => (estado.dividir ? it.pag : 1) === k).map(it => Object.assign({}, it.p, { foto: estado.tipo === "resultados" ? it.foto || null : null, ajuste: it.ajuste }));
       if (ps.length) out.push(ps);
     }
     return out.map((ps, i) => ({ tipo: estado.tipo, desde: estado.desde, hasta: estado.hasta, partidos: ps, n: i + 1, total: out.length }));
@@ -860,7 +907,7 @@
     const t = estado.tipo, sel = elegidos();
     const sinRes = t === "resultados" ? estado.items.filter(it => !it.p.res).length : 0;
     $(m, "info").textContent = !estado.items.length ? "No hay partidos de los equipos del club entre esas fechas en «Calendario de partidos»."
-      : `${sel.length} de ${estado.items.length - sinRes} partidos en la story${sinRes ? ` (${sinRes} todavía sin resultado)` : ""}. Las fotos solo salen en los estilos con fotos.`;
+      : `${sel.length} de ${estado.items.length - sinRes} partidos en la story${sinRes ? ` (${sinRes} todavía sin resultado)` : ""}.` + (t === "resultados" ? " Las fotos solo salen en los estilos con fotos." : "");
     $(m, "lista").innerHTML = estado.items.map((it, i) => {
       const p = it.p, off = t === "resultados" && !p.res;
       return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:10px;${it.sel && !off ? "" : " opacity:.5;"}">
@@ -870,7 +917,7 @@
           <small style="color:#64748b;">${esc(p.dia)}${p.hora ? " · " + esc(p.hora) : ""} · ${esc(p.cat)}${off ? " · sin resultado" : ""}</small></div>
         ${estado.dividir && it.sel && !off ? `<select data-pag="${i}" class="app-input" style="width:auto; flex:none; padding:4px 6px; font-size:.75rem;">
           ${Array.from({ length: estado.paginas }, (_, k) => `<option value="${k + 1}" ${it.pag === k + 1 ? "selected" : ""}>Story ${k + 1}</option>`).join("")}</select>` : ""}
-        ${off ? "" : `<label class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 8px; font-size:0.7rem; cursor:pointer; background:${it.foto ? "#64748b" : "var(--btn-fondoVerde)"};">
+        ${off || t !== "resultados" ? "" : `<label class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 8px; font-size:0.7rem; cursor:pointer; background:${it.foto ? "#64748b" : "var(--btn-fondoVerde)"};">
           ${it.foto ? "📸 Cambiar" : "➕ Foto"}<input type="file" accept="image/*" hidden data-foto="${i}"></label>`}
       </div>`;
     }).join("");
@@ -917,7 +964,10 @@
     if (!pags.length) return;
     const muestra = pags[0];
     $(m, "avisoFoto").textContent = elegidos().some(it => it.foto) ? "" : "Ningún partido tiene foto: los estilos con fotos usan el color y el escudo del equipo.";
-    for (const [cont, conFoto] of [["estilosSin", false], ["estilosCon", true]]) {
+    const res = estado.tipo === "resultados";
+    $(m, "conFotos").hidden = !res;
+    if (!res) $(m, "avisoFoto").textContent = "";
+    for (const [cont, conFoto] of res ? [["estilosSin", false], ["estilosCon", true]] : [["estilosSin", false]]) {
       const el = $(m, cont); el.innerHTML = "";
       ESTILOS.filter(e => e.foto === conFoto).forEach(e => {
         const b = document.createElement("button");
@@ -938,11 +988,89 @@
       const si = b.dataset.estilo === estado.estilo;
       b.style.borderColor = si ? "#2563eb" : "#cbd5e1"; b.style.boxShadow = si ? "0 0 0 2px #93c5fd" : "none";
     });
+    const conFoto = (ESTILOS.find(e => e.id === estado.estilo) || {}).foto;
+    const conImagen = elegidos().filter(it => it.foto);
+    $(m, "ajustes").hidden = !(conFoto && conImagen.length);
+    $(m, "ajustesLista").innerHTML = conImagen.map(it => `<button type="button" data-ajustar="${estado.items.indexOf(it)}"
+      style="display:flex; align-items:center; gap:6px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:3px 8px 3px 3px; cursor:pointer; color:#1e293b; font-size:.72rem; max-width:48%;">
+      <img src="${it.fotoUrl}" alt="" style="width:32px; height:32px; object-fit:cover; border-radius:5px; flex:none;">
+      <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✏️ ${esc(it.p.nvaLocal ? it.p.local.nombre : it.p.visit.nombre)}</span></button>`).join("");
     const previa = $(m, "previa"); previa.innerHTML = "";
     paginas().forEach(pag => {
       const c = dibujarPagina(estado.estilo, pag, 0.3);
       c.style.cssText = "flex:0 0 auto; width:" + (paginas().length > 1 ? "46%" : "70%") + "; height:auto; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.25);";
       previa.appendChild(c);
+    });
+  }
+
+  // Editor: la story donde va la foto, arrastrar para moverla y barra (o rueda / pellizco) para el zoom
+  function ajustarFoto(it) {
+    const pag = paginas().find(pg => pg.partidos.some(p => p.id === it.p.id));
+    if (!pag) return Promise.resolve(false);
+    const a = Object.assign({ z: 1, fx: 0.5, fy: 0.35 }, it.ajuste || {});
+    const antes = it.ajuste;
+    return new Promise((resolver) => {
+      const capa = document.createElement("div");
+      capa.setAttribute("role", "dialog"); capa.setAttribute("aria-modal", "true");
+      capa.style.cssText = "position:fixed; inset:0; z-index:100010; background:rgba(5,12,35,.88); display:flex; align-items:center; justify-content:center; padding:12px;";
+      capa.innerHTML = `
+        <div style="background:#0f1d4a; color:#e9eefa; border:1px solid rgba(255,255,255,.15); border-radius:14px; width:100%; max-width:360px; max-height:100%; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:10px; font-family:inherit;">
+          <div style="font-weight:800; font-size:1.05rem; color:#fff;">🔍 Encaja la foto</div>
+          <canvas data-v style="width:100%; max-width:280px; align-self:center; aspect-ratio:9/16; border-radius:10px; touch-action:none; cursor:grab; box-shadow:0 4px 18px rgba(0,0,0,.4);"></canvas>
+          <label style="display:flex; align-items:center; gap:8px; font-size:.9rem;">➖
+            <input type="range" data-z min="1" max="4" step="0.01" value="${a.z}" style="flex:1;">➕</label>
+          <small style="font-size:.8rem; opacity:.85;">Arrastra sobre la story para mover la foto de este partido y usa la barra para acercarla.</small>
+          <div style="display:flex; gap:8px;">
+            <button type="button" data-e="reset" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-weight:700; cursor:pointer;">↺ Centrar</button>
+            <button type="button" data-e="no" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-weight:700; cursor:pointer;">Cancelar</button>
+            <button type="button" data-e="si" style="flex:1.4; padding:10px; border-radius:10px; border:0; background:#16a34a; color:#fff; font:inherit; font-weight:700; cursor:pointer;">✅ Usar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(capa);
+      const lienzoV = capa.querySelector("[data-v]"), zoom = capa.querySelector("[data-z]");
+      let pendiente = false, escala = 0.25;
+      const pintar = () => {
+        pendiente = false;
+        it.ajuste = Object.assign({}, a);
+        const pg = Object.assign({}, pag, { partidos: pag.partidos.map(p => p.id === it.p.id ? Object.assign({}, p, { ajuste: it.ajuste }) : p) });
+        const r = lienzoV.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+        escala = (r.width || 260) * dpr / W;
+        const c = dibujarPagina(estado.estilo, pg, escala);
+        lienzoV.width = c.width; lienzoV.height = c.height;
+        lienzoV.getContext("2d").drawImage(c, 0, 0);
+      };
+      const repintar = () => { if (!pendiente) { pendiente = true; requestAnimationFrame(pintar); } };
+      const cambiarZoom = (z) => { a.z = Math.min(4, Math.max(1, z)); zoom.value = String(a.z); repintar(); };
+      zoom.oninput = () => cambiarZoom(+zoom.value);
+      lienzoV.addEventListener("wheel", (e) => { e.preventDefault(); cambiarZoom(a.z * (e.deltaY < 0 ? 1.06 : 1 / 1.06)); }, { passive: false });
+      const dedos = new Map();
+      let distancia = 0;
+      lienzoV.addEventListener("pointerdown", (e) => { lienzoV.setPointerCapture(e.pointerId); dedos.set(e.pointerId, { x: e.clientX, y: e.clientY }); });
+      lienzoV.addEventListener("pointermove", (e) => {
+        const prev = dedos.get(e.pointerId);
+        if (!prev) return;
+        dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (dedos.size === 2) {
+          const [p1, p2] = [...dedos.values()], d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          if (distancia) cambiarZoom(a.z * d / distancia);
+          distancia = d;
+          return;
+        }
+        // Del movimiento en pantalla al desplazamiento de la foto dentro de su hueco
+        const hu = huecos[it.p.id], k = W / lienzoV.getBoundingClientRect().width;
+        if (!hu) return;
+        if (hu.iw > hu.w + 1) a.fx = Math.min(1, Math.max(0, a.fx - (e.clientX - prev.x) * k / (hu.iw - hu.w)));
+        if (hu.ih > hu.h + 1) a.fy = Math.min(1, Math.max(0, a.fy - (e.clientY - prev.y) * k / (hu.ih - hu.h)));
+        repintar();
+      });
+      const soltar = (e) => { dedos.delete(e.pointerId); distancia = 0; };
+      lienzoV.addEventListener("pointerup", soltar);
+      lienzoV.addEventListener("pointercancel", soltar);
+      const cerrar = (ok) => { capa.remove(); if (!ok) it.ajuste = antes; resolver(ok); };
+      capa.querySelector('[data-e="reset"]').onclick = () => { Object.assign(a, { z: 1, fx: 0.5, fy: 0.35 }); cambiarZoom(1); };
+      capa.querySelector('[data-e="no"]').onclick = () => cerrar(false);
+      capa.querySelector('[data-e="si"]').onclick = () => cerrar(true);
+      requestAnimationFrame(pintar);
     });
   }
 
@@ -975,16 +1103,18 @@
     tipo = tipo === "resultados" ? "resultados" : "proximos";
     const r = tipo === "resultados" ? rangoResultados() : rangoProximos();
     estado = { tipo, desde: r.desde, hasta: r.hasta, items: [], dividir: false, paginas: 2, estilo: estiloGuardado() };
-    if (!ESTILOS.some(e => e.id === estado.estilo)) estado.estilo = "marco";
+    const valido = ESTILOS.find(e => e.id === estado.estilo);
+    if (!valido || (valido.foto && tipo !== "resultados")) estado.estilo = "marco";
     const m = modal();
     $(m, "titulo").textContent = tipo === "resultados" ? "🏆 Story · Resultados de la semana" : "📅 Story · Partidos de la semana";
     $(m, "desde").value = estado.desde; $(m, "hasta").value = estado.hasta;
     const verPaso = (n) => { $(m, "paso1").hidden = n !== 1; $(m, "paso2").hidden = n !== 2; };
     m.addEventListener("click", async (ev) => {
       if (ev.target === m) return m.remove();
-      const b = ev.target.closest("[data-s],[data-estilo]");
+      const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar]");
       if (!b) return;
       if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; marcarEstilo(m); return; }
+      if (b.dataset.ajustar != null) { if (await ajustarFoto(estado.items[+b.dataset.ajustar])) marcarEstilo(m); return; }
       const a = b.dataset.s;
       if (a === "cerrar") m.remove();
       else if (a === "volver") verPaso(1);
@@ -1018,7 +1148,7 @@
         const it = estado.items[+t.dataset.foto], f = t.files && t.files[0];
         if (!f) return;
         if (it.fotoUrl && it.fotoUrl.startsWith("blob:")) URL.revokeObjectURL(it.fotoUrl);
-        it.fotoUrl = URL.createObjectURL(f); it.foto = await cargarImg(it.fotoUrl);
+        it.fotoUrl = URL.createObjectURL(f); it.foto = await cargarImg(it.fotoUrl); it.ajuste = null;
         pintarLista(m);
       }
     });

@@ -455,7 +455,7 @@
     ctx.fillStyle = "#0b0b0c"; ctx.fillRect(0, 0, W, H);
     vetas(ctx, 0, 0, W, H, 11, "#ffffff", 0.07); grano(ctx, 0, 0, W, H, 0.25, 3);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#f5c518", alfaLogo: 0.5, sombra: true });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 26, 380);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 26, 460);
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 60, w = W - 120, tab = Math.min(70, h * 0.32), r = Math.min(30, h * 0.18);
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip();
@@ -470,18 +470,18 @@
       ctx.restore();
       const info = p.res ? 0 : Math.min(330, w * 0.36), ax = x + tab + 16, aw = w - tab - 16 - info - (info ? 26 : 16);
       const banda = p.res ? Math.min(64, h * 0.22) : 0, hz = h - banda;
-      const lado = Math.min(hz * 0.64, aw * 0.27), nPx = Math.max(18, Math.min(38, hz * 0.13));
+      const lado = Math.min(hz * 0.66, aw * 0.27), nPx = Math.max(18, Math.min(50, hz * 0.15));
       const top = y + (hz - lado - nPx * 2.1) / 2 + (banda ? 4 : 0);
-      equipo(ctx, p.local, ax + aw * 0.2, top, lado, aw * 0.38, nPx, "#fff", true);
-      equipo(ctx, p.visit, ax + aw * 0.8, top, lado, aw * 0.38, nPx, "#fff", true);
-      if (p.res) tanteo(ctx, p, ax + aw / 2, top + lado * 0.5, Math.min(hz * 0.5, 150));
+      equipo(ctx, p.local, ax + aw * 0.2, top, lado, aw * 0.4, nPx, "#fff", true);
+      equipo(ctx, p.visit, ax + aw * 0.8, top, lado, aw * 0.4, nPx, "#fff", true);
+      if (p.res) tanteo(ctx, p, ax + aw / 2, top + lado * 0.5, Math.min(hz * 0.5, 190));
       else texto(ctx, "VS", ax + aw / 2, top + lado / 2 + h * 0.08, aw * 0.2, h * 0.24, (s) => F(s, 800, true), "#9aa0a6", "center");
       if (p.res) {
         sets(ctx, p, ax + aw / 2, y + h - banda / 2 - 4, aw - 20, Math.min(30, banda * 0.5), { gana: p.color, pierde: "#9aa0a6" });
       } else {
         const ix = x + w - info - 10;
         ctx.fillStyle = p.color; ctx.fillRect(ix, y + h * 0.16, 6, h * 0.68);
-        const px = Math.min(44, h * 0.17), tx = ix + 24, tw = info - 30;
+        const px = Math.min(56, h * 0.17), tx = ix + 24, tw = info - 30;
         texto(ctx, p.dia, tx, y + h * 0.36, tw, px, (s) => F(s, 800, true), "#fff");
         texto(ctx, p.hora ? `${p.hora} H` : "HORA POR CONFIRMAR", tx, y + h * 0.36 + px * 1.1, tw, px * (p.hora ? 1 : 0.6), (s) => F(s, 800, true), "#fff");
         bloque(ctx, p.campo, tx, y + h * 0.36 + px * 1.95, tw, px * 0.62, (s) => F(s, 700), "#c9cdd2", "left", 2);
@@ -493,18 +493,18 @@
   function eCronica(ctx, pag) {
     ctx.fillStyle = "#f1ece2"; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.35, 5, true);
     cabecera(ctx, pag, { texto: "#14161c", acento: "#d1452b", fechaTxt: "#14161c", alfaLogo: 0.22, mezcla: "multiply" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 0, 280), x = 70, w = W - 140;
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 0, 360), x = 70, w = W - 140;
     ctx.fillStyle = "#14161c"; ctx.fillRect(x, R[0].y - 3, w, 5);
     ps.forEach((p, i) => {
       const { y, h } = R[i];
       ctx.fillStyle = "#14161c"; ctx.globalAlpha = 0.85; ctx.fillRect(x, y + h - 1.5, w, i === ps.length - 1 ? 5 : 2); ctx.globalAlpha = 1;
-      const cab = Math.min(44, h * 0.2), px = Math.min(52, (h - cab) * 0.3);
+      const cab = Math.min(44, h * 0.2), px = Math.min(66, (h - cab) * 0.3);
       ctx.fillStyle = p.color; ctx.fillRect(x, y + cab * 0.42, 18, 18);
       ctx.font = FB(Math.min(24, cab * 0.6), 700);
       espaciado(ctx, p.cat, x + 30, y + cab * 0.42 + 16, 4, "#14161c");
       if (p.res) sets(ctx, p, x + w, y + cab * 0.42 + 9, w * 0.55, Math.min(24, cab * 0.55), { gana: p.color, pierde: "#8a857b", align: "right", borde: "#14161c" });
       else { ctx.font = FB(Math.min(24, cab * 0.6), 600); espaciado(ctx, [p.dia, p.hora && `${p.hora} H`].filter(Boolean).join(" · "), x + w, y + cab * 0.42 + 16, 3, "#555", "right"); }
-      const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.47, 130);
+      const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.47, 160);
       const numW = p.res ? 90 : 0;
       [[p.local, l1, p.setsL, true], [p.visit, l2, p.setsV, false]].forEach(([eq, cy, sets, loc]) => {
         contener(ctx, eq.logo, x + lado / 2, cy, lado);
@@ -530,7 +530,7 @@
     for (let j = 0; j < 12; j++) { const yy = H * 0.42 + Math.pow(j / 11, 1.8) * H * 0.58; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
     ctx.restore(); grano(ctx, 0, 0, W, H, 0.12, 9);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#7cc4ff", alfaLogo: 0.55, pill: "rgba(124,196,255,.16)" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 30, 360);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 30, 440);
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 70, w = W - 140, r = Math.min(44, h * 0.25);
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.fillStyle = "rgba(8,12,34,.72)"; ctx.fill();
@@ -540,17 +540,17 @@
       ctx.font = FB(cab * 0.8, 700); espaciado(ctx, p.cat, W / 2, y + cab + 14, 6, p.color, "center");
       if (p.res) sets(ctx, p, W / 2, y + h - 12 - pie * 0.45, w - 120, pie * 0.72, { gana: p.color, pierde: "rgba(255,255,255,.6)" });
       else texto(ctx, [p.dia, p.hora && `${p.hora} H`, p.campo].filter(Boolean).join("  ·  "), W / 2, y + h - 18, w - 80, pie * 0.75, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
-      const zt = y + cab + 26, zh = h - cab - 26 - pie - 18, lado = Math.min(h * 0.64, 200), nPx = Math.min(40, h * 0.17);
+      const zt = y + cab + 26, zh = h - cab - 26 - pie - 18, lado = Math.min(h * 0.64, 190), nPx = Math.min(48, h * 0.16);
       const top = zt + (zh - lado - nPx * 2) / 2;
       ctx.save(); ctx.shadowColor = rgba(p.color, 0.8); ctx.shadowBlur = 24;
       contener(ctx, p.local.logo, x + 50 + lado / 2, y + h / 2, lado); contener(ctx, p.visit.logo, x + w - 50 - lado / 2, y + h / 2, lado); ctx.restore();
       const tw = w - 100 - lado * 2 - 40, cx = W / 2;
       if (p.res) {
-        ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 30; tanteo(ctx, p, cx, zt + zh * 0.36, Math.min(zh * 0.62, 130), ["#fff", "#fff", p.color]); ctx.restore();
-        texto(ctx, `${p.local.nombre}  ·  ${p.visit.nombre}`, cx, zt + zh * 0.84, tw, nPx, (s) => F(s, 700), "#dfe6ff", "center");
+        ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 30; tanteo(ctx, p, cx, zt + zh * 0.36, Math.min(zh * 0.62, 170), ["#fff", "#fff", p.color]); ctx.restore();
+        texto(ctx, `${p.local.nombre}  ·  ${p.visit.nombre}`, cx, zt + zh * 0.84, tw, Math.min(nPx, zh * 0.26), (s) => F(s, 700), "#dfe6ff", "center");
       } else {
         bloque(ctx, p.local.nombre, cx, zt + zh * 0.2, tw, nPx * 1.1, (s) => F(s, 800, true), "#fff", "center", 1);
-        ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 20; texto(ctx, "VS", cx, zt + zh * 0.5 + nPx * 0.4, tw, nPx * 1.2, (s) => F(s, 800, true), p.color, "center"); ctx.restore();
+        ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 20; texto(ctx, "VS", cx, zt + zh * 0.5 + nPx * 0.3, tw, nPx * 0.85, (s) => F(s, 800, true), p.color, "center"); ctx.restore();
         bloque(ctx, p.visit.nombre, cx, zt + zh * 0.8, tw, nPx * 1.1, (s) => F(s, 800, true), "#fff", "center", 1);
       }
     });
@@ -563,7 +563,7 @@
     for (let i = -4; i < 12; i++) { ctx.beginPath(); ctx.moveTo(i * 180, 0); ctx.lineTo(i * 180 + 70, 0); ctx.lineTo(i * 180 + 70 - 600, H); ctx.lineTo(i * 180 - 600, H); ctx.fill(); }
     ctx.restore(); grano(ctx, 0, 0, W, H, 0.15, 13);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffc400", alfaLogo: 0.45, pill: "#ffc400", fechaTxt: "#0a1640" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 22, 320);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 22, 400);
     ps.forEach((p, i) => {
       const { y, h } = R[i], sk = h * 0.28, x = 40 + (i % 2 ? 24 : 0), w = W - 104, bw = Math.min(260, w * 0.28);
       const poli = (x0, w0) => { ctx.beginPath(); ctx.moveTo(x0 + sk, y); ctx.lineTo(x0 + w0, y); ctx.lineTo(x0 + w0 - sk, y + h); ctx.lineTo(x0, y + h); ctx.closePath(); };
@@ -573,14 +573,14 @@
       ctx.fillStyle = g; poli(x, bw + sk); ctx.fill();
       const tc = sobre(p.color), bx = x + (bw + sk) / 2;
       if (p.res) {
-        tanteo(ctx, p, bx, y + h * 0.48, Math.min(h * 0.55, 120), [tc, tc, tc]);
+        tanteo(ctx, p, bx, y + h * 0.48, Math.min(h * 0.55, 160), [tc, tc, tc]);
         texto(ctx, p.dia, bx, y + h * 0.88, bw * 0.75, Math.min(26, h * 0.12), (s) => FB(s, 700), tc, "center");
       } else {
         texto(ctx, p.dia.split(" ")[0], bx, y + h * 0.3, bw * 0.7, Math.min(30, h * 0.14), (s) => FB(s, 700), tc, "center");
         texto(ctx, p.dia.split(" ")[1], bx, y + h * 0.66, bw * 0.7, Math.min(110, h * 0.42), (s) => F(s, 800, true), tc, "center");
         texto(ctx, p.dia.split(" ")[2] + (p.hora ? ` · ${p.hora}` : ""), bx, y + h * 0.88, bw * 0.75, Math.min(30, h * 0.13), (s) => FB(s, 700), tc, "center");
       }
-      const cx = x + bw + sk + 26, cw = w - bw - sk * 2 - 40, lado = Math.min((h - 46) / 2.2, 120), nPx = Math.min(40, h * 0.17);
+      const cx = x + bw + sk + 26, cw = w - bw - sk * 2 - 40, lado = Math.min((h - 46) / 2.2, 160), nPx = Math.min(54, h * 0.18);
       ctx.font = FB(Math.min(22, h * 0.1), 700); const catW = espaciado(ctx, p.cat, cx + 8, y + Math.min(34, h * 0.17), 4, p.color === "#ffffff" ? "#ffc400" : mezcla(p.color, "#ffffff", 0.35));
       [[p.local, y + Math.min(44, h * 0.2) + lado / 2 + 2], [p.visit, y + Math.min(44, h * 0.2) + lado * 1.6 + 6]].forEach(([eq, cy], k) => {
         const off = k * sk * 0.3;
@@ -599,7 +599,7 @@
     ctx.fillStyle = "rgba(255,255,255,.045)";
     for (let yy = 8; yy < H; yy += 16) for (let xx = 8; xx < W; xx += 16) ctx.fillRect(xx, yy, 3, 3);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffb300", alfaLogo: 0.38, pill: "#ffb300", fechaTxt: "#050505" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 24, 320), amb = "#ffb300";
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 24, 400), amb = "#ffb300";
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 54, w = W - 108, cab = Math.min(48, h * 0.24), filaH = (h - cab) / 2;
       ctx.fillStyle = "#121212"; rr(ctx, x, y, w, h, 12); ctx.fill();
@@ -608,7 +608,7 @@
       ctx.font = F(cab * 0.62, 800, true); espaciado(ctx, p.cat, x + 20, y + cab * 0.72, 3, sobre(p.color));
       ctx.font = FB(cab * 0.48, 700);
       espaciado(ctx, p.res ? p.dia : [p.dia, p.campo].filter(Boolean).join(" · ").slice(0, 52), x + w - 20, y + cab * 0.7, 2, sobre(p.color), "right");
-      const caja = Math.min(filaH * 0.8, 110), lado = Math.min(filaH * 0.88, 120), nPx = Math.min(44, filaH * 0.42);
+      const caja = Math.min(filaH * 0.8, 130), lado = Math.min(filaH * 0.88, 150), nPx = Math.min(56, filaH * 0.44);
       [[p.local, p.setsL, 0], [p.visit, p.setsV, 1]].forEach(([eq, sets, k]) => {
         const cy = y + cab + filaH * (k + 0.5);
         if (k === 1) { ctx.fillStyle = "#2a2a2a"; ctx.fillRect(x + 18, y + cab + filaH, w - 36, 2); }
@@ -661,11 +661,11 @@
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.fillStyle = p.color; ctx.fillRect(x, y, iw * 0.86, 12); ctx.restore();
       texto(ctx, p.cat, x + 22, y + 10 + cab * 0.76, iw * 0.7, cab * 0.72, (s) => F(s, 800, true), sobre(p.color));
       const banda = p.res ? Math.min(56, h * 0.18) : 0;
-      const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.74, 160), nPx = Math.min(32, zh * 0.12);
+      const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.72, 190), nPx = Math.min(40, zh * 0.14);
       const top = zt + (zh - lado - nPx * 2.2) / 2;
       if (p.res) sets(ctx, p, x + iw / 2, y + h - banda / 2 - 8, iw - 40, Math.min(26, banda * 0.48), { gana: p.color, pierde: "#b9bcc2" });
-      equipo(ctx, p.local, x + iw * 0.2, top, lado, iw * 0.32, nPx, "#fff", true);
-      equipo(ctx, p.visit, x + iw * 0.8, top, lado, iw * 0.32, nPx, "#fff", true);
+      equipo(ctx, p.local, x + iw * 0.2, top, lado, iw * 0.36, nPx, "#fff", true);
+      equipo(ctx, p.visit, x + iw * 0.8, top, lado, iw * 0.36, nPx, "#fff", true);
       if (p.res) tanteo(ctx, p, x + iw / 2, top + lado * 0.55, Math.min(lado * 1.25, 130, iw * 0.17));
       else {
         texto(ctx, "VS", x + iw / 2, top + lado * 0.68, iw * 0.2, lado * 0.5, (s) => F(s, 800, true), "#e9c46a", "center");
@@ -693,13 +693,13 @@
       const cw = ctx.measureText(p.cat).width + 34;
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.moveTo(x, y + 18); ctx.lineTo(x + cw + 14, y + 18); ctx.lineTo(x + cw, y + 18 + cab); ctx.lineTo(x, y + 18 + cab); ctx.fill();
       texto(ctx, p.cat, x + 16, y + 18 + cab * 0.76, cw, cab * 0.7, (s) => F(s, 800, true), sobre(p.color));
-      const zona = Math.min(h * 0.46, 260), zt = y + h - zona - 8, lado = Math.min(zona * 0.46, w * 0.23), nPx = Math.min(32, zona * 0.13, w * 0.06);
+      const zona = Math.min(h * 0.46, 330), zt = y + h - zona - 8, lado = Math.min(zona * 0.46, w * 0.25), nPx = Math.min(42, zona * 0.14, w * 0.07);
       const ancho = w * 0.36;
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 14;
       contener(ctx, p.local.logo, x + w * 0.2, zt + lado * 0.6, lado); contener(ctx, p.visit.logo, x + w * 0.8, zt + lado * 0.6, lado); ctx.restore();
       bloque(ctx, p.local.nombre, x + w * 0.2, zt + lado * 1.2 + nPx, ancho, nPx, (s) => F(s, 800, true), "#fff", "center", 2);
       bloque(ctx, p.visit.nombre, x + w * 0.8, zt + lado * 1.2 + nPx, ancho, nPx, (s) => F(s, 800, true), "#fff", "center", 2);
-      if (p.res) tanteo(ctx, p, x + w / 2, zt + lado * 0.6, Math.min(lado * 1.05, 120));
+      if (p.res) tanteo(ctx, p, x + w / 2, zt + lado * 0.6, Math.min(lado * 1.05, 160));
       else {
         texto(ctx, p.hora || "VS", x + w / 2, zt + lado * 0.8, w * 0.26, lado * 0.5, (s) => F(s, 800, true), "#fff", "center");
         texto(ctx, p.dia, x + w / 2, zt + lado * 0.22, w * 0.26, lado * 0.26, (s) => FB(s, 700), "#7cc4ff", "center");
@@ -720,7 +720,7 @@
       const t = T[i], ang = ((i % 2 ? 1 : -1) * (1.2 + rnd() * 1.6)) * Math.PI / 180;
       const pw = Math.min(t.w, t.h * (ps.length === 1 ? 0.8 : 1.25)), ph = t.h;
       ctx.save(); ctx.translate(t.x + t.w / 2, t.y + t.h / 2); ctx.rotate(ang);
-      const x = -pw / 2, y = -ph / 2, m = Math.max(12, pw * 0.035), pie = Math.min(ph * 0.34, 210);
+      const x = -pw / 2, y = -ph / 2, m = Math.max(12, pw * 0.035), pie = Math.min(ph * 0.34, 250);
       ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
       ctx.fillStyle = "#f8f6f0"; ctx.fillRect(x, y, pw, ph); ctx.shadowColor = "transparent";
       grano(ctx, x, y, pw, ph, 0.12, 31, true);
@@ -729,7 +729,7 @@
       ctx.fillStyle = p.color; ctx.fillRect(x + m, y + ph - pie - 2, pw - m * 2, 6);
       // Cinta
       ctx.save(); ctx.translate(0, y + 4); ctx.rotate(-ang * 2); ctx.fillStyle = "rgba(255,248,220,.6)"; ctx.fillRect(-pw * 0.14, -16, pw * 0.28, 34); ctx.restore();
-      const cy = y + ph - pie / 2, lado = Math.min(pie * 0.58, 110), nPx = Math.min(30, pie * 0.17, pw * 0.055);
+      const cy = y + ph - pie / 2, lado = Math.min(pie * 0.58, 140), nPx = Math.min(38, pie * 0.17, pw * 0.065);
       contener(ctx, p.local.logo, x + m + lado / 2 + 6, cy - pie * 0.12, lado);
       contener(ctx, p.visit.logo, x + pw - m - lado / 2 - 6, cy - pie * 0.12, lado);
       const centro = pw - m * 2 - lado * 2 - 30;
@@ -749,7 +749,7 @@
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffffff", alfaLogo: 0.55, pill: "#ffffff", fechaTxt: "#000" });
     const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 10, 420);
     ps.forEach((p, i) => {
-      const { y, h } = R[i], sk = h * 0.35, cw = W * 0.56;
+      const { y, h } = R[i], sk = h * 0.35, cw = W * 0.6;
       ctx.save(); ctx.beginPath(); ctx.rect(0, y, W, h); ctx.clip();
       foto(ctx, p, W * 0.3, y, W * 0.7, h, 0.35, { x0: 0.42 });
       const g = ctx.createLinearGradient(W * 0.3, 0, W * 0.62, 0); g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
@@ -759,18 +759,18 @@
       ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.lineTo(cw - sk, y + h); ctx.lineTo(0, y + h); ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(cw + 10, y); ctx.lineTo(cw + 22, y); ctx.lineTo(cw + 22 - sk, y + h); ctx.lineTo(cw + 10 - sk, y + h); ctx.fill();
       ctx.restore();
-      const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.52, 150), cab = Math.min(30, h * 0.12);
+      const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.54, 190, aw * 0.32), cab = Math.min(32, h * 0.12);
       ctx.font = FB(cab * 0.85, 700); const catW = espaciado(ctx, p.cat, ax, y + cab + 12, 4, tc);
       if (p.res) sets(ctx, p, cw - 34, y + cab * 0.62 + 12, cw - 34 - ax - catW - 30, cab * 0.85, { gana: p.color, pierde: rgba(tc === "#ffffff" ? "#ffffff" : "#111111", 0.6), align: "right", borde: tc });
       const cy = y + h * 0.53;
       contener(ctx, p.local.logo, ax + lado / 2, cy, lado);
       contener(ctx, p.visit.logo, ax + aw - lado / 2 + sk * 0.35, cy, lado);
-      if (p.res) tanteo(ctx, p, ax + (aw + sk * 0.35) / 2, cy + 2, Math.min(h * 0.42, 120), [tc, tc, tc]);
+      if (p.res) tanteo(ctx, p, ax + (aw + sk * 0.35) / 2, cy + 2, Math.min(h * 0.42, 140, (aw + sk * 0.35 - lado * 2 - 30) / 1.8), [tc, tc, tc]);
       else {
         texto(ctx, p.hora || "VS", ax + (aw + sk * 0.35) / 2, cy + h * 0.1, aw - lado * 2 - 20, Math.min(h * 0.3, 90), (s) => F(s, 800, true), tc, "center");
         texto(ctx, p.dia, ax + (aw + sk * 0.35) / 2, cy - Math.min(h * 0.3, 90) * 0.55, aw - lado * 2 - 20, Math.min(30, h * 0.1), (s) => FB(s, 700), tc, "center");
       }
-      texto(ctx, `${p.local.nombre} - ${p.visit.nombre}`, ax, y + h - Math.min(18, h * 0.08), aw - sk * 0.4, Math.min(30, h * 0.09), (s) => F(s, 700, true), tc);
+      texto(ctx, `${p.local.nombre} - ${p.visit.nombre}`, ax, y + h - Math.min(18, h * 0.08), aw - sk * 0.4, Math.min(40, h * 0.1), (s) => F(s, 700, true), tc);
       ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.fillRect(0, y + h + 4, W, 2);
     });
   }
@@ -782,7 +782,7 @@
     else { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, mezcla(pag.partidos[0].color, "#0d1b45", 0.5)); g.addColorStop(1, "#060b1e"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
     ctx.fillStyle = "rgba(6,10,28,.55)"; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.12, 41);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffffff", alfaLogo: 0.6, pill: "rgba(255,255,255,.18)", sombra: true });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 24, 320);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 24, 420);
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 50, w = W - 100, r = Math.min(40, h * 0.3);
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.fillStyle = "rgba(255,255,255,.13)"; ctx.fill();
@@ -790,7 +790,7 @@
       const d = h - 28, fx = x + 14 + d / 2, fy = y + h / 2;
       ctx.save(); ctx.beginPath(); ctx.arc(fx, fy, d / 2, 0, Math.PI * 2); ctx.clip(); foto(ctx, p, fx - d / 2, fy - d / 2, d, d, 0.3, { x0: 0.12, x1: 0.88, y0: 0.12, y1: 0.88 }); ctx.restore();
       ctx.lineWidth = 6; ctx.strokeStyle = p.color; ctx.beginPath(); ctx.arc(fx, fy, d / 2 + 1, 0, Math.PI * 2); ctx.stroke();
-      const cx = x + d + 44, cw = w - d - 70, cab = Math.min(26, h * 0.12), lado = Math.min(h * 0.5, 140), nPx = Math.min(34, h * 0.15);
+      const cx = x + d + 44, cw = w - d - 70, cab = Math.min(26, h * 0.12), lado = Math.min(h * 0.54, 180), nPx = Math.min(44, h * 0.16);
       ctx.font = FB(cab * 0.9, 700); espaciado(ctx, p.cat, cx, y + cab + Math.min(20, h * 0.1), 4, mezcla(p.color, "#ffffff", 0.3));
       const ly = y + h * 0.46;
       contener(ctx, p.local.logo, cx + lado / 2, ly, lado);
@@ -817,7 +817,7 @@
   function escudoCirculo(ctx, logo, cx, cy, d, fondo) {
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = d * 0.12; ctx.shadowOffsetY = d * 0.03;
     ctx.fillStyle = fondo || "#ffffff"; ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    contener(ctx, logo, cx, cy, d * 0.72);
+    contener(ctx, logo, cx, cy, d * 0.8);
   }
 
   // 11 · Cartelera: papel de cartel, los partidos agrupados por día, la hora en grande
@@ -826,7 +826,7 @@
     cabecera(ctx, pag, { texto: "#111111", acento: "#c8102e", fechaTxt: "#111111", alfaLogo: 0.2, mezcla: "multiply" });
     const x = 72, w = W - 144, dias = porDias(pag.partidos), n = pag.partidos.length;
     const cabD = Math.min(96, 1240 / (dias.length * 1.6 + n));   // alto de la cabecera de cada día
-    const filaH = Math.min(240, (Y1 + 20 - Y0 - cabD * dias.length - 14 * (dias.length - 1)) / n);
+    const filaH = Math.min(300, (Y1 + 20 - Y0 - cabD * dias.length - 14 * (dias.length - 1)) / n);
     let y = Y0 + Math.max(0, (Y1 + 20 - Y0 - cabD * dias.length - 14 * (dias.length - 1) - filaH * n) / 2);
     dias.forEach((dia, k) => {
       const d = partesDia(dia.ps[0]), base = y + cabD * 0.78;
@@ -844,10 +844,10 @@
         ctx.textBaseline = "middle";
         texto(ctx, p.hora || "--:--", x, cy + filaH * 0.03, hw - 26, Math.min(100, filaH * 0.5), (s) => F(s, 800, true), "#111111");
         ctx.fillStyle = p.color; ctx.fillRect(x + hw - 4, y + filaH * 0.18, 8, filaH * 0.64);
-        const lado = Math.min(filaH * 0.62, 130), lx = x + hw + 22;
+        const lado = Math.min(filaH * 0.7, 160), lx = x + hw + 22;
         contener(ctx, p.local.logo, lx + lado / 2, cy, lado);
         contener(ctx, p.visit.logo, lx + lado * 1.55, cy, lado);
-        const tx = lx + lado * 2.1 + 14, tw = x + w - tx, px = Math.min(46, filaH * 0.21);
+        const tx = lx + lado * 2.1 + 14, tw = x + w - tx, px = Math.min(56, filaH * 0.23);
         ctx.font = FB(px * 0.62, 700); espaciado(ctx, p.cat, tx, cy - px * 1.45, 3, mezcla(p.color, "#111111", luz(p.color) > 0.6 ? 0.45 : 0));
         texto(ctx, p.local.nombre, tx, cy - px * 0.42, tw, px, (s) => F(s, 800, true), "#111111");
         texto(ctx, p.visit.nombre, tx, cy + px * 0.62, tw, px, (s) => F(s, 700), "#3b3b3b");
@@ -878,22 +878,22 @@
     ctx.restore();
     ctx.fillStyle = "rgba(40,16,4,.28)"; ctx.fillRect(0, 0, W, H);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffe2c2", alfaLogo: 0.45, pill: "#ffffff", fechaTxt: "#8a3f16", sombra: true });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 18, 340);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 18, 420);
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 64, w = W - 128, r2 = Math.min(26, h * 0.2);
       ctx.save(); ctx.shadowColor = "rgba(40,14,0,.45)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
       ctx.fillStyle = "#fbf8f3"; rr(ctx, x, y, w, h, r2); ctx.fill(); ctx.restore();
-      const dc = Math.min(h * 0.78, 190), cx = x + 22 + dc / 2, cy = y + h / 2;
+      const dc = Math.min(h * 0.78, 230), cx = x + 22 + dc / 2, cy = y + h / 2;
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(cx, cy, dc / 2, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,.12)"; ctx.lineWidth = 2; ctx.stroke();
       const tc = sobre(p.color), d = partesDia(p);
       ctx.textBaseline = "middle";
       texto(ctx, p.hora || "--:--", cx, cy + dc * 0.06, dc * 0.8, dc * 0.3, (s) => F(s, 800, true), tc, "center");
       texto(ctx, `${d.corto} ${d.num}`, cx, cy - dc * 0.24, dc * 0.6, dc * 0.13, (s) => FB(s, 700), tc, "center");
-      const lado = Math.min(h * 0.56, 120), ax = cx + dc / 2 + 26, aw = x + w - 24 - ax;
+      const ax = cx + dc / 2 + 26, aw = x + w - 24 - ax, lado = Math.min(h * 0.62, 170, aw * 0.21);
       contener(ctx, p.local.logo, ax + lado / 2, cy - h * 0.04, lado);
       contener(ctx, p.visit.logo, ax + aw - lado / 2, cy - h * 0.04, lado);
-      const mx = ax + aw / 2, mw = aw - lado * 2 - 24, nPx = Math.min(42, h * 0.17);
+      const mx = ax + aw / 2, mw = aw - lado * 2 - 24, nPx = Math.min(54, h * 0.2);
       ctx.font = FB(Math.min(20, h * 0.09), 700); espaciado(ctx, p.cat, mx, y + Math.min(30, h * 0.17), 3, mezcla(p.color, "#000000", luz(p.color) > 0.6 ? 0.45 : 0.1), "center");
       bloque(ctx, p.local.nombre, mx, cy - nPx * 0.95, mw, nPx, (s) => F(s, 800, true), "#1b1b1b", "center", 1);
       texto(ctx, "VS", mx, cy + nPx * 0.05, mw, nPx * 0.6, (s) => F(s, 800, true), "#b0602c", "center");
@@ -911,7 +911,7 @@
     for (let yy = -H; yy < H * 2; yy += 26) { ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy + W * 0.5); ctx.stroke(); }
     ctx.restore(); grano(ctx, 0, 0, W, H, 0.14, 81);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#f2c14e", alfaLogo: 0.5, pill: "#f2c14e", fechaTxt: "#0b1230" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 22, 320);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 22, 400);
     ps.forEach((p, i) => {
       const { y, h } = R[i], x = 58, w = W - 116, mw = Math.min(250, w * 0.26), corte = x + w - mw, rad = Math.min(18, h * 0.1);
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
@@ -935,11 +935,11 @@
       // cuerpo: categoría, escudos y nombres
       const bx = x + 34, bw = corte - 30 - bx, cab = Math.min(22, h * 0.11);
       ctx.font = FB(cab, 700); espaciado(ctx, p.cat, bx, y + cab + 14, 4, mezcla(p.color, "#000000", luz(p.color) > 0.6 ? 0.45 : 0));
-      const zt = y + cab + 26, zh = h - cab - 26 - Math.min(30, h * 0.15), cy = zt + zh / 2, lado = Math.min(zh * 0.78, 150, bw * 0.16);
+      const zt = y + cab + 26, zh = h - cab - 26 - Math.min(30, h * 0.15), cy = zt + zh / 2, lado = Math.min(zh * 0.8, 170, bw * 0.18);
       contener(ctx, p.local.logo, bx + lado / 2, cy, lado);
       texto(ctx, "VS", bx + lado * 1.32, cy + 2, lado * 0.5, lado * 0.32, (s) => F(s, 800, true), "#b9b2a4", "center");
       contener(ctx, p.visit.logo, bx + lado * 2.14, cy, lado);
-      const tx = bx + lado * 2.75 + 6, tw = bx + bw - tx, nPx = Math.min(46, zh * 0.3);
+      const tx = bx + lado * 2.75 + 6, tw = bx + bw - tx, nPx = Math.min(56, zh * 0.32);
       texto(ctx, p.local.nombre, tx, cy - nPx * 0.58, tw, nPx, (s) => F(s, 800, true), "#141414");
       texto(ctx, p.visit.nombre, tx, cy + nPx * 0.62, tw, nPx, (s) => F(s, 800, true), "#141414");
       texto(ctx, p.campo, bx, y + h - Math.min(20, h * 0.1), bw, Math.min(19, h * 0.085), (s) => FB(s, 600), "#776f62");
@@ -955,7 +955,7 @@
     for (let yy = 0; yy < H; yy += 40) { ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
     ctx.restore();
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ff8a3d", alfaLogo: 0.42, pill: "rgba(255,138,61,.16)", fechaTxt: "#ffb27a" });
-    const ps = pag.partidos, R = filas(ps.length, Y0 + 10, Y1, 0, 300), lx = 300;
+    const ps = pag.partidos, R = filas(ps.length, Y0 + 10, Y1, 0, 380), lx = 300;
     ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(lx - 2, R[0].y - 10, 4, R[ps.length - 1].y + R[ps.length - 1].h - R[0].y + 20);
     ps.forEach((p, i) => {
       const { y, h } = R[i], cy = y + h / 2, nuevoDia = !i || ps[i - 1].fecha !== p.fecha, d = partesDia(p);
@@ -965,18 +965,18 @@
         ctx.font = FB(Math.min(24, h * 0.13), 700); espaciado(ctx, `${d.largo} ${d.num}`, lx - 40, cy - Math.min(52, h * 0.3), 4, "#ff8a3d", "right");
         if (i) { ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(72, y, W - 144, 1.5); }
       }
-      texto(ctx, p.hora || "--:--", lx - 40, cy + h * 0.06, lx - 110, Math.min(100, h * 0.42), (s) => F(s, 800, true), "#ffffff", "right");
+      texto(ctx, p.hora || "--:--", lx - 40, cy + h * 0.06, lx - 110, Math.min(120, h * 0.42), (s) => F(s, 800, true), "#ffffff", "right");
       // nodo
       const nr = Math.min(20, h * 0.11);
       ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 18;
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(lx, cy, nr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       ctx.strokeStyle = "#0e1014"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(lx, cy, nr + 2.5, 0, Math.PI * 2); ctx.stroke();
       // derecha: categoría, los dos equipos y el pabellón
-      const tx = lx + 46, tw = W - 72 - tx, fila = Math.min(h * 0.27, 78), lado = Math.min(fila * 0.95, 80);
+      const tx = lx + 46, tw = W - 72 - tx, fila = Math.min(h * 0.28, 100), lado = Math.min(fila * 1.05, 104);
       ctx.font = FB(Math.min(20, h * 0.1), 700); espaciado(ctx, p.cat, tx, cy - fila * 1.32, 4, luz(p.color) < 0.25 ? mezcla(p.color, "#ffffff", 0.5) : p.color);
       [[p.local, cy - fila * 0.48], [p.visit, cy + fila * 0.5]].forEach(([eq, yy]) => {
         contener(ctx, eq.logo, tx + lado / 2, yy, lado);
-        texto(ctx, eq.nombre, tx + lado + 16, yy + 2, tw - lado - 16, Math.min(46, fila * 0.62), (s) => F(s, 800, true), "#f4f4f4");
+        texto(ctx, eq.nombre, tx + lado + 16, yy + 2, tw - lado - 16, Math.min(60, fila * 0.66), (s) => F(s, 800, true), "#f4f4f4");
       });
       texto(ctx, p.campo, tx, cy + fila * 1.36, tw, Math.min(19, h * 0.085), (s) => FB(s, 600), "rgba(255,255,255,.55)");
       ctx.textBaseline = "alphabetic";
@@ -987,7 +987,7 @@
   function eBloques(ctx, pag) {
     ctx.fillStyle = "#0c0c0d"; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.2, 101);
     cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffffff", alfaLogo: 0.5, pill: "#ffffff", fechaTxt: "#0c0c0d" });
-    const ps = pag.partidos, R = filas(ps.length, Y0, Y1 + 40, 8, 300);
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1 + 40, 8, 380);
     ps.forEach((p, i) => {
       const { y, h } = R[i], tc = sobre(p.color), d = partesDia(p);
       const g = ctx.createLinearGradient(0, y, W, y + h); g.addColorStop(0, mezcla(p.color, "#ffffff", 0.08)); g.addColorStop(1, mezcla(p.color, "#000000", 0.28));
@@ -1002,10 +1002,10 @@
       ctx.font = FB(Math.min(24, h * 0.11), 700); espaciado(ctx, `${d.corto} ${d.num} ${d.mes}`, x, y + h * 0.28, 4, tc);
       texto(ctx, p.hora || "--:--", x - 4, y + h * 0.6, hw - 20, Math.min(96, h * 0.44), (s) => F(s, 800, true), tc);
       ctx.fillStyle = rgba(tc, 0.5); ctx.fillRect(x + hw - 4, y + h * 0.2, 3, h * 0.6);
-      const dc = Math.min(h * 0.58, 128), rx = W - 64 - dc / 2;
+      const dc = Math.min(h * 0.6, 170), rx = W - 64 - dc / 2;
       escudoCirculo(ctx, p.visit.logo, rx, y + h / 2, dc);
       escudoCirculo(ctx, p.local.logo, rx - dc * 1.12, y + h / 2, dc);
-      const tx = x + hw + 22, tw = rx - dc * 1.62 - 18 - tx, nPx = Math.min(38, h * 0.17);
+      const tx = x + hw + 22, tw = rx - dc * 1.62 - 18 - tx, nPx = Math.min(52, h * 0.19);
       ctx.font = FB(Math.min(20, h * 0.095), 700); espaciado(ctx, p.cat, tx, y + h * 0.24, 4, rgba(tc, 0.85));
       texto(ctx, p.local.nombre, tx, y + h * 0.46, tw, nPx, (s) => F(s, 800, true), tc);
       texto(ctx, p.visit.nombre, tx, y + h * 0.46 + nPx * 1.1, tw, nPx, (s) => F(s, 800, true), tc);

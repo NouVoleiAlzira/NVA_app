@@ -162,5 +162,7 @@
     location.href = (results ? "Resultados.html" : "Partidos.html") + "?auto=1";
   }
 
+  // Para Redes Sociales › Stories (historia-semana.js)
+  window.cartelCollect = (from, to, results) => collect(from, to, results);
   window.cartelAuto = (tipo) => run(tipo).catch(e => { console.error(e); ocultarCargando(); alert("Error en la carga automática: " + e.message); });
 })();

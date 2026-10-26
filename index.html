@@ -237,9 +237,11 @@
 
         <div class="cp-sub-head" id="igSubHead_stories" role="button" tabindex="0" aria-expanded="true" onclick="igToggleSub('stories')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();igToggleSub('stories');}">📲 Stories <span class="sec-arrow">▾</span></div>
         <div class="cp-sub-body" id="igSub_stories">
-        <p class="ig-info">Elige las fotos o carteles; salen enteros, sin cambios. Nada se publica hasta que una persona lo revisa y pulsa «Confirmar y publicar».</p>
+        <p class="ig-info">«Resultados» y «Partidos» crean una story con todos los partidos de la semana (o varias, si las divides) en el estilo que elijas. «Manual»: tus fotos, enteras y sin cambios. Nada se publica hasta que una persona lo revisa y pulsa «Confirmar y publicar».</p>
         <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:10px;">
           <div style="flex:1; min-width:0; display:flex; gap:6px;">
+            <button class="btn-save-session" style="margin:0; flex:1 1 auto; min-width:0; padding:10px 2px; white-space:nowrap; font-size:0.78em; letter-spacing:0;" onclick="igHistoriasGenerar('resultados')">🏆 Resultados</button>
+            <button class="btn-save-session" style="margin:0; flex:1 1 auto; min-width:0; padding:10px 2px; white-space:nowrap; font-size:0.78em; letter-spacing:0; background:var(--azul-primary);" onclick="igHistoriasGenerar('proximos')">📅 Partidos</button>
             <button class="btn-save-session" style="margin:0; flex:1 1 auto; min-width:0; padding:10px 2px; white-space:nowrap; font-size:0.78em; letter-spacing:0; background:var(--btn-fondoVerde);" onclick="igHistoriasGenerar('evento')">📸 Manual</button>
           </div>
           <button class="btn-save-session" style="margin:0; width:44px; flex:none; padding:10px 0; background:#2563eb;" onclick="igHistoriasCargar()" title="Refrescar borradores de stories" aria-label="Refrescar borradores de stories"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block; margin:auto;"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16"/><path d="M20 21v-5h-5"/></svg></button>
@@ -931,6 +933,7 @@
 <script src="animaciones.js" defer></script>
 <script src="inicio.js" defer></script>
 <script src="historia-editor.js" defer></script>
+<script src="historia-semana.js" defer></script>
 <script src="instagram.js" defer></script>
 
 

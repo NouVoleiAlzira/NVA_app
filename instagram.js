@@ -650,17 +650,6 @@
           <button class="btn-save-session" type="button" id="igResPedir" style="flex:2;">🎬 Generar reel</button>
         </div>
       </div>
-      <div id="igGenCarteles" hidden>
-        <p class="ig-info">Primero genera y descarga los carteles en <b>Redes Sociales › Carteles</b> (Partidos o Resultados de la semana, «Carga automática»). Después elígelos aquí: cada cartel será una story y saldrá entero, sin cambios. Toca una miniatura para acercarla, alejarla o moverla.</p>
-        <label class="btn-save-session" style="display:block; text-align:center; cursor:pointer; margin-bottom:6px; background:var(--btn-fondoVerde);">🖼️ Elegir carteles (JPG)
-          <input type="file" id="igCartFotos" accept="image/*" multiple hidden></label>
-        <div id="igCartMiniaturas" style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px;"></div>
-        <small class="ig-info" id="igCartEstado"></small>
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn-save-session" type="button" data-ig="cerrar" style="flex:1; background:#64748b;">Cancelar</button>
-          <button class="btn-save-session" type="button" id="igCartPedir" style="flex:2;">📲 Generar stories</button>
-        </div>
-      </div>
       <div id="igGenEvento" hidden>
         <label class="ig-label" for="igEvTitulo">Título</label>
         <input type="text" id="igEvTitulo" class="app-input" maxlength="40" placeholder="Ej.: Challenge NVA">
@@ -699,8 +688,6 @@
       const d = document.getElementById("igResDesde").value, h = document.getElementById("igResHasta").value;
       if (d && h && d <= h) cargarResultados({ desde: d, hasta: h });
     });
-    document.getElementById("igCartFotos").onchange = (e) => { anadirCarteles(e.target.files); e.target.value = ""; };
-    document.getElementById("igCartPedir").onclick = pedirCarteles;
     const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
     const voz = document.getElementById("igEvVoz");
     if (!Rec) { voz.hidden = true; voz.dataset.sinVoz = "1"; }
@@ -711,12 +698,10 @@
     document.getElementById("igGenMenu").style.display = paso === "menu" ? "flex" : "none";
     document.getElementById("igGenEvento").hidden = paso !== "evento";
     document.getElementById("igGenResultados").hidden = paso !== "resultados";
-    document.getElementById("igGenCarteles").hidden = paso !== "carteles";
     const historia = destino === "historia";
     document.getElementById("igGenTitulo").textContent = {
       menu: "¿Qué reel quieres generar?", evento: historia ? "📸 Stories" : "📸 Evento manual",
-      resultados: "🏆 Fotos de los partidos",
-      carteles: tipoCarteles === "proximos" ? "📅 Stories de próximos partidos" : "🏆 Stories de resultados" }[paso];
+      resultados: "🏆 Fotos de los partidos" }[paso];
     document.getElementById("igEvTextoLabel").textContent = historia ? "Notas (no salen en la story)" : "¿De qué va el reel?";
     document.getElementById("igEvMiniaturas").style.gridTemplateColumns = historia ? "repeat(4,1fr)" : "repeat(5,1fr)";
     if (fotosEvento.length && fotosEvento.destino && fotosEvento.destino !== destino) { fotosEvento.forEach(f => URL.revokeObjectURL(f.url)); fotosEvento = []; pintarFotos(); }
@@ -1100,31 +1085,20 @@
 
   /* =====================================================================
      Stories · borradores
-     Mismos botones que los reels. Resultados y Próximos usan los carteles
-     (JPG) que se generan en Resultados.html y Partidos.html; el evento
-     manual es el mismo formulario que el de los reels. La app sube las
-     imágenes a Reels/historias/<id>/origen/ y escribe
-     Reels/solicitud_historia.json; el Action «Generar stories» monta cada
-     story (1080×1920) y deja el borrador. Confirmar escribe
-     Reels/publicar.json con tipo «historia».
+     Mismos botones que los reels. Resultados y Partidos dibujan en la
+     app una story con todos los partidos de la semana (historia-semana.js);
+     el evento manual es el mismo formulario que el de los reels.
+     historia-editor.js sube las imágenes a Reels/historias/<id>/ y deja el
+     borrador. Confirmar escribe Reels/publicar.json con tipo «historia».
      ===================================================================== */
   const DIR_H = "Reels/historias";
   let destino = "reel";          // "reel" o "historia": a qué va el formulario del evento
-  let tipoCarteles = "resultados";
-  let carteles = [];             // [{ blob, url }]
-
-  function rangoProximos() {      // mismo cálculo que el Action: de mañana al domingo siguiente
-    const ini = new Date(); ini.setHours(12, 0, 0, 0); ini.setDate(ini.getDate() + 1);
-    const fin = new Date(ini); fin.setDate(ini.getDate() + ((7 - ini.getDay()) % 7));
-    if ((fin - ini) / 864e5 < 3) fin.setDate(fin.getDate() + 7);
-    return { desde: isoDia(ini), hasta: isoDia(fin) };
-  }
-
+  // Resultados y Partidos: una story con todos los partidos de la semana (historia-semana.js)
   function generarHistoria(tipo) {
+    if (tipo === "resultados" || tipo === "proximos") { window.nvaSemana.abrir(tipo); return; }
     crearMenu();
     destino = "historia";
-    if (tipo === "evento") verPaso("evento");
-    else { tipoCarteles = tipo === "proximos" ? "proximos" : "resultados"; verPaso("carteles"); }
+    verPaso("evento");
     document.getElementById("modalIgGenerar").classList.add("active");
   }
 
@@ -1144,16 +1118,6 @@
     repintar();
   }
 
-  async function anadirCarteles(files) {
-    const libres = MAX_FOTOS - carteles.length;
-    const lista = Array.from(files || []).filter(f => f.type.startsWith("image/"));
-    if (lista.length > libres) alert(`Como mucho ${MAX_FOTOS} imágenes. Se añaden las ${libres} primeras.`);
-    for (const f of lista.slice(0, libres)) {
-      try { await anadirStory(carteles, f); } catch (e) { alert(e.message); }
-    }
-    pintarCarteles();
-  }
-
   function miniaturasStory(el, lista, repintar) {
     el.innerHTML = lista.map((f, i) => `
       <div style="position:relative; aspect-ratio:9/16;">
@@ -1165,10 +1129,6 @@
       const [f] = lista.splice(+b.dataset.quitar, 1); URL.revokeObjectURL(f.url); repintar();
     });
     el.querySelectorAll("[data-editar]").forEach(im => im.onclick = () => editarStory(lista[+im.dataset.editar], repintar));
-  }
-
-  function pintarCarteles() {
-    miniaturasStory(document.getElementById("igCartMiniaturas"), carteles, pintarCarteles);
   }
 
   async function subirYPedirHistoria(imagenes, datos, estado, boton) {
@@ -1189,14 +1149,6 @@
     } finally {
       boton.disabled = false;
     }
-  }
-
-  async function pedirCarteles() {
-    if (!carteles.length) { alert("Elige al menos un cartel."); return; }
-    const r = tipoCarteles === "proximos" ? rangoProximos() : rangoResultados();
-    const ok = await subirYPedirHistoria(carteles, { tipo: tipoCarteles, desde: r.desde, hasta: r.hasta },
-      document.getElementById("igCartEstado"), document.getElementById("igCartPedir"));
-    if (ok) { carteles.forEach(f => URL.revokeObjectURL(f.url)); carteles = []; pintarCarteles(); }
   }
 
   async function pedirEventoHistoria() {
@@ -1353,6 +1305,9 @@
   }
 
   window.igHistoriasCargar = cargarHistorias;
+  // Fotos guardadas en Resultados.html entre dos fechas: [{ home, away, url() -> objectURL }]
+  window.igFotosGuardadas = async (desde, hasta) => (await fotosGuardadas(desde, hasta))
+    .map(c => ({ home: c.homeTeam, away: c.awayTeam, url: () => blobUrl(`PartidosyResultados/${c.photo.file}`) }));
   window.igHistoriasGenerar = generarHistoria;
   window.addEventListener("load", () => setTimeout(cargarHistorias, 3000));
 

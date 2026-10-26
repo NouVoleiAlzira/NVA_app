@@ -162,6 +162,8 @@
       <div class="cp-sub-body" id="cpSub_list"><div id="cpMatches" class="cp-matches"></div></div>
       <div class="cp-sub-head" id="cpSubHead_teams" role="button" tabindex="0" aria-expanded="true" onclick="cpToggleSub('teams')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpToggleSub('teams');}">👥 Equipos · PDF Competición <span class="sec-arrow">▾</span></div>
       <div class="cp-sub-body" id="cpSub_teams"><div id="cpTeams" class="cp-teams"></div></div>
+      <div class="cp-sub-head" id="cpSubHead_prog" role="button" tabindex="0" aria-expanded="true" onclick="cpToggleSub('prog')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpToggleSub('prog');}">⏰ Actualización programada <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="cpSub_prog"><div id="cpProg" class="cp-prog"></div></div>
       <input type="file" id="cpFileInput" accept="application/pdf,.pdf" style="display:none;">
     </div>
 
@@ -918,6 +920,7 @@
 <script src="registro.js" defer></script>
 <script src="avisos.js" defer></script>
 <script src="anulaciones.js" defer></script>
+<script src="supabase/functions/_shared/lectura-calendarios.js" defer></script>
 <script src="calendario-partidos.js" defer></script>
 <script src="importar-datos.js" defer></script>
 <script src="partidos-semana.js" defer></script>

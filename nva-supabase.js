@@ -46,6 +46,7 @@
     "calendario.avisos": ["#cpSubHead_warn", "#cpSub_warn"],
     "calendario.lista": ["#cpSubHead_list", "#cpSub_list"],
     "calendario.equipos": ["#cpSubHead_teams", "#cpSub_teams"],
+    "calendario.programada": ["#cpSubHead_prog", "#cpSub_prog"],
     "direccion.avisos": ["#btnDireccionNVA", "#direccionTeamsContainer"],
     "direccion.consultas": ["[data-nva-menu=\"direccion.consultas\"]"],
     "direccion.horarios": ["[data-nva-menu=\"direccion.horarios\"]"],

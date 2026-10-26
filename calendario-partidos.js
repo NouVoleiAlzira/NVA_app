@@ -8,6 +8,7 @@
 //  writeGitHubFile, b64_to_utf8, escapeHtml, mostrarCargando, ocultarCargando.
 // =====================================================================
 (function () {
+  const L = window.nvaCalLectura;   // lectura de los PDF, compartida con la actualización programada
   const CP_FILE = "CalendarioPartidos.json";
   const CP_LOCAL = "NVA_CALENDARIO_PARTIDOS";
   const CP_OPEN = "NVA_SEC_CAL_OPEN";
@@ -69,7 +70,7 @@
   }
 
   // ---------- Pintado ----------
-  function render() { renderMatches(); renderTeams(); }
+  function render() { renderMatches(); renderTeams(); renderProg(); }
 
   // =====================================================================
   //  PLANIFICACIÓN: línea temporal, avisos y encaje de partidos sin hora
@@ -87,7 +88,7 @@
   const dow = (iso) => new Date(iso + "T12:00:00").getDay();
   const hasTime = (m) => !!m.time && m.time !== "00:00";
   const isRest = (m) => /DESCANS/i.test(m.rival || "") || /\bDESCANSA\b/i.test(m.raw || "");
-  const moveKey = (team, m) => [team, m.date, m.rival || "", m.jornada || ""].join("|");
+  const moveKey = L.moveKey;
 
   function teamObj(key) { return ((typeof appData !== "undefined" && appData.teams) || []).find(t => getTeamKey(t) === key); }
   function teamGroup(key) {   // "base" = infantil/cadete (y menores), "mayor" = juvenil/senior
@@ -216,6 +217,7 @@
     try { localStorage.setItem(SUB_KEY, JSON.stringify(st)); } catch (e) {}
     applySub(id, open);
     if (open && id === "teams") renderTeams();
+    if (open && id === "prog") { renderProg(); loadProg(); }
   };
   function applySub(id, open) {
     const head = document.getElementById("cpSubHead_" + id), body = document.getElementById("cpSub_" + id);
@@ -225,7 +227,7 @@
   }
   function initSubs() {
     const st = subState();
-    const def = { tl: true, warn: true, list: false, teams: false };
+    const def = { tl: true, warn: true, list: false, teams: false, prog: false };
     Object.keys(def).forEach(id => applySub(id, st[id] === undefined ? def[id] : st[id]));
   }
 
@@ -628,146 +630,7 @@
 
   async function pdfLines(file) {
     await ensurePdfJs();
-    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const out = [];
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const content = await (await pdf.getPage(p)).getTextContent();
-      const lines = [];
-      content.items.forEach(it => {
-        if (!it.str || !it.str.trim()) return;
-        const y = it.transform[5], x = it.transform[4];
-        let line = lines.find(l => Math.abs(l.y - y) < 2.5);
-        if (!line) { line = { y, items: [] }; lines.push(line); }
-        line.items.push({ x, w: it.width || 0, str: it.str.trim() });
-      });
-      lines.sort((a, b) => b.y - a.y);
-      lines.forEach(l => {
-        l.items.sort((a, b) => a.x - b.x);
-        // Celdas: textos separados por un hueco grande son columnas distintas
-        const cells = [];
-        let prevEnd = -1e9;
-        l.items.forEach(it => {
-          if (cells.length && it.x - prevEnd < 6) cells[cells.length - 1] += " " + it.str;
-          else cells.push(it.str);
-          prevEnd = it.x + it.w;
-        });
-        out.push({ text: l.items.map(i => i.str).join(" ").replace(/\s+/g, " "), cells: cells.map(c => c.replace(/\s+/g, " ").trim()) });
-      });
-    }
-    return out;
-  }
-
-  const RE_DATE = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/;
-  const RE_TIME = /\b(\d{1,2})[:.h](\d{2})\b(?![\/\-.]\d)/;
-  const RE_JOR = /JORNADA\s*(\d+)/i;
-
-  function parseDate(s) {
-    const m = s.match(RE_DATE);
-    if (!m) return "";
-    let y = parseInt(m[3], 10); if (y < 100) y += 2000;
-    const mo = parseInt(m[2], 10), d = parseInt(m[1], 10);
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return "";
-    return `${y}-${pad(mo)}-${pad(d)}`;
-  }
-  function parseTime(s) {
-    const clean = s.replace(new RegExp(RE_DATE.source, "g"), " ");
-    const m = clean.match(RE_TIME);
-    if (!m) return "";
-    const h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
-    return h < 24 && mi < 60 ? `${pad(h)}:${pad(mi)}` : "";
-  }
-  const isDataCell = (c) => !/[A-Za-zÀ-ÿ]{2,}/.test(c.replace(RE_DATE, "").replace(/\bh\b/i, ""));
-  const tokens = (n) => normalizeTeamName(n).split(" ").filter(Boolean);
-
-  // Cuántas palabras del nombre buscado aparecen en el texto (0..1)
-  function score(name, text) {
-    const t = " " + normalizeTeamName(text) + " ";
-    const tk = tokens(name);
-    if (!tk.length) return 0;
-    if (t.includes(" " + tk.join(" ") + " ")) return 1;
-    return tk.filter(w => t.includes(" " + w + " ")).length / tk.length;
-  }
-
-  // Posibles nombres de equipo en celdas de líneas con fecha (para elegir si no se encuentra)
-  function candidateNames(lines) {
-    const count = {};
-    lines.forEach(l => {
-      if (!RE_DATE.test(l.text) && !RE_TIME.test(l.text)) return;
-      l.cells.forEach(c => {
-        if (isDataCell(c) || c.length < 3 || RE_JOR.test(c)) return;
-        c.split(/\s+-\s+/).forEach(part => {
-          const k = part.trim(); if (k.length >= 3) count[k] = (count[k] || 0) + 1;
-        });
-      });
-    });
-    return Object.keys(count).filter(k => count[k] >= 2).sort((a, b) => count[b] - count[a]);
-  }
-
-  // Los equipos del club pueden aparecer como «NVA» o «Nou Volei Alzira»
-  const isClubName = (n) => /\bNVA\b|NOU VOLE[IY]S? ALZIRA/.test(normalizeTeamName(n));
-  function findFedName(lines, team) {
-    const names = candidateNames(lines);
-    const club = names.filter(isClubName);
-    const wanted = [team.name, `${team.name} ${team.category}`];
-    const sc = (n) => Math.max(...wanted.map(w => score(w, n)));
-    let best = null;
-    if (club.length === 1) best = club[0];
-    else {
-      const pool = (club.length ? club : names).map(n => ({ n, s: sc(n) })).sort((x, y) => y.s - x.s);
-      if (pool.length && pool[0].s >= 0.99 && !(pool[1] && pool[1].s >= pool[0].s)) best = pool[0].n;
-      else if (club.length && pool[0].s >= 0.5 && !(pool[1] && pool[1].s >= pool[0].s)) best = pool[0].n;
-    }
-    // Para preguntar: primero los del club
-    return { best, names: club.concat(names.filter(n => !club.includes(n))) };
-  }
-
-
-  function extractMatches(lines, fed) {
-    const fedN = normalizeTeamName(fed);
-    const matches = [];
-    let curDate = "", curJor = "";
-    lines.forEach((l, i) => {
-      const jm = l.text.match(RE_JOR); if (jm) curJor = jm[1];
-      const d = parseDate(l.text);
-      if (d && !normalizeTeamName(l.text).includes(fedN)) curDate = d; // cabecera de jornada con fecha
-      if (!normalizeTeamName(l.text).includes(fedN)) return;
-      // Fecha/hora en la línea, o en la siguiente/anterior si el PDF las parte
-      const near = [l, lines[i + 1], lines[i - 1]].filter(Boolean);
-      let date = d, time = parseTime(l.text);
-      if (!date) date = curDate;
-      if (!time) { const n = near.slice(1).find(x => parseTime(x.text) && !/[A-Za-z]{3,}/.test(x.text.replace(RE_TIME, ""))); time = n ? parseTime(n.text) : ""; }
-      if (!date) return;
-      // Celdas de texto (equipos, campo): separar también "LOCAL - VISITANTE"
-      let parts = [];
-      l.cells.forEach(c => {
-        if (isDataCell(c) || RE_JOR.test(c)) return;
-        c.replace(RE_DATE, "").replace(RE_TIME, "").split(/\s+-\s+(?=[A-Za-zÀ-ÿ0-9]{2,})/).forEach(p => { p = p.trim(); if (/[A-Za-zÀ-ÿ]{2,}/.test(p)) parts.push(p); });
-      });
-      const own = parts.findIndex(p => normalizeTeamName(p).includes(fedN));
-      let rival = "", home = null, venue = "";
-      if (own >= 0) {
-        const ownIsWholeCell = normalizeTeamName(parts[own]) === fedN;
-        if (!ownIsWholeCell) { // "NVA A ALGEMESI" en una sola celda: el rival es el resto
-          const rest = parts[own].replace(new RegExp(fed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "").replace(/^\s*-\s*|\s*-\s*$/g, "").trim();
-          if (rest) { rival = rest; home = normalizeTeamName(parts[own]).indexOf(fedN) === 0; }
-        }
-        if (!rival) {
-          if (own > 0 && (own === parts.length - 1 || own % 2 === 1)) { rival = parts[own - 1]; home = false; venue = parts.slice(own + 1).join(" · "); }
-          else if (parts[own + 1]) { rival = parts[own + 1]; home = true; venue = parts.slice(own + 2).join(" · "); }
-        } else venue = parts.slice(own + 1).join(" · ");
-      }
-      // Rival y pabellón pegados en la misma celda ("NOU ALGEMESÍ PAV. 9 OCTUBRE (ALGEMESÍ)")
-      if (rival && !venue) {
-        const vm = rival.match(/^(.+?)\s+((?:PAB|PAV|PABELL[OÓ]N|POLIDEPORTIVO|POLIESPORTIU|PALAU|PISTAS?|CAMPO|COMPLEJO|CIUTAT|ESTADI|CENTRO|CENTRE|COLEGIO|INSTITUTO|IES|CEIP)\b.*)$/i);
-        if (vm && /[A-Za-zÀ-ÿ]{2,}/.test(vm[1])) { rival = vm[1].trim(); venue = vm[2].trim(); }
-      }
-      if (/DESCANS/i.test(rival) || /\bDESCANSA\b/i.test(l.text)) return;   // jornada de descanso
-      matches.push({ date, time, rival, home, venue, jornada: curJor, raw: l.text });
-    });
-    // Sin duplicados (mismo día y rival)
-    const seen = new Set();
-    return matches.filter(m => { const k = m.date + m.time + m.rival; if (seen.has(k)) return false; seen.add(k); return true; })
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    return L.pdfLines(await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise);
   }
 
   async function onFile(input) {
@@ -799,10 +662,10 @@
     ocultarCargando();
 
     const prev = cp.teams[key];
-    let fed = fedHint || (prev && prev.fedName && lines.some(l => normalizeTeamName(l.text).includes(normalizeTeamName(prev.fedName))) ? prev.fedName : null);
+    let fed = fedHint || L.previousFedName(lines, prev);
     let asked = false;
     if (!fed) {
-      const r = findFedName(lines, team);
+      const r = L.findFedName(lines, team);
       fed = r.best;
       if (!fed) {
         if (!r.names.length) { if (!batch) alert("No he encontrado partidos con fecha en este PDF."); return "sin partidos con fecha"; }
@@ -814,90 +677,28 @@
         fed = r.names[n - 1]; asked = true;
       }
     }
-    const matches = extractMatches(lines, fed);
+    const matches = L.extractMatches(lines, fed);
     if (!matches.length) { if (!batch) alert(`He encontrado "${fed}" pero ningún partido con fecha.`); return `«${fed}» sin partidos con fecha`; }
-    // ¿Ha cambiado algo respecto a lo que ya había guardado?
-    const same = prev && prev.fedName === fed && sameMatches(prev.matches, matches);
-    if (same) {
-      const now = new Date().toISOString();
-      prev.changeStatus = "sin";
-      migrarClaves(key, prev.matches, matches);
-      prev.matches = matches;   // mismos partidos; se guarda el texto nuevo (p. ej. con los resultados)
-      prev.changedAt = prev.changedAt || prev.uploadedAt;
-      prev.checkedAt = now;
-      cp.updated = now;
-      saveLocal();
-      render();
-      if (typeof writeGitHubFile === "function" && typeof ghSettings !== "undefined" && ghSettings.user && ghSettings.repo && ghSettings.token) {
-        await writeGitHubFile(CP_FILE, cp, `Calendario de partidos de ${key}: sin cambios`);
-      }
-      if (!batch) alert(`${key}: sin cambios desde el ${fmtDay(prev.changedAt.slice(0, 10))}. Se mantiene lo que había.`);
-      return `«${fed}», ${matches.length} partidos · sin cambios`;
-    }
-    if (!batch && !asked && !confirm(`Equipo encontrado en el PDF: "${fed}"\n${matches.length} partidos (del ${fmtDay(matches[0].date)} al ${fmtDay(matches[matches.length - 1].date)}).\n\n¿Guardar para ${key}?`)) return "cancelado";
+    // ¿Ha cambiado algo respecto a lo que ya había guardado? Si no, no se pide confirmación.
+    const same = prev && prev.fedName === fed && L.sameMatches(prev.matches, matches);
+    if (!same && !batch && !asked && !confirm(`Equipo encontrado en el PDF: "${fed}"\n${matches.length} partidos (del ${fmtDay(matches[0].date)} al ${fmtDay(matches[matches.length - 1].date)}).\n\n¿Guardar para ${key}?`)) return "cancelado";
 
-    const now = new Date().toISOString();
-    cp.teams[key] = { fedName: fed, fileName, uploadedAt: now, matches, changeStatus: prev ? "con" : "nuevo", changedAt: now, checkedAt: now };
-    if (prev) cp.teams[key].changes = diffMatches(prev.matches, matches);
-    cp.updated = now;
+    const estado = L.aplicarLectura(cp, key, fed, matches, fileName);
     saveLocal();
     render();
     if (typeof writeGitHubFile === "function" && typeof ghSettings !== "undefined" && ghSettings.user && ghSettings.repo && ghSettings.token) {
-      await writeGitHubFile(CP_FILE, cp, `Calendario de partidos de ${key}`);
+      await writeGitHubFile(CP_FILE, cp, `Calendario de partidos de ${key}${same ? ": sin cambios" : ""}`);
     }
-    return `«${fed}», ${matches.length} partidos · ${prev ? "con cambios" : "nuevo"}`;
+    if (same && !batch) alert(`${key}: sin cambios desde el ${fmtDay(cp.teams[key].changedAt.slice(0, 10))}. Se mantiene lo que había.`);
+    return `«${fed}», ${matches.length} partidos · ${estado}`;
   }
 
-  // Detalle de los cambios. Solo cuentan los cambios de FECHA, HORA o CAMPO (pabellón);
-  // otras diferencias del PDF (nombre del rival, resultados...) no son cambios.
-  // Los partidos se emparejan por jornada y local/visitante, o por rival parecido.
-  const nrm = (t) => normalizeTeamName(t || "");
-  function rivalLike(a, b) {
-    const x = nrm(a), y = nrm(b);
-    if (!x || !y) return x === y;   // los dos sin rival (p. ej. partido aún sin rival asignado)
-    return x === y || x.startsWith(y) || y.startsWith(x);
-  }
-  function venueChanged(o, n) {
-    const ov = nrm(o.venue), nv = nrm(n.venue);
-    if (!nv || ov === nv) return false;                 // sin campo en el PDF nuevo: no se considera cambio
-    if (!ov && nrm(o.rival).includes(nv)) return false; // antes el campo venía pegado al nombre del rival
-    return true;
-  }
-  function significantChange(o, n) {
-    return o.date !== n.date || (o.time || "") !== (n.time || "") || venueChanged(o, n);
-  }
-  function pairMatches(oldList, newList) {
-    const olds = (oldList || []).slice(), used = new Set(), pairs = [], adds = [];
-    (newList || []).forEach(n => {
-      let best = -1, bestScore = 0;
-      olds.forEach((o, k) => {
-        if (used.has(k) || !!o.home !== !!n.home) return;
-        let sc = 0;
-        if (o.jornada && n.jornada && String(o.jornada) === String(n.jornada)) sc += 4;
-        if (rivalLike(o.rival, n.rival)) sc += 2;
-        if (!sc) return;
-        if (o.date === n.date) sc += 1;
-        if (sc > bestScore) { bestScore = sc; best = k; }
-      });
-      if (best >= 0) { used.add(best); pairs.push([olds[best], n]); } else adds.push(n);
-    });
-    return { pairs, adds, dels: olds.filter((o, k) => !used.has(k)) };
-  }
-  function diffMatches(oldList, newList) {
-    const slim = (m) => ({ date: m.date, time: m.time, rival: m.rival, home: !!m.home, venue: m.venue || "" });
-    const r = pairMatches(oldList, newList), out = [];
-    r.pairs.forEach(([o, n]) => { if (significantChange(o, n)) out.push({ type: "mod", before: slim(o), after: slim(n) }); });
-    r.adds.forEach(n => out.push({ type: "add", after: slim(n) }));
-    r.dels.forEach(o => out.push({ type: "del", before: slim(o) }));
-    const d = (c) => (c.after || c.before).date + (c.after || c.before).time;
-    return out.sort((a, b) => d(a).localeCompare(d(b)));
-  }
   // Los «con cambios» guardados con la regla anterior se revisan con la regla nueva
   function revisarEstadosCambios() {
     let tocado = false;
     Object.values(cp.teams || {}).forEach(info => {
       if (info.changeStatus !== "con" || !Array.isArray(info.changes)) return;
-      const ch = info.changes.filter(c => c.type !== "mod" || significantChange(c.before, c.after));
+      const ch = info.changes.filter(c => c.type !== "mod" || L.significantChange(c.before, c.after));
       if (ch.length === info.changes.length) return;
       info.changes = ch;
       if (!ch.length) info.changeStatus = "sin";
@@ -928,20 +729,6 @@
     o.addEventListener("click", (e) => { if (e.target === o || e.target.classList.contains("cp-modal-main")) o.remove(); });
     document.body.appendChild(o);
   };
-
-  // ¿Son los mismos partidos? (sin cambios de fecha, hora ni campo)
-  function sameMatches(a, b) {
-    return diffMatches(a, b).length === 0;
-  }
-  // Si el PDF escribe distinto el rival o la jornada, los partidos movidos y los cambios
-  // local/visitante del equipo siguen apuntando al mismo partido.
-  function migrarClaves(key, oldList, newList) {
-    pairMatches(oldList, newList).pairs.forEach(([o, n]) => {
-      const a = moveKey(key, o), b = moveKey(key, n);
-      if (a === b) return;
-      [cp.moved, cp.homeOv, cp.homeBy].forEach(map => { if (map && a in map && !(b in map)) { map[b] = map[a]; delete map[a]; } });
-    });
-  }
 
   // ---------- Iden de cada equipo y actualización automática desde la federación ----------
   window.cpSetIden = function (inp) {
@@ -982,51 +769,14 @@
   // solo si el registro ya existe (no se crean registros nuevos).
   // Sin resultado grabado: se graba. Igual al grabado: no se toca. Distinto: se pregunta.
 
-  // Resultado del texto de la fila del PDF: "LOCAL 3 - 1 (25-20/18-25/25-22/25-19) VISITANTE"
-  function parseResult(raw) {
-    const m = String(raw || "").match(/\s(\d)\s*-\s*(\d)\s*\(([\d\s\-\/]+)\)/);
-    if (!m) return null;
-    const sets = m[3].split("/").map(x => x.trim().match(/^(\d+)\s*-\s*(\d+)$/)).filter(Boolean)
-      .map(x => ({ local: parseInt(x[1], 10), visitante: parseInt(x[2], 10) }));
-    return { setsL: parseInt(m[1], 10), setsV: parseInt(m[2], 10), sets };
-  }
+  const parseResult = L.parseResult;
   window.cpParseResult = parseResult;
   // En los PDF el apóstrofo sale como coma: "L,ILLA" -> "L'ILLA"
   const apos = (t) => String(t || "").replace(/([A-Za-zÀ-ÿ]),(?=[A-Za-zÀ-ÿ])/g, "$1'");
-
   // Partidos con resultado de esos equipos (con el cambio local/visitante aplicado)
-  function playedMatches(keys) {
-    const out = [];
-    keys.forEach(key => {
-      ((cp.teams[key] || {}).matches || []).forEach(m => {
-        const res = parseResult(m.raw);
-        if (!res || !m.date) return;
-        const mk = moveKey(key, m);
-        const home = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
-        out.push({ key, fecha: m.date, rival: m.rival || "", home, res });
-      });
-    });
-    return out;
-  }
-  function buildMarcador(p) {
-    return {
-      local: p.home ? p.key : p.rival,
-      visitante: p.home ? p.rival : p.key,
-      sets: Array.from({ length: MATCH_SETS_COUNT }, (_, i) => p.res.sets[i] || { local: null, visitante: null }),
-      setsLocal: p.res.setsL,
-      setsVisitante: p.res.setsV
-    };
-  }
+  const playedMatches = (keys) => L.playedMatches(cp, keys);
+  const buildMarcador = (p) => L.buildMarcador(p, MATCH_SETS_COUNT);
   const findLog = (p) => allMatchLogs.find(l => l.equipo === p.key && l.fecha === p.fecha);
-  const numOrNull = (v) => (v === "" || v == null || isNaN(+v)) ? null : +v;
-  // Texto del marcador para comparar y para enseñarlo: "3-1 (25-20, 18-25, 25-22, 25-19)"
-  function marcadorTxt(m) {
-    if (!m) return "";
-    const sets = (m.sets || []).map(x => [numOrNull(x && x.local), numOrNull(x && x.visitante)])
-      .filter(x => x[0] != null || x[1] != null).map(x => `${x[0] ?? "-"}-${x[1] ?? "-"}`);
-    const tot = numOrNull(m.setsLocal) == null && numOrNull(m.setsVisitante) == null ? "" : `${numOrNull(m.setsLocal) ?? "-"}-${numOrNull(m.setsVisitante) ?? "-"}`;
-    return (tot + (sets.length ? ` (${sets.join(", ")})` : "")).trim();
-  }
   // Partidos cuyo resultado ya estaba grabado y es distinto: se pregunta cuáles se reescriben
   function askOverwrite(list) {
     return new Promise((resolve) => {
@@ -1037,7 +787,7 @@
         <div class="cp-modal-txt">Estos partidos ya tienen un resultado grabado en su registro que no coincide con el del PDF. Marca los que quieras reescribir.</div>
         <div class="imp-list">${list.map((c, i) => `<label class="imp-item ca-item"><input type="checkbox" data-i="${i}" checked>
           <span><b>${fmtDay(c.p.fecha)} · ${esc(c.p.key)}</b> ${c.p.home ? "🏠" : "✈️"} ${esc(apos(c.p.rival))}<br>
-          Grabado: <s>${esc(marcadorTxt(c.old))}</s><br>Nuevo: <b class="ca-score">${esc(marcadorTxt(c.nuevo))}</b></span></label>`).join("")}</div>
+          Grabado: <s>${esc(L.marcadorTxt(c.old))}</s><br>Nuevo: <b class="ca-score">${esc(L.marcadorTxt(c.nuevo))}</b></span></label>`).join("")}</div>
         <div class="cp-modal-row">
           <button class="cp-modal-btn cp-modal-stop">No reescribir</button>
           <button class="cp-modal-btn cp-modal-main">Reescribir marcados</button>
@@ -1071,9 +821,9 @@
       const nuevos = [], distintos = [];
       conRegistro.forEach(p => {
         const nuevo = buildMarcador(p), old = findLog(p).marcador;
-        const oldTxt = marcadorTxt(old);
+        const oldTxt = L.marcadorTxt(old);
         if (!oldTxt) nuevos.push({ p, nuevo });
-        else if (oldTxt !== marcadorTxt(nuevo)) distintos.push({ p, nuevo, old });
+        else if (oldTxt !== L.marcadorTxt(nuevo)) distintos.push({ p, nuevo, old });
       });
       let reescribir = [];
       if (distintos.length) { ocultarCargando(); reescribir = await askOverwrite(distintos); mostrarCargando("Guardando los resultados en los registros de partido..."); }
@@ -1161,6 +911,84 @@
     alert("Actualización terminada:\n\n" + results.join("\n\n"));
   };
 
+  // ---------- Actualización programada (función de Supabase actualizar-calendarios) ----------
+  // Cada hora en punto el servidor mira si está activada y si es la hora elegida (hora de España);
+  // entonces hace lo mismo que «Actualizar automáticamente», sin preguntar nada: si un registro de
+  // partido ya tiene otro resultado no se toca. Lo elegido y el resumen van en su propio archivo
+  // para que guardar los partidos desde un dispositivo no lo pise.
+  const PROG_FILE = "CalendarioProgramada.json";
+  let prog = null;   // null = aún sin leer
+  const horaEs = (iso) => new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+  async function loadProg() {
+    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !navigator.onLine) return prog;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${PROG_FILE}`, { headers: { "Authorization": `token ${ghSettings.token}` }, cache: "no-store" });
+      prog = res.ok ? JSON.parse(b64_to_utf8((await res.json()).content)) : (res.status === 404 ? {} : prog);
+    } catch (e) { console.error(`Error al cargar ${PROG_FILE}:`, e); }
+    renderProg();
+    return prog;
+  }
+  function renderProg() {
+    const box = document.getElementById("cpProg");
+    if (!box || box.closest(".collapsed")) return;
+    if (!prog) { box.innerHTML = `<div class="cp-empty">Cargando…</div>`; return; }
+    const hora = prog.hora == null ? 5 : +prog.hora, u = prog.ultima;
+    const horas = Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === hora ? " selected" : ""}>${pad(h)}:00</option>`).join("");
+    const last = u
+      ? `Última: ${fmtDay(u.dia || u.fecha.slice(0, 10))} a las ${horaEs(u.fecha)}${u.manual ? " (prueba)" : ""} · ${u.equipos} equipo(s)${u.conCambios ? `, ${u.conCambios} con cambios` : ""} <button type="button" class="cp-chg-btn" onclick="cpShowProgResumen()">🔍 Ver resumen</button>`
+      : "Todavía no se ha hecho ninguna actualización programada.";
+    box.innerHTML = `
+      <label class="cp-prog-row cp-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="cpSetProg({ activa: this.checked })"> Actualizar los PDF automáticamente cada día</label>
+      <label class="cp-prog-row"><span>Hora</span><select onchange="cpSetProg({ hora: +this.value })"${prog.activa ? "" : " disabled"}>${horas}</select><span class="cp-prog-txt">hora de España</span></label>
+      <div class="cp-prog-txt">Hace lo mismo que «Actualizar automáticamente»: descarga los PDF de los equipos con iden, marca los cambios de fecha, hora o pabellón y pasa los resultados a los registros de partido que ya existen. Si un registro ya tiene otro resultado, no se toca: se decide al pulsar «Actualizar automáticamente».</div>
+      <div class="cp-prog-last">${last}</div>
+      <div class="cp-prog-btns"><button type="button" class="btn-save-session" onclick="cpProbarProg()">▶️ Probar ahora</button></div>`;
+  }
+  window.cpSetProg = async function (cambio) {
+    if (!navigator.onLine) { alert("Sin conexión: no se puede cambiar ahora."); renderProg(); return; }
+    await loadProg();   // lo último guardado (p. ej. el resumen de esta noche)
+    prog = Object.assign({ activa: false, hora: 5 }, prog, cambio, { cambiadoPor: quienSoy(), cambiado: new Date().toISOString() });
+    renderProg();
+    const ok = await writeGitHubFile(PROG_FILE, prog, "Actualización programada de los PDF");
+    if (!ok) alert("No se pudo guardar el cambio. Revisa la conexión o los permisos.");
+  };
+  window.cpShowProgResumen = function () {
+    const u = prog && prog.ultima;
+    if (!u) return;
+    const o = document.createElement("div");
+    o.className = "cp-modal";
+    o.innerHTML = `<div class="cp-modal-box imp-box">
+      <div class="cp-modal-title">Actualización ${u.manual ? "de prueba" : "programada"}</div>
+      <div class="cp-modal-txt"><small>${fmtDay(u.dia || u.fecha.slice(0, 10))} a las ${horaEs(u.fecha)}${u.quien ? ` · ${esc(u.quien)}` : ""}</small></div>
+      <div class="cp-modal-txt cp-prog-res">${esc((u.resumen || []).join("\n\n")) || "No había equipos con iden."}</div>
+      <button class="cp-modal-btn cp-modal-main">Cerrar</button>
+    </div>`;
+    o.addEventListener("click", (e) => { if (e.target === o || e.target.classList.contains("cp-modal-main")) o.remove(); });
+    document.body.appendChild(o);
+  };
+  // Lanza ahora la misma actualización que hará el servidor a la hora elegida
+  window.cpProbarProg = async function () {
+    if (updating) return;
+    const sb = window.nva && window.nva.cliente;
+    if (!sb || !navigator.onLine) { alert("Sin conexión con Supabase."); return; }
+    if (!confirm("Se hará ahora en el servidor la misma actualización que la programada (descargar los PDF, comprobar cambios y pasar resultados). Puede tardar un par de minutos.\n\n¿Seguir?")) return;
+    updating = true;
+    mostrarCargando("Actualizando en el servidor (puede tardar un par de minutos)...");
+    let msg;
+    try {
+      const { data, error } = await sb.functions.invoke("actualizar-calendarios", { body: { ahora: true } });
+      if (error) {
+        msg = error.message;
+        try { msg = (await error.context.json()).error || msg; } catch (e) {}
+        msg = `No se pudo hacer la actualización: ${msg}.`;
+      } else msg = "Actualización terminada:\n\n" + ((data && data.ultima && data.ultima.resumen) || []).join("\n\n");
+    } catch (e) { console.error(e); msg = "No se pudo hacer la actualización: error de conexión."; }
+    finally { updating = false; ocultarCargando(); }
+    await fetchFromGitHub();
+    await loadProg();
+    alert(msg);
+  };
+
   async function fetchFromGitHub() {
     if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !navigator.onLine) return;
     if (typeof offlineQueue !== "undefined" && offlineQueue.some(op => op.fileName === CP_FILE)) return;
@@ -1197,6 +1025,9 @@
     setOpen(open);
     renderMatches();
     fetchFromGitHub();
+    loadProg();
+    // Al volver a la app (p. ej. por la mañana) se recogen los cambios de la actualización programada
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { fetchFromGitHub(); loadProg(); } });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

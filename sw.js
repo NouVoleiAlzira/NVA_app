@@ -1,6 +1,6 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v136";
+const VERSION = "nva-v137";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
@@ -24,6 +24,7 @@ const SHELL_FILES = [
   "registro.js",
   "avisos.js",
   "anulaciones.js",
+  "supabase/functions/_shared/lectura-calendarios.js",
   "calendario-partidos.js",
   "importar-datos.js",
   "partidos-semana.js",

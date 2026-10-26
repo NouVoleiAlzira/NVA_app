@@ -1679,6 +1679,15 @@
     .cp-tl-blk.placed { border: 2px dashed var(--balon); color: var(--balon); }
     .cp-tl-blk.placed.home { background: rgba(30,138,87,.35); }
     .cp-tl-blk.placed.away { background: rgba(124,58,237,.35); }
+    .cp-tl-blk.alevin { background: #38bdf8; color: #0b1e3a; }
+    .cp-tl-blk.placed.alevin { background: rgba(56,189,248,.35); }
+    /* Bloque alevín: partidos seguidos del mismo equipo, separados por una diagonal (4px = SEG) */
+    .cp-tl-blk.seg { padding-left: 8px; padding-right: 8px; clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 100%, 4px 100%); }
+    .cp-tl-blk.seg-l { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+    .cp-tl-blk.seg-r { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .cp-tl-blk.seg.seg-l { clip-path: polygon(8px 0, calc(100% - 4px) 0, calc(100% - 4px) 100%, 0 100%); }
+    .cp-tl-blk.seg.seg-r { clip-path: polygon(4px 0, 100% 0, calc(100% - 8px) 100%, 4px 100%); }
+    .cp-tl-blk.seg.seg-l.seg-r { clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
     .cp-tl-blk.dragging { z-index: 5; box-shadow: 0 6px 16px rgba(0,0,0,.5); transform: scale(1.06); opacity: .95; }
     body.cp-dragging { overflow: hidden; touch-action: none; }
     .cp-tl-row.empty .cp-tl-label { opacity: .55; }
@@ -1691,6 +1700,7 @@
     .cp-lg { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
     .cp-lg.home { background: #1E8A57; }
     .cp-lg.away { background: #7c3aed; }
+    .cp-lg.alevin { background: #38bdf8; }
     .cp-lg.placed { border: 2px dashed var(--balon); }
     .cp-lg.warn { border: 2px solid var(--alzira); }
     .cp-tl-hint { font-style: italic; }

@@ -78,6 +78,7 @@
   //  sábado por la mañana, y un entrenador no puede tener 2 partidos a la vez (2 h).
   // =====================================================================
   const DUR = 120;                 // duración de un partido (min)
+  const SEG = 4;                   // px que se solapan los partidos de un bloque alevín (diagonal)
   const TARDE = 15 * 60;           // a partir de las 15:00 es «tarde»
   const PISTAS = 2;
   const FRANJA_TXT = { "6M": "sábado mañana", "6T": "sábado tarde", "0M": "domingo mañana", "0T": "domingo tarde" };
@@ -104,7 +105,13 @@
       return !!t && getTeamKey(t) === key;
     })).map(c => c.name);
   }
-  const isHome = (m) => m.forced ? m.home === true : (m.home === true || /PALAU/i.test(m.venue || ""));
+  // Local/visitante: manda el cambio hecho a mano; si no, el pabellón del PDF (un equipo puede
+  // salir como local y jugar en otro campo); solo si no hay pabellón, el orden de los equipos.
+  const isHome = (m) => m.forced ? m.home === true : (m.venue ? /PALAU/i.test(m.venue) : m.home === true);
+  // Alevines: un día al mes, varios partidos seguidos en un mismo pabellón (local o visitante da igual).
+  // No ocupan la franja del Palau ni siguen sus premisas; solo cuenta que un entrenador no esté en dos sitios.
+  const isAlevin = (key) => { const t = teamObj(key); return /ALEVIN/.test(normalizeTeamName((t && t.category) || key)); };
+  const enPalau = (m) => isHome(m) && !m.alevin;
   const placeOf = (m) => isHome(m) ? "Palau" : (m.forced || !m.venue ? `campo de ${m.rival || "rival"}` : m.venue);
   const isWeekend = (iso) => { const d = dow(iso); return d === 6 || d === 0; };
   const franja = (m) => isWeekend(m.date) ? `${dow(m.date)}${m.start < TARDE ? "M" : "T"}` : "";
@@ -116,7 +123,7 @@
   function checkRules(ms) {
     const out = [];
     const add = (level, text, list) => out.push({ level, text, ids: list.map(m => m.id) });
-    const home = ms.filter(isHome);
+    const home = ms.filter(enPalau);
     // 1. Una sola franja por fin de semana
     const byWk = {};
     home.filter(m => isWeekend(m.date)).forEach(m => { (byWk[weekendKey(m.date)] = byWk[weekendKey(m.date)] || []).push(m); });
@@ -172,7 +179,7 @@
     fixed.forEach(m => { if (moved[m.mk]) Object.assign(m, { date: moved[m.mk].date, start: moved[m.mk].start, moved: true }); });
     all.filter(m => !hasTime(m) && moved[m.mk]).forEach(m => { Object.assign(m, { date: moved[m.mk].date, start: moved[m.mk].start, placed: true, moved: true }); fixed.push(m); });
     const free = all.filter(m => !hasTime(m) && !moved[m.mk]);
-    free.sort((a, b) => (isHome(b) - isHome(a)) || ((teamGroup(b.team) === "mayor") - (teamGroup(a.team) === "mayor")) || a.date.localeCompare(b.date));
+    free.sort((a, b) => (enPalau(b) - enPalau(a)) || ((teamGroup(b.team) === "mayor") - (teamGroup(a.team) === "mayor")) || a.date.localeCompare(b.date));
     const placed = fixed.slice();
     free.forEach(m => {
       const wk = isWeekend(m.date);
@@ -181,14 +188,14 @@
       let best = null, bestCost = Infinity;
       cands.forEach(t => {
         const trial = Object.assign({}, m, { start: t });
-        const sameDay = placed.filter(o => o.date === m.date || (isHome(trial) && wk && weekendKey(o.date) === weekendKey(m.date)));
+        const sameDay = placed.filter(o => o.date === m.date || (enPalau(trial) && wk && weekendKey(o.date) === weekendKey(m.date)));
         let c = cost(checkRules(sameDay.concat([trial]))) * 100;
         const g = teamGroup(m.team);
-        if (wk && g === "base" && t >= TARDE) c += 50;                    // preferencia de mañana
+        if (wk && g === "base" && !m.alevin && t >= TARDE) c += 50;                    // preferencia de mañana
         if (wk && g === "mayor" && t < TARDE && dow(m.date) === 6) c += 50;
         // En casa: pegarse a los partidos ya fijados (bloques seguidos en las pistas)
-        const homeSame = placed.filter(o => isHome(o) && o.date === m.date);
-        if (isHome(m) && homeSame.length) c += Math.min(...homeSame.map(o => Math.abs(o.start - t))) / 60;
+        const homeSame = placed.filter(o => enPalau(o) && o.date === m.date);
+        if (enPalau(m) && homeSame.length) c += Math.min(...homeSame.map(o => Math.abs(o.start - t))) / 60;
         else c += Math.abs(t - (wk ? (g === "mayor" ? 17 * 60 : 10 * 60) : 19 * 60)) / 600;  // horas habituales
         if (c < bestCost) { bestCost = c; best = t; }
       });
@@ -233,13 +240,13 @@
     const all = [];
     let n = 0;
     Object.keys(cp.teams).forEach(key => {
-      const coaches = teamCoaches(key);
+      const coaches = teamCoaches(key), alevin = isAlevin(key);
       (cp.teams[key].matches || []).forEach(m => {
         if (isRest(m)) return;   // «DESCANSA» = no hay partido
         const mk = moveKey(key, m);
         const ov = (cp.homeOv || {})[mk];   // campo cambiado a mano (local/visitante)
         const extra = ov === undefined ? {} : { home: ov, forced: true };
-        if ((!fromWk || m.date >= fromWk) && (!toWk || m.date <= toWk)) all.push(Object.assign({}, m, { id: "m" + (n++), mk, team: key, coaches }, extra));
+        if ((!fromWk || m.date >= fromWk) && (!toWk || m.date <= toWk)) all.push(Object.assign({}, m, { id: "m" + (n++), mk, team: key, coaches, alevin }, extra));
       });
     });
     const planned = planMatches(all);
@@ -299,22 +306,37 @@
       days.sort();
       days.forEach(day => {
         const dm = rows.filter(m => m.date === day).sort((a, b) => a.start - b.start);
+        // Grupos: cada partido por separado, salvo los de un mismo equipo alevín, que van juntos en un único bloque
+        const grupos = [];
+        dm.forEach(m => {
+          const g = m.alevin && grupos.find(x => x.alevin === m.team);
+          if (g) { g.ms.push(m); g.end = Math.max(g.end, m.start + DUR); }
+          else grupos.push({ alevin: m.alevin ? m.team : "", ms: [m], start: m.start, end: m.start + DUR });
+        });
         const lanes = [];   // carriles para que no se monten los bloques
-        dm.forEach(m => { let l = lanes.findIndex(end => end <= m.start); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = m.start + DUR; m.lane = l; });
-        const fr = isWeekend(day) ? [...new Set(dm.filter(isHome).map(m => franja(m).endsWith("M") ? "mañana" : "tarde"))] : [];
+        grupos.forEach(g => { let l = lanes.findIndex(end => end <= g.start); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.end; g.ms.forEach(m => { m.lane = l; }); });
+        // Bloque alevín: cada partido llega hasta el inicio del siguiente, separados por una diagonal
+        grupos.filter(g => g.alevin).forEach(g => g.ms.forEach((m, i) => {
+          const nx = g.ms[i + 1];
+          m.seg = { end: nx ? nx.start : m.start + DUR, first: i === 0, last: !nx };
+        }));
+        const fr = isWeekend(day) ? [...new Set(dm.filter(enPalau).map(m => franja(m).endsWith("M") ? "mañana" : "tarde"))] : [];
         t += `<div class="cp-tl-row${dm.length ? "" : " empty"}" data-day="${day}"><div class="cp-tl-label"><b>${DIAS[dow(day)]}</b>${fmtDay(day).slice(0, 5)}${fr.length ? `<small>🏠 ${fr.join(" + ")}</small>` : ""}</div>
           <div class="cp-tl-track" style="height:${Math.max(1, lanes.length) * 34 + 4}px">${tardeBg}`;
         dm.forEach(m => {
           const w = warnOf[m.id];
-          const cls = ["cp-tl-blk", isHome(m) ? "home" : "away", m.placed ? "placed" : "", m.moved ? "moved" : "", w ? "warn" : ""].join(" ");
+          const cls = ["cp-tl-blk", m.alevin ? "alevin" : isHome(m) ? "home" : "away", m.seg ? "seg" + (m.seg.first ? "" : " seg-l") + (m.seg.last ? "" : " seg-r") : "", m.placed ? "placed" : "", m.moved ? "moved" : "", w ? "warn" : ""].join(" ");
           const tip = `${toHHMM(m.start)}${m.placed ? " (propuesta)" : ""}${m.moved ? " (movido)" : ""} · ${m.team} ${isHome(m) ? "vs" : "en"} ${m.rival || "?"}${m.coaches.length ? " · " + m.coaches.join(", ") : ""}${w ? "\n⚠ " + w.map(x => x.text).join("\n⚠ ") : ""}`;
-          t += `<div class="${cls}" style="left:${pct(m.start)};width:${pct(minH * 60 + DUR)};top:${m.lane * 34 + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
+          const pos = m.seg
+            ? `left:calc(${pct(m.start)} - ${SEG}px);width:calc(${pct(minH * 60 + Math.max(15, m.seg.end - m.start))} + ${2 * SEG}px)`
+            : `left:${pct(m.start)};width:${pct(minH * 60 + DUR)}`;
+          t += `<div class="${cls}" style="${pos};top:${m.lane * 34 + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
             <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}</span><span class="cp-tl-n">${esc(short(m.team))}</span></div>`;
         });
         t += `</div></div>`;
       });
       const nCh = changeList().length;
-      t += `<div class="cp-tl-legend"><span><i class="cp-lg home"></i>Casa</span><span><i class="cp-lg away"></i>Fuera</span><span><i class="cp-lg placed"></i>Hora propuesta</span><span><i class="cp-lg warn"></i>Aviso</span><span>✎ Movido</span></div>
+      t += `<div class="cp-tl-legend"><span><i class="cp-lg home"></i>Casa</span><span><i class="cp-lg away"></i>Fuera</span><span><i class="cp-lg alevin"></i>Alevín</span><span><i class="cp-lg placed"></i>Hora propuesta</span><span><i class="cp-lg warn"></i>Aviso</span><span>✎ Movido</span></div>
         <div class="cp-tl-legend"><span class="cp-tl-hint">Toca un partido para ver el detalle. Mantén pulsado cualquier partido para moverlo (hora o día).</span></div>
         <div class="cp-tl-actions"><button type="button" class="cp-tl-btn" onclick="cpToggleChanges()">📝 Cambios realizados (${nCh}) ${changesOpen ? "▴" : "▾"}</button></div>
         <div class="cp-changes" id="cpChanges" style="${changesOpen ? "" : "display:none"}">${renderChanges()}</div>`;

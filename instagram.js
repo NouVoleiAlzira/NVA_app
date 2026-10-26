@@ -665,7 +665,7 @@
   }
   const textoMusica = (mu) => mu && mu.archivo ? `${mu.titulo || mu.archivo} · desde ${mmss(mu.inicio || 0)}` : "🎲 Al azar";
 
-  /* ---------- Menú «Generar ahora» (resultados, próximos o evento manual) ---------- */
+  /* ---------- Ventana «Generar» (fotos de los resultados o evento manual) ---------- */
   const MAX_FOTOS = 10;
   let fotosEvento = [];   // [{ blob, url }]
   let dictado = null;
@@ -676,13 +676,8 @@
   <div class="modal-backdrop" id="modalIgGenerar">
     <div class="modal-box" style="max-width: 420px;">
       <div class="modal-header">
-        <div class="modal-title" id="igGenTitulo">¿Qué reel quieres generar?</div>
+        <div class="modal-title" id="igGenTitulo"></div>
         <button class="btn-close-modal" type="button" data-ig="cerrar">✕</button>
-      </div>
-      <div id="igGenMenu" style="display:flex; flex-direction:column; gap:8px;">
-        <button class="btn-save-session" type="button" data-ig="resultados">🏆 Resultados de la semana</button>
-        <button class="btn-save-session" type="button" data-ig="proximos" style="background:var(--azul-primary);">📅 Próximos partidos</button>
-        <button class="btn-save-session" type="button" data-ig="evento" style="background:var(--btn-fondoVerde);">📸 Evento manual</button>
       </div>
       <div id="igGenResultados" hidden>
         <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -695,7 +690,7 @@
         <div id="igResLista" style="display:flex; flex-direction:column; gap:6px; max-height:46vh; overflow:auto;"></div>
         <small class="ig-info" id="igResEstado"></small>
         <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn-save-session" type="button" data-ig="volver" style="flex:1; background:#64748b;">← Volver</button>
+          <button class="btn-save-session" type="button" data-ig="cerrar" style="flex:1; background:#64748b;">Cancelar</button>
           <button class="btn-save-session" type="button" id="igResPedir" style="flex:2;">🎬 Generar reel</button>
         </div>
       </div>
@@ -711,7 +706,7 @@
         <div id="igEvMiniaturas" style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px;"></div>
         <small class="ig-info" id="igEvEstado"></small>
         <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn-save-session" type="button" data-ig="volver" style="flex:1; background:#64748b;">← Volver</button>
+          <button class="btn-save-session" type="button" data-ig="cerrar" style="flex:1; background:#64748b;">Cancelar</button>
           <button class="btn-save-session" type="button" id="igEvPedir" style="flex:2;">🎬 Generar reel</button>
         </div>
       </div>
@@ -720,14 +715,7 @@
     const m = document.getElementById("modalIgGenerar");
     m.addEventListener("click", (e) => {
       if (e.target === m) return cerrarMenu();
-      const b = e.target.closest("[data-ig]");
-      if (!b) return;
-      const a = b.dataset.ig;
-      if (a === "cerrar") cerrarMenu();
-      else if (a === "volver") { if (destino === "historia") cerrarMenu(); else verPaso("menu"); }
-      else if (a === "evento") verPaso("evento");
-      else if (a === "resultados") prepararResultados();
-      else pedirPartidos(a);
+      if (e.target.closest('[data-ig="cerrar"]')) cerrarMenu();
     });
     document.getElementById("igEvFotos").onchange = (e) => { anadirFotos(e.target.files); e.target.value = ""; };
     document.getElementById("igEvPedir").onclick = pedirEvento;
@@ -744,12 +732,11 @@
   }
 
   function verPaso(paso) {
-    document.getElementById("igGenMenu").style.display = paso === "menu" ? "flex" : "none";
     document.getElementById("igGenEvento").hidden = paso !== "evento";
     document.getElementById("igGenResultados").hidden = paso !== "resultados";
     const historia = destino === "historia";
     document.getElementById("igGenTitulo").textContent = {
-      menu: "¿Qué reel quieres generar?", evento: historia ? "📸 Stories" : "📸 Evento manual",
+      evento: historia ? "📸 Stories" : "📸 Evento manual",
       resultados: "🏆 Fotos de los partidos" }[paso];
     document.getElementById("igEvTextoLabel").textContent = historia ? "Notas (no salen en la story)" : "¿De qué va el reel?";
     document.getElementById("igEvMiniaturas").style.gridTemplateColumns = historia ? "repeat(4,1fr)" : "repeat(5,1fr)";
@@ -1303,13 +1290,13 @@
 
   const tituloPartido = (id) => { const [eq, , rival] = String(id).split("|"); return `${(eq || "").replace(/\s*\(.*\)\s*$/, "")} – ${rival || ""}`; };
 
-  // Botones de la sección: resultados, próximos o evento manual (sin tipo, el menú con los tres)
+  // Botones de la sección: resultados, próximos o evento manual
   function generar(tipo) {
     crearMenu();
     destino = "reel";
     if (tipo === "proximos") { pedirPartidos("proximos"); return; }
     if (tipo === "resultados") { prepararResultados(); return; }
-    verPaso(tipo === "evento" ? "evento" : "menu");
+    verPaso("evento");
     document.getElementById("modalIgGenerar").classList.add("active");
   }
 

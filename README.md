@@ -1,6 +1,6 @@
 # App NVA · Nou Volei Alzira
 
-App web (PWA) del club: entrenamientos, partidos, informes, calendario, Dirección NVA, carteles e Instagram.
+App web (PWA) del club: entrenamientos, partidos, informes, calendario, Dirección NVA e Instagram (reels y stories).
 Viene del repositorio `Entrenadores`. Los datos ya no se guardan en GitHub, sino en **Supabase**, y para usar la app hay que **iniciar sesión**.
 
 ## Cómo funciona

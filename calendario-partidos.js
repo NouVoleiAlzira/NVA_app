@@ -1143,7 +1143,7 @@
     } catch (e) { console.error(`Error al cargar ${CP_FILE}:`, e); }
   }
 
-  // Acceso para otras partes de la app (carga automática de carteles)
+  // Acceso para otras partes de la app (partidos de la semana para las Stories)
   window.cpGetData = () => cp;
   window.cpGetRange = () => ({ from: (document.getElementById("cpFrom") || {}).value || "", to: (document.getElementById("cpTo") || {}).value || "" });
   window.cpRefreshFromGitHub = () => fetchFromGitHub();

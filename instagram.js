@@ -33,7 +33,7 @@
 
   function applyVisibility() {
     const ig = loadIg();
-    // La sección Redes Sociales (con Carteles) se ve siempre; Reels y Stories solo con el token
+    // Reels y Stories solo con el token de Instagram
     const solo = document.getElementById("igSoloToken");
     if (solo) solo.hidden = !ig;
     const sin = document.getElementById("igSinToken");
@@ -129,7 +129,7 @@
     applySub(id, open);
   }
   const st0 = subsState();
-  ["carteles", "reels", "stories"].forEach(id => applySub(id, st0[id] !== false));
+  ["reels", "stories"].forEach(id => applySub(id, st0[id] !== false));
   ["reelsPub", "storiesPub"].forEach(id => applySub(id, st0[id] === true));   // «Publicados» empieza plegado
   window.igToggleSub = igToggleSub;
 
@@ -953,7 +953,7 @@
     return { desde: iso(a.m > b.m ? +y - 1 : +y, a), hasta: iso(+y, b) };
   }
 
-  // Fotos ya guardadas desde Resultados.html para esas fechas (el Action las usa solas)
+  // Fotos ya guardadas para esas fechas (antes se guardaban desde el cartel de Resultados; el Action las usa solas)
   async function fotosGuardadas(desde, hasta) {
     const r = await fetch(api("PartidosyResultados"), { headers: hdr(), cache: "no-store" });
     if (!r.ok) return [];
@@ -1340,7 +1340,7 @@
   }
 
   window.igHistoriasCargar = cargarHistorias;
-  // Fotos guardadas en Resultados.html entre dos fechas: [{ home, away, url() -> objectURL }]
+  // Fotos ya guardadas (antes, desde el cartel de Resultados) entre dos fechas: [{ home, away, url() -> objectURL }]
   window.igFotosGuardadas = async (desde, hasta) => (await fotosGuardadas(desde, hasta))
     .map(c => ({ home: c.homeTeam, away: c.awayTeam, url: () => blobUrl(`PartidosyResultados/${c.photo.file}`) }));
   window.igHistoriasGenerar = generarHistoria;

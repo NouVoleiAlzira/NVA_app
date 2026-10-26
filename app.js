@@ -3765,8 +3765,8 @@
   }
 
   // El marcador ya no se rellena a mano: se muestra (solo lectura) cuando el registro
-  // del partido de esa fecha tiene resultado, que llega con la carga automática de
-  // «Resultados de la semana» (Dirección NVA > Carteles). Sin datos, no se ve.
+  // del partido de esa fecha tiene resultado, que llega al actualizar
+  // los PDF de «Calendario de partidos». Sin datos, no se ve.
   function hasMatchScoreData() {
     return !!(matchScore.local || matchScore.visitante ||
       matchScore.sets.some(s => s.local !== "" || s.visitante !== ""));

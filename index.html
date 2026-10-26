@@ -197,24 +197,10 @@
     </div>
     </div>
 
-    <!-- ===== Sección plegable: Redes Sociales (Carteles para todos; Reels y Stories solo con el token de Instagram) ===== -->
+    <!-- ===== Sección plegable: Redes Sociales (Reels y Stories solo con el token de Instagram) ===== -->
     <div id="igSectionWrap">
       <div class="section-title section-toggle" id="secHead_instagram" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_instagram" style="margin-top:20px;" onclick="toggleSection('instagram')" onkeydown="sectionKey(event,'instagram')">Redes Sociales <span class="sec-arrow">▾</span></div>
       <div class="section-body" id="secBody_instagram">
-        <div class="cp-sub-head" id="igSubHead_carteles" role="button" tabindex="0" aria-expanded="true" onclick="igToggleSub('carteles')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();igToggleSub('carteles');}">🖼️ Carteles <span class="sec-arrow">▾</span></div>
-        <div class="cp-sub-body" id="igSub_carteles">
-          <div class="cartel-sub">📅 Partidos de la semana</div>
-          <div class="cartel-row">
-            <button class="btn-pdf-mode2" onclick="cartelAuto('partidos')">⚡ Carga automática</button>
-            <button class="btn-pdf-mode2" onclick="location.href='Partidos.html'">✍️ Introducción manual</button>
-          </div>
-          <div class="cartel-sub">🏆 Resultados</div>
-          <div class="cartel-row">
-            <button class="btn-pdf-mode2" onclick="cartelAuto('resultados')">⚡ Carga automática</button>
-            <button class="btn-pdf-mode2" onclick="location.href='Resultados.html'">✍️ Introducción manual</button>
-          </div>
-        </div>
-
         <p class="ig-info" id="igSinToken">Para hacer Reels y Stories de Instagram, activa Instagram en Opciones › Instagram.</p>
         <div id="igSoloToken" hidden>
         <div class="cp-sub-head" id="igSubHead_reels" role="button" tabindex="0" aria-expanded="true" onclick="igToggleSub('reels')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();igToggleSub('reels');}">🎬 Reels <span class="sec-arrow">▾</span></div>
@@ -927,7 +913,7 @@
 <script src="anulaciones.js" defer></script>
 <script src="calendario-partidos.js" defer></script>
 <script src="importar-datos.js" defer></script>
-<script src="carteles-auto.js" defer></script>
+<script src="partidos-semana.js" defer></script>
 <script src="cuadrante-pdf.js" defer></script>
 <script src="kilometraje.js" defer></script>
 <script src="animaciones.js" defer></script>

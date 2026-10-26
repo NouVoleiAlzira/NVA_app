@@ -38,7 +38,6 @@
     otros: ["[onclick=\"openOtros()\"]", "#screenOtros"],
     calendario: ["#secHead_cal", "#secBody_cal"],
     direccion: ["#secHead_direccion", "#secBody_direccion"],
-    carteles: ["[onclick^=\"cartelAuto\"]", "[onclick*=\"Partidos.html\"]", "[onclick*=\"Resultados.html\"]"],
     opciones: ["[onclick=\"promptOwnerPassword()\"]"],
     // Subsecciones («menú.subsección»): solo se muestran u ocultan
     "informes.pdf": ["[data-nva-menu=\"informes.pdf\"]"],
@@ -697,7 +696,7 @@
         if (ver) n.removeAttribute("data-nva-oculto"); else n.setAttribute("data-nva-oculto", "");
       }));
     });
-    const igVisible = acceso("instagram") !== "ninguno" || acceso("carteles") !== "ninguno";
+    const igVisible = acceso("instagram") !== "ninguno";
     ["#secHead_instagram", "#secBody_instagram"].forEach(sel => {
       const n = document.querySelector(sel);
       if (n) igVisible ? n.removeAttribute("data-nva-oculto") : n.setAttribute("data-nva-oculto", "");

@@ -185,6 +185,13 @@
     <div class="section-subtitle">Horarios de entrenamiento</div>
     <button class="btn-pdf-mode2" style="margin-bottom:20px;" onclick="openHorarios()">🗓️ Horarios</button>
     </div>
+    <div data-nva-menu="direccion.drive">
+    <div class="section-subtitle">PDFs Resultados en Drive</div>
+    <div style="display:flex; gap:8px; margin-bottom:20px;">
+      <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="actualizarVinculosDrive()">🔄 Actualizar vínculos</button>
+      <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
+    </div>
+    </div>
 
     <div id="histSeccion" hidden>
     <div class="section-subtitle">Control de registros</div>
@@ -915,6 +922,7 @@
 <script src="importar-datos.js" defer></script>
 <script src="partidos-semana.js" defer></script>
 <script src="cuadrante-pdf.js" defer></script>
+<script src="drive-pdfs.js" defer></script>
 <script src="kilometraje.js" defer></script>
 <script src="animaciones.js" defer></script>
 <script src="inicio.js" defer></script>

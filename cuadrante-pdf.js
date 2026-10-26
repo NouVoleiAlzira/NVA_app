@@ -347,5 +347,16 @@
   }
   engancharJsPdf();
 
-  window.nvaCuadrante = { analizar, dibujar, generar };
+  // PDF de un solo equipo (para «PDFs Resultados en Drive»). Lanza un error si falta el PDF de la federación.
+  async function pdfDeEquipo(key, logo) {
+    await ensureExportLibs();
+    const d = analizar(await lineasPdf(await leerPdfGitHub(key)));
+    if (!d.partidos.length) throw new Error("no se encontraron partidos en el PDF");
+    const pdf = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+    dibujar(pdf, key, d, logo);
+    if (typeof nvaPdfFooters === "function") nvaPdfFooters(pdf);
+    return pdf.output("blob");
+  }
+
+  window.nvaCuadrante = { analizar, dibujar, generar, pdfDeEquipo };
 })();

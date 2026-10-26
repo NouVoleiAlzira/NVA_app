@@ -49,6 +49,7 @@
     "direccion.avisos": ["#btnDireccionNVA", "#direccionTeamsContainer"],
     "direccion.consultas": ["[data-nva-menu=\"direccion.consultas\"]"],
     "direccion.horarios": ["[data-nva-menu=\"direccion.horarios\"]"],
+    "direccion.drive": ["[data-nva-menu=\"direccion.drive\"]"],
     "direccion.registros": ["#histSeccion"],
     "instagram.reels": ["#igSubHead_reels", "#igSub_reels"],
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],

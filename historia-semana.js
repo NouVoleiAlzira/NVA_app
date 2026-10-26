@@ -804,6 +804,216 @@
     });
   }
 
+  /* ---------- Cinco estilos más, solo para «Partidos de la semana» (sin fotos) ---------- */
+  const DIAS_L = { DOM: "DOMINGO", LUN: "LUNES", MAR: "MARTES", "MIÉ": "MIÉRCOLES", JUE: "JUEVES", VIE: "VIERNES", "SÁB": "SÁBADO" };
+  // Partidos agrupados por día, en orden
+  function porDias(ps) {
+    const g = [];
+    ps.forEach(p => { const u = g[g.length - 1]; if (u && u.fecha === p.fecha) u.ps.push(p); else g.push({ fecha: p.fecha, ps: [p] }); });
+    return g;
+  }
+  const partesDia = (p) => { const [d, n, m] = p.dia.split(" "); return { corto: d, largo: DIAS_L[d] || d, num: n, mes: m }; };
+  // Escudo sobre un círculo claro (para fondos de color)
+  function escudoCirculo(ctx, logo, cx, cy, d, fondo) {
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = d * 0.12; ctx.shadowOffsetY = d * 0.03;
+    ctx.fillStyle = fondo || "#ffffff"; ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    contener(ctx, logo, cx, cy, d * 0.72);
+  }
+
+  // 11 · Cartelera: papel de cartel, los partidos agrupados por día, la hora en grande
+  function eCartelera(ctx, pag) {
+    ctx.fillStyle = "#f2ede3"; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.4, 61, true);
+    cabecera(ctx, pag, { texto: "#111111", acento: "#c8102e", fechaTxt: "#111111", alfaLogo: 0.2, mezcla: "multiply" });
+    const x = 72, w = W - 144, dias = porDias(pag.partidos), n = pag.partidos.length;
+    const cabD = Math.min(96, 1240 / (dias.length * 1.6 + n));   // alto de la cabecera de cada día
+    const filaH = Math.min(240, (Y1 + 20 - Y0 - cabD * dias.length - 14 * (dias.length - 1)) / n);
+    let y = Y0 + Math.max(0, (Y1 + 20 - Y0 - cabD * dias.length - 14 * (dias.length - 1) - filaH * n) / 2);
+    dias.forEach((dia, k) => {
+      const d = partesDia(dia.ps[0]), base = y + cabD * 0.78;
+      ctx.textBaseline = "alphabetic";
+      ctx.font = F(cabD * 1.02, 800, true); ctx.fillStyle = "#111111"; ctx.textAlign = "left";
+      ctx.fillText(d.num, x - 4, base);
+      const nw = ctx.measureText(d.num).width;
+      ctx.font = F(cabD * 0.44, 700); espaciado(ctx, d.largo, x + nw + 16, base - cabD * 0.38, 6, "#111111");
+      ctx.font = FB(cabD * 0.24, 700); espaciado(ctx, MESES.find(m => m.startsWith(d.mes)) || d.mes, x + nw + 18, base - 2, 5, "#c8102e");
+      ctx.fillStyle = "#111111"; ctx.fillRect(x, y + cabD - 4, w, 4);
+      y += cabD;
+      dia.ps.forEach((p, i) => {
+        const cy = y + filaH / 2, hw = Math.min(230, filaH * 1.5);
+        if (i) { ctx.fillStyle = "rgba(17,17,17,.25)"; ctx.fillRect(x + hw, y, w - hw, 1.5); }
+        ctx.textBaseline = "middle";
+        texto(ctx, p.hora || "--:--", x, cy + filaH * 0.03, hw - 26, Math.min(100, filaH * 0.5), (s) => F(s, 800, true), "#111111");
+        ctx.fillStyle = p.color; ctx.fillRect(x + hw - 4, y + filaH * 0.18, 8, filaH * 0.64);
+        const lado = Math.min(filaH * 0.62, 130), lx = x + hw + 22;
+        contener(ctx, p.local.logo, lx + lado / 2, cy, lado);
+        contener(ctx, p.visit.logo, lx + lado * 1.55, cy, lado);
+        const tx = lx + lado * 2.1 + 14, tw = x + w - tx, px = Math.min(46, filaH * 0.21);
+        ctx.font = FB(px * 0.62, 700); espaciado(ctx, p.cat, tx, cy - px * 1.45, 3, mezcla(p.color, "#111111", luz(p.color) > 0.6 ? 0.45 : 0));
+        texto(ctx, p.local.nombre, tx, cy - px * 0.42, tw, px, (s) => F(s, 800, true), "#111111");
+        texto(ctx, p.visit.nombre, tx, cy + px * 0.62, tw, px, (s) => F(s, 700), "#3b3b3b");
+        texto(ctx, p.campo, tx, cy + px * 1.55, tw, px * 0.56, (s) => FB(s, 600), "#6d675c");
+        ctx.textBaseline = "alphabetic";
+        y += filaH;
+      });
+      y += k < dias.length - 1 ? 14 : 0;
+    });
+    ctx.fillStyle = "#111111"; ctx.fillRect(x, y + 2, w, 1.5);
+  }
+
+  // 12 · Pista: parqué cálido con las líneas de la pista vistas desde la grada; fichas blancas
+  function ePista(ctx, pag) {
+    const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#c9773b"); g.addColorStop(1, "#9c4f22");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const r = azar(71);   // tablas del parqué
+    for (let xx = 0; xx < W; xx += 54) {
+      ctx.fillStyle = `rgba(${r() > 0.5 ? "255,236,210" : "60,25,8"},${0.03 + r() * 0.05})`; ctx.fillRect(xx, 0, 54, H);
+      ctx.fillStyle = "rgba(60,25,8,.18)"; ctx.fillRect(xx, 0, 1.5, H);
+    }
+    vetas(ctx, 0, 0, W, H, 73, "#3c1908", 0.08); grano(ctx, 0, 0, W, H, 0.18, 75);
+    // líneas de la pista (9 × 18): fondo, red y líneas de tres metros
+    ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 10;
+    const px0 = 110, px1 = W - 110, pw = px1 - px0, py0 = H / 2 - pw, py1 = H / 2 + pw;
+    ctx.strokeRect(px0, py0, pw, py1 - py0);
+    [H / 2, H / 2 - pw / 3, H / 2 + pw / 3].forEach((yy, i) => { ctx.lineWidth = i ? 8 : 14; ctx.beginPath(); ctx.moveTo(px0 - (i ? 0 : 40), yy); ctx.lineTo(px1 + (i ? 0 : 40), yy); ctx.stroke(); });
+    ctx.restore();
+    ctx.fillStyle = "rgba(40,16,4,.28)"; ctx.fillRect(0, 0, W, H);
+    cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffe2c2", alfaLogo: 0.45, pill: "#ffffff", fechaTxt: "#8a3f16", sombra: true });
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 18, 340);
+    ps.forEach((p, i) => {
+      const { y, h } = R[i], x = 64, w = W - 128, r2 = Math.min(26, h * 0.2);
+      ctx.save(); ctx.shadowColor = "rgba(40,14,0,.45)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8;
+      ctx.fillStyle = "#fbf8f3"; rr(ctx, x, y, w, h, r2); ctx.fill(); ctx.restore();
+      const dc = Math.min(h * 0.78, 190), cx = x + 22 + dc / 2, cy = y + h / 2;
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(cx, cy, dc / 2, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.12)"; ctx.lineWidth = 2; ctx.stroke();
+      const tc = sobre(p.color), d = partesDia(p);
+      ctx.textBaseline = "middle";
+      texto(ctx, p.hora || "--:--", cx, cy + dc * 0.06, dc * 0.8, dc * 0.3, (s) => F(s, 800, true), tc, "center");
+      texto(ctx, `${d.corto} ${d.num}`, cx, cy - dc * 0.24, dc * 0.6, dc * 0.13, (s) => FB(s, 700), tc, "center");
+      const lado = Math.min(h * 0.56, 120), ax = cx + dc / 2 + 26, aw = x + w - 24 - ax;
+      contener(ctx, p.local.logo, ax + lado / 2, cy - h * 0.04, lado);
+      contener(ctx, p.visit.logo, ax + aw - lado / 2, cy - h * 0.04, lado);
+      const mx = ax + aw / 2, mw = aw - lado * 2 - 24, nPx = Math.min(42, h * 0.17);
+      ctx.font = FB(Math.min(20, h * 0.09), 700); espaciado(ctx, p.cat, mx, y + Math.min(30, h * 0.17), 3, mezcla(p.color, "#000000", luz(p.color) > 0.6 ? 0.45 : 0.1), "center");
+      bloque(ctx, p.local.nombre, mx, cy - nPx * 0.95, mw, nPx, (s) => F(s, 800, true), "#1b1b1b", "center", 1);
+      texto(ctx, "VS", mx, cy + nPx * 0.05, mw, nPx * 0.6, (s) => F(s, 800, true), "#b0602c", "center");
+      bloque(ctx, p.visit.nombre, mx, cy + nPx * 1.05, mw, nPx, (s) => F(s, 800, true), "#1b1b1b", "center", 1);
+      texto(ctx, p.campo, mx, y + h - Math.min(18, h * 0.1), aw - 10, Math.min(20, h * 0.085), (s) => FB(s, 600), "#7a6a5c", "center");
+      ctx.textBaseline = "alphabetic";
+    });
+  }
+
+  // 13 · Entrada: cada partido es una entrada con su matriz troquelada del color del equipo
+  function eEntrada(ctx, pag) {
+    const g = ctx.createRadialGradient(W / 2, H * 0.3, 60, W / 2, H * 0.55, H * 0.85);
+    g.addColorStop(0, "#1d2c5e"); g.addColorStop(1, "#070b1d"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.globalAlpha = 0.05; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5;
+    for (let yy = -H; yy < H * 2; yy += 26) { ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy + W * 0.5); ctx.stroke(); }
+    ctx.restore(); grano(ctx, 0, 0, W, H, 0.14, 81);
+    cabecera(ctx, pag, { texto: "#ffffff", acento: "#f2c14e", alfaLogo: 0.5, pill: "#f2c14e", fechaTxt: "#0b1230" });
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1, 22, 320);
+    ps.forEach((p, i) => {
+      const { y, h } = R[i], x = 58, w = W - 116, mw = Math.min(250, w * 0.26), corte = x + w - mw, rad = Math.min(18, h * 0.1);
+      ctx.save(); ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+      ctx.beginPath(); ctx.moveTo(x + 10, y); ctx.lineTo(corte - rad, y); ctx.arc(corte, y, rad, Math.PI, 0, true); ctx.lineTo(x + w - 10, y);
+      ctx.arcTo(x + w, y, x + w, y + 10, 10); ctx.lineTo(x + w, y + h - 10); ctx.arcTo(x + w, y + h, x + w - 10, y + h, 10);
+      ctx.lineTo(corte + rad, y + h); ctx.arc(corte, y + h, rad, 0, Math.PI, true); ctx.lineTo(x + 10, y + h);
+      ctx.arcTo(x, y + h, x, y + h - 10, 10); ctx.lineTo(x, y + 10); ctx.arcTo(x, y, x + 10, y, 10); ctx.closePath();
+      ctx.fillStyle = "#f6f1e7"; ctx.fill(); ctx.restore();
+      ctx.save(); ctx.clip();
+      const gm = ctx.createLinearGradient(corte, y, x + w, y + h); gm.addColorStop(0, p.color); gm.addColorStop(1, mezcla(p.color, "#000000", 0.3));
+      ctx.fillStyle = gm; ctx.fillRect(corte, y, mw + 2, h);
+      grano(ctx, x, y, w, h, 0.18, 83 + i, true);
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = "rgba(20,20,20,.35)"; ctx.lineWidth = 2.5; ctx.setLineDash([2, 9]); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(corte, y + rad + 6); ctx.lineTo(corte, y + h - rad - 6); ctx.stroke(); ctx.restore();
+      // matriz: día y hora
+      const tc = sobre(p.color), d = partesDia(p), mx = corte + mw / 2;
+      ctx.textBaseline = "middle";
+      ctx.font = FB(Math.min(22, h * 0.11), 700); espaciado(ctx, `${d.corto} ${d.num} ${d.mes}`, mx, y + h * 0.27, 4, tc, "center");
+      texto(ctx, p.hora || "--:--", mx, y + h * 0.64, mw - 30, Math.min(96, h * 0.44), (s) => F(s, 800, true), tc, "center");
+      // cuerpo: categoría, escudos y nombres
+      const bx = x + 34, bw = corte - 30 - bx, cab = Math.min(22, h * 0.11);
+      ctx.font = FB(cab, 700); espaciado(ctx, p.cat, bx, y + cab + 14, 4, mezcla(p.color, "#000000", luz(p.color) > 0.6 ? 0.45 : 0));
+      const zt = y + cab + 26, zh = h - cab - 26 - Math.min(30, h * 0.15), cy = zt + zh / 2, lado = Math.min(zh * 0.78, 150, bw * 0.16);
+      contener(ctx, p.local.logo, bx + lado / 2, cy, lado);
+      texto(ctx, "VS", bx + lado * 1.32, cy + 2, lado * 0.5, lado * 0.32, (s) => F(s, 800, true), "#b9b2a4", "center");
+      contener(ctx, p.visit.logo, bx + lado * 2.14, cy, lado);
+      const tx = bx + lado * 2.75 + 6, tw = bx + bw - tx, nPx = Math.min(46, zh * 0.3);
+      texto(ctx, p.local.nombre, tx, cy - nPx * 0.58, tw, nPx, (s) => F(s, 800, true), "#141414");
+      texto(ctx, p.visit.nombre, tx, cy + nPx * 0.62, tw, nPx, (s) => F(s, 800, true), "#141414");
+      texto(ctx, p.campo, bx, y + h - Math.min(20, h * 0.1), bw, Math.min(19, h * 0.085), (s) => FB(s, 600), "#776f62");
+      ctx.textBaseline = "alphabetic";
+    });
+  }
+
+  // 14 · Horario: la semana como línea de tiempo; un nodo del color del equipo por partido
+  function eHorario(ctx, pag) {
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#14171c"); g.addColorStop(1, "#0a0c10");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.16, 91);
+    ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.035)"; ctx.lineWidth = 1;
+    for (let yy = 0; yy < H; yy += 40) { ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
+    ctx.restore();
+    cabecera(ctx, pag, { texto: "#ffffff", acento: "#ff8a3d", alfaLogo: 0.42, pill: "rgba(255,138,61,.16)", fechaTxt: "#ffb27a" });
+    const ps = pag.partidos, R = filas(ps.length, Y0 + 10, Y1, 0, 300), lx = 300;
+    ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(lx - 2, R[0].y - 10, 4, R[ps.length - 1].y + R[ps.length - 1].h - R[0].y + 20);
+    ps.forEach((p, i) => {
+      const { y, h } = R[i], cy = y + h / 2, nuevoDia = !i || ps[i - 1].fecha !== p.fecha, d = partesDia(p);
+      // columna izquierda: día (si cambia) y hora
+      ctx.textBaseline = "middle";
+      if (nuevoDia) {
+        ctx.font = FB(Math.min(24, h * 0.13), 700); espaciado(ctx, `${d.largo} ${d.num}`, lx - 40, cy - Math.min(52, h * 0.3), 4, "#ff8a3d", "right");
+        if (i) { ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(72, y, W - 144, 1.5); }
+      }
+      texto(ctx, p.hora || "--:--", lx - 40, cy + h * 0.06, lx - 110, Math.min(100, h * 0.42), (s) => F(s, 800, true), "#ffffff", "right");
+      // nodo
+      const nr = Math.min(20, h * 0.11);
+      ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 18;
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(lx, cy, nr, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = "#0e1014"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(lx, cy, nr + 2.5, 0, Math.PI * 2); ctx.stroke();
+      // derecha: categoría, los dos equipos y el pabellón
+      const tx = lx + 46, tw = W - 72 - tx, fila = Math.min(h * 0.27, 78), lado = Math.min(fila * 0.95, 80);
+      ctx.font = FB(Math.min(20, h * 0.1), 700); espaciado(ctx, p.cat, tx, cy - fila * 1.32, 4, luz(p.color) < 0.25 ? mezcla(p.color, "#ffffff", 0.5) : p.color);
+      [[p.local, cy - fila * 0.48], [p.visit, cy + fila * 0.5]].forEach(([eq, yy]) => {
+        contener(ctx, eq.logo, tx + lado / 2, yy, lado);
+        texto(ctx, eq.nombre, tx + lado + 16, yy + 2, tw - lado - 16, Math.min(46, fila * 0.62), (s) => F(s, 800, true), "#f4f4f4");
+      });
+      texto(ctx, p.campo, tx, cy + fila * 1.36, tw, Math.min(19, h * 0.085), (s) => FB(s, 600), "rgba(255,255,255,.55)");
+      ctx.textBaseline = "alphabetic";
+    });
+  }
+
+  // 15 · Bloques: bandas de color a sangre, una por partido, con la hora gigante calada al fondo
+  function eBloques(ctx, pag) {
+    ctx.fillStyle = "#0c0c0d"; ctx.fillRect(0, 0, W, H); grano(ctx, 0, 0, W, H, 0.2, 101);
+    cabecera(ctx, pag, { texto: "#ffffff", acento: "#ffffff", alfaLogo: 0.5, pill: "#ffffff", fechaTxt: "#0c0c0d" });
+    const ps = pag.partidos, R = filas(ps.length, Y0, Y1 + 40, 8, 300);
+    ps.forEach((p, i) => {
+      const { y, h } = R[i], tc = sobre(p.color), d = partesDia(p);
+      const g = ctx.createLinearGradient(0, y, W, y + h); g.addColorStop(0, mezcla(p.color, "#ffffff", 0.08)); g.addColorStop(1, mezcla(p.color, "#000000", 0.28));
+      ctx.fillStyle = g; ctx.fillRect(0, y, W, h);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, y, W, h); ctx.clip();
+      vetas(ctx, 0, y, W, h, 103 + i, tc, 0.06);
+      ctx.font = F(h * 1.25, 800, true); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; ctx.strokeStyle = rgba(tc, 0.16); ctx.strokeText(p.hora || "VS", W + h * 0.08, y + h * 0.56);
+      ctx.restore();
+      ctx.textBaseline = "middle";
+      const x = 64, hw = Math.min(250, W * 0.24);
+      ctx.font = FB(Math.min(24, h * 0.11), 700); espaciado(ctx, `${d.corto} ${d.num} ${d.mes}`, x, y + h * 0.28, 4, tc);
+      texto(ctx, p.hora || "--:--", x - 4, y + h * 0.6, hw - 20, Math.min(96, h * 0.44), (s) => F(s, 800, true), tc);
+      ctx.fillStyle = rgba(tc, 0.5); ctx.fillRect(x + hw - 4, y + h * 0.2, 3, h * 0.6);
+      const dc = Math.min(h * 0.58, 128), rx = W - 64 - dc / 2;
+      escudoCirculo(ctx, p.visit.logo, rx, y + h / 2, dc);
+      escudoCirculo(ctx, p.local.logo, rx - dc * 1.12, y + h / 2, dc);
+      const tx = x + hw + 22, tw = rx - dc * 1.62 - 18 - tx, nPx = Math.min(38, h * 0.17);
+      ctx.font = FB(Math.min(20, h * 0.095), 700); espaciado(ctx, p.cat, tx, y + h * 0.24, 4, rgba(tc, 0.85));
+      texto(ctx, p.local.nombre, tx, y + h * 0.46, tw, nPx, (s) => F(s, 800, true), tc);
+      texto(ctx, p.visit.nombre, tx, y + h * 0.46 + nPx * 1.1, tw, nPx, (s) => F(s, 800, true), tc);
+      texto(ctx, p.campo, tx, y + h * 0.46 + nPx * 1.95, tw, Math.min(19, h * 0.085), (s) => FB(s, 600), rgba(tc, 0.75));
+      ctx.textBaseline = "alphabetic";
+    });
+  }
+
   const ESTILOS = [
     { id: "marco", nombre: "Marco", foto: false, dibujar: eMarco },
     { id: "cronica", nombre: "Crónica", foto: false, dibujar: eCronica },
@@ -814,7 +1024,13 @@
     { id: "mosaico", nombre: "Mosaico", foto: true, dibujar: eMosaico },
     { id: "polaroid", nombre: "Polaroid", foto: true, dibujar: ePolaroid },
     { id: "cinta", nombre: "Cinta", foto: true, dibujar: eCinta },
-    { id: "cristal", nombre: "Cristal", foto: true, dibujar: eCristal }
+    { id: "cristal", nombre: "Cristal", foto: true, dibujar: eCristal },
+    // solo: el estilo solo se ofrece para ese tipo de story
+    { id: "cartelera", nombre: "Cartelera", foto: false, solo: "proximos", dibujar: eCartelera },
+    { id: "pista", nombre: "Pista", foto: false, solo: "proximos", dibujar: ePista },
+    { id: "entrada", nombre: "Entrada", foto: false, solo: "proximos", dibujar: eEntrada },
+    { id: "horario", nombre: "Horario", foto: false, solo: "proximos", dibujar: eHorario },
+    { id: "bloques", nombre: "Bloques", foto: false, solo: "proximos", dibujar: eBloques }
   ];
 
   // Dibuja una página; escala < 1 para las miniaturas
@@ -978,7 +1194,7 @@
     if (!res) $(m, "avisoFoto").textContent = "";
     for (const [cont, conFoto] of res ? [["estilosSin", false], ["estilosCon", true]] : [["estilosSin", false]]) {
       const el = $(m, cont); el.innerHTML = "";
-      ESTILOS.filter(e => e.foto === conFoto).forEach(e => {
+      ESTILOS.filter(e => e.foto === conFoto && (!e.solo || e.solo === estado.tipo)).forEach(e => {
         const b = document.createElement("button");
         b.type = "button"; b.dataset.estilo = e.id;
         b.style.cssText = "padding:3px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; cursor:pointer; color:#1e293b; min-width:0;";
@@ -1192,7 +1408,7 @@
     const r = tipo === "resultados" ? rangoResultados() : rangoProximos();
     estado = { tipo, desde: r.desde, hasta: r.hasta, items: [], dividir: false, paginas: 2, estilo: estiloGuardado() };
     const valido = ESTILOS.find(e => e.id === estado.estilo);
-    if (!valido || (valido.foto && tipo !== "resultados")) estado.estilo = "marco";
+    if (!valido || (valido.foto && tipo !== "resultados") || (valido.solo && valido.solo !== tipo)) estado.estilo = "marco";
     const m = modal();
     $(m, "titulo").textContent = tipo === "resultados" ? "🏆 Story · Resultados de la semana" : "📅 Story · Partidos de la semana";
     $(m, "desde").value = estado.desde; $(m, "hasta").value = estado.hasta;
@@ -1246,5 +1462,5 @@
     cargarPartidos(m);
   }
 
-  window.nvaSemana = { abrir, dibujarPagina, prepararPartido, cargarFichas, fuentes, prepararLogo, ESTILOS };
+  window.nvaSemana = { abrir, dibujarPagina, prepararPartido, cargarFichas, fuentes, prepararLogo, ESTILOS, grupo, ajusteGrupo };
 })();

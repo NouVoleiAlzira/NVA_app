@@ -470,7 +470,7 @@
       ctx.restore();
       const info = p.res ? 0 : Math.min(330, w * 0.36), ax = x + tab + 16, aw = w - tab - 16 - info - (info ? 26 : 16);
       const banda = p.res ? Math.min(64, h * 0.22) : 0, hz = h - banda;
-      const lado = Math.min(hz * 0.52, aw * 0.22), nPx = Math.max(18, Math.min(40, hz * 0.14));
+      const lado = Math.min(hz * 0.64, aw * 0.27), nPx = Math.max(18, Math.min(38, hz * 0.13));
       const top = y + (hz - lado - nPx * 2.1) / 2 + (banda ? 4 : 0);
       equipo(ctx, p.local, ax + aw * 0.2, top, lado, aw * 0.38, nPx, "#fff", true);
       equipo(ctx, p.visit, ax + aw * 0.8, top, lado, aw * 0.38, nPx, "#fff", true);
@@ -504,7 +504,7 @@
       espaciado(ctx, p.cat, x + 30, y + cab * 0.42 + 16, 4, "#14161c");
       if (p.res) sets(ctx, p, x + w, y + cab * 0.42 + 9, w * 0.55, Math.min(24, cab * 0.55), { gana: p.color, pierde: "#8a857b", align: "right", borde: "#14161c" });
       else { ctx.font = FB(Math.min(24, cab * 0.6), 600); espaciado(ctx, [p.dia, p.hora && `${p.hora} H`].filter(Boolean).join(" · "), x + w, y + cab * 0.42 + 16, 3, "#555", "right"); }
-      const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.42, 80);
+      const zona = h - cab - (p.res ? 10 : Math.min(40, h * 0.17)), l1 = y + cab + zona * 0.3, l2 = y + cab + zona * 0.74, lado = Math.min(zona * 0.47, 130);
       const numW = p.res ? 90 : 0;
       [[p.local, l1, p.setsL, true], [p.visit, l2, p.setsV, false]].forEach(([eq, cy, sets, loc]) => {
         contener(ctx, eq.logo, x + lado / 2, cy, lado);
@@ -540,14 +540,14 @@
       ctx.font = FB(cab * 0.8, 700); espaciado(ctx, p.cat, W / 2, y + cab + 14, 6, p.color, "center");
       if (p.res) sets(ctx, p, W / 2, y + h - 12 - pie * 0.45, w - 120, pie * 0.72, { gana: p.color, pierde: "rgba(255,255,255,.6)" });
       else texto(ctx, [p.dia, p.hora && `${p.hora} H`, p.campo].filter(Boolean).join("  ·  "), W / 2, y + h - 18, w - 80, pie * 0.75, (s) => FB(s, 600), "rgba(255,255,255,.75)", "center");
-      const zt = y + cab + 26, zh = h - cab - 26 - pie - 18, lado = Math.min(h * 0.5, 150), nPx = Math.min(40, h * 0.17);
+      const zt = y + cab + 26, zh = h - cab - 26 - pie - 18, lado = Math.min(h * 0.64, 200), nPx = Math.min(40, h * 0.17);
       const top = zt + (zh - lado - nPx * 2) / 2;
       ctx.save(); ctx.shadowColor = rgba(p.color, 0.8); ctx.shadowBlur = 24;
       contener(ctx, p.local.logo, x + 50 + lado / 2, y + h / 2, lado); contener(ctx, p.visit.logo, x + w - 50 - lado / 2, y + h / 2, lado); ctx.restore();
       const tw = w - 100 - lado * 2 - 40, cx = W / 2;
       if (p.res) {
         ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 30; tanteo(ctx, p, cx, zt + zh * 0.36, Math.min(zh * 0.62, 130), ["#fff", "#fff", p.color]); ctx.restore();
-        bloque(ctx, `${p.local.nombre}  ·  ${p.visit.nombre}`, cx, zt + zh * 0.84, tw, nPx, (s) => F(s, 700), "#dfe6ff", "center", 2);
+        texto(ctx, `${p.local.nombre}  ·  ${p.visit.nombre}`, cx, zt + zh * 0.84, tw, nPx, (s) => F(s, 700), "#dfe6ff", "center");
       } else {
         bloque(ctx, p.local.nombre, cx, zt + zh * 0.2, tw, nPx * 1.1, (s) => F(s, 800, true), "#fff", "center", 1);
         ctx.save(); ctx.shadowColor = p.color; ctx.shadowBlur = 20; texto(ctx, "VS", cx, zt + zh * 0.5 + nPx * 0.4, tw, nPx * 1.2, (s) => F(s, 800, true), p.color, "center"); ctx.restore();
@@ -580,15 +580,15 @@
         texto(ctx, p.dia.split(" ")[1], bx, y + h * 0.66, bw * 0.7, Math.min(110, h * 0.42), (s) => F(s, 800, true), tc, "center");
         texto(ctx, p.dia.split(" ")[2] + (p.hora ? ` · ${p.hora}` : ""), bx, y + h * 0.88, bw * 0.75, Math.min(30, h * 0.13), (s) => FB(s, 700), tc, "center");
       }
-      const cx = x + bw + sk + 26, cw = w - bw - sk * 2 - 40, lado = Math.min(h * 0.3, 74), nPx = Math.min(40, h * 0.17);
-      ctx.font = FB(Math.min(22, h * 0.1), 700); espaciado(ctx, p.cat, cx + 8, y + Math.min(34, h * 0.17), 4, p.color === "#ffffff" ? "#ffc400" : mezcla(p.color, "#ffffff", 0.35));
-      [[p.local, y + h * 0.38], [p.visit, y + h * 0.38 + lado * 1.1]].forEach(([eq, cy], k) => {
+      const cx = x + bw + sk + 26, cw = w - bw - sk * 2 - 40, lado = Math.min((h - 46) / 2.2, 120), nPx = Math.min(40, h * 0.17);
+      ctx.font = FB(Math.min(22, h * 0.1), 700); const catW = espaciado(ctx, p.cat, cx + 8, y + Math.min(34, h * 0.17), 4, p.color === "#ffffff" ? "#ffc400" : mezcla(p.color, "#ffffff", 0.35));
+      [[p.local, y + Math.min(44, h * 0.2) + lado / 2 + 2], [p.visit, y + Math.min(44, h * 0.2) + lado * 1.6 + 6]].forEach(([eq, cy], k) => {
         const off = k * sk * 0.3;
         ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(cx + lado / 2 - off, cy, lado / 2 + 4, 0, Math.PI * 2); ctx.fill();
         contener(ctx, eq.logo, cx + lado / 2 - off, cy, lado * 0.82);
         ctx.textBaseline = "middle"; texto(ctx, eq.nombre, cx + lado + 18 - off, cy + 2, cw - lado - 10, nPx, (s) => F(s, 800, true), "#ffffff"); ctx.textBaseline = "alphabetic";
       });
-      if (p.res) sets(ctx, p, cx + lado + 18 - sk * 0.3, y + h - Math.min(22, h * 0.1), cw - lado - 30, Math.min(22, h * 0.085), { gana: p.color, pierde: "rgba(255,255,255,.7)", align: "left" });
+      if (p.res) sets(ctx, p, x + w - sk * 0.2 - 24, y + Math.min(34, h * 0.17) - Math.min(22, h * 0.1) * 0.35, x + w - sk * 0.2 - 24 - (cx + 8 + catW + 24), Math.min(22, h * 0.1), { gana: p.color, pierde: "rgba(255,255,255,.7)", align: "right" });
       if (!p.res && p.campo) texto(ctx, p.campo, cx + lado + 18 - sk * 0.3, y + h - Math.min(12, h * 0.05), cw - lado - 30, Math.min(22, h * 0.09), (s) => FB(s, 600), "rgba(255,255,255,.7)");
     });
   }
@@ -608,7 +608,7 @@
       ctx.font = F(cab * 0.62, 800, true); espaciado(ctx, p.cat, x + 20, y + cab * 0.72, 3, sobre(p.color));
       ctx.font = FB(cab * 0.48, 700);
       espaciado(ctx, p.res ? p.dia : [p.dia, p.campo].filter(Boolean).join(" · ").slice(0, 52), x + w - 20, y + cab * 0.7, 2, sobre(p.color), "right");
-      const caja = Math.min(filaH * 0.8, 110), lado = Math.min(filaH * 0.7, 76), nPx = Math.min(44, filaH * 0.42);
+      const caja = Math.min(filaH * 0.8, 110), lado = Math.min(filaH * 0.88, 120), nPx = Math.min(44, filaH * 0.42);
       [[p.local, p.setsL, 0], [p.visit, p.setsV, 1]].forEach(([eq, sets, k]) => {
         const cy = y + cab + filaH * (k + 0.5);
         if (k === 1) { ctx.fillStyle = "#2a2a2a"; ctx.fillRect(x + 18, y + cab + filaH, w - 36, 2); }
@@ -661,7 +661,7 @@
       ctx.save(); rr(ctx, x, y, w, h, r); ctx.clip(); ctx.fillStyle = p.color; ctx.fillRect(x, y, iw * 0.86, 12); ctx.restore();
       texto(ctx, p.cat, x + 22, y + 10 + cab * 0.76, iw * 0.7, cab * 0.72, (s) => F(s, 800, true), sobre(p.color));
       const banda = p.res ? Math.min(56, h * 0.18) : 0;
-      const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.52, 120), nPx = Math.min(36, zh * 0.15);
+      const zt = y + cab + 16, zh = h - cab - 24 - banda, lado = Math.min(zh * 0.74, 160), nPx = Math.min(32, zh * 0.12);
       const top = zt + (zh - lado - nPx * 2.2) / 2;
       if (p.res) sets(ctx, p, x + iw / 2, y + h - banda / 2 - 8, iw - 40, Math.min(26, banda * 0.48), { gana: p.color, pierde: "#b9bcc2" });
       equipo(ctx, p.local, x + iw * 0.2, top, lado, iw * 0.32, nPx, "#fff", true);
@@ -693,7 +693,7 @@
       const cw = ctx.measureText(p.cat).width + 34;
       ctx.fillStyle = p.color; ctx.beginPath(); ctx.moveTo(x, y + 18); ctx.lineTo(x + cw + 14, y + 18); ctx.lineTo(x + cw, y + 18 + cab); ctx.lineTo(x, y + 18 + cab); ctx.fill();
       texto(ctx, p.cat, x + 16, y + 18 + cab * 0.76, cw, cab * 0.7, (s) => F(s, 800, true), sobre(p.color));
-      const zona = Math.min(h * 0.46, 260), zt = y + h - zona - 8, lado = Math.min(zona * 0.36, w * 0.17), nPx = Math.min(32, zona * 0.13, w * 0.06);
+      const zona = Math.min(h * 0.46, 260), zt = y + h - zona - 8, lado = Math.min(zona * 0.46, w * 0.23), nPx = Math.min(32, zona * 0.13, w * 0.06);
       const ancho = w * 0.36;
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 14;
       contener(ctx, p.local.logo, x + w * 0.2, zt + lado * 0.6, lado); contener(ctx, p.visit.logo, x + w * 0.8, zt + lado * 0.6, lado); ctx.restore();
@@ -720,7 +720,7 @@
       const t = T[i], ang = ((i % 2 ? 1 : -1) * (1.2 + rnd() * 1.6)) * Math.PI / 180;
       const pw = Math.min(t.w, t.h * (ps.length === 1 ? 0.8 : 1.25)), ph = t.h;
       ctx.save(); ctx.translate(t.x + t.w / 2, t.y + t.h / 2); ctx.rotate(ang);
-      const x = -pw / 2, y = -ph / 2, m = Math.max(12, pw * 0.035), pie = Math.min(ph * 0.3, 190);
+      const x = -pw / 2, y = -ph / 2, m = Math.max(12, pw * 0.035), pie = Math.min(ph * 0.34, 210);
       ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
       ctx.fillStyle = "#f8f6f0"; ctx.fillRect(x, y, pw, ph); ctx.shadowColor = "transparent";
       grano(ctx, x, y, pw, ph, 0.12, 31, true);
@@ -729,14 +729,14 @@
       ctx.fillStyle = p.color; ctx.fillRect(x + m, y + ph - pie - 2, pw - m * 2, 6);
       // Cinta
       ctx.save(); ctx.translate(0, y + 4); ctx.rotate(-ang * 2); ctx.fillStyle = "rgba(255,248,220,.6)"; ctx.fillRect(-pw * 0.14, -16, pw * 0.28, 34); ctx.restore();
-      const cy = y + ph - pie / 2, lado = Math.min(pie * 0.42, 70), nPx = Math.min(30, pie * 0.17, pw * 0.055);
+      const cy = y + ph - pie / 2, lado = Math.min(pie * 0.58, 110), nPx = Math.min(30, pie * 0.17, pw * 0.055);
       contener(ctx, p.local.logo, x + m + lado / 2 + 6, cy - pie * 0.12, lado);
       contener(ctx, p.visit.logo, x + pw - m - lado / 2 - 6, cy - pie * 0.12, lado);
       const centro = pw - m * 2 - lado * 2 - 30;
       const linea = p.res ? marcador(p) : (p.hora ? p.hora : "VS");
       const sube = p.res ? pie * 0.12 : 0;
       texto(ctx, linea, 0, cy - pie * 0.02 - sube, centro, Math.min(pie * 0.34, 80), (s) => F(s, 800, true), "#1d1d1d", "center");
-      texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25 - sube, pw - m * 2 - 20, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
+      texto(ctx, `${p.local.nombre} · ${p.visit.nombre}`, 0, cy + pie * 0.25 - sube, pw - m * 2 - lado * 2 - 24, nPx, (s) => F(s, 700, true), "#3a3a3a", "center");
       if (p.res) sets(ctx, p, 0, Math.min(cy + pie * 0.25 - sube + nPx * 1.2, y + ph - nPx * 0.75), pw - m * 2 - 20, nPx * 0.72, { gana: p.color, pierde: "#8a8a8a", borde: "#1d1d1d" });
       else texto(ctx, `${p.cat} · ${p.dia}`, 0, cy + pie * 0.25 + nPx * 1.1, pw - m * 2 - 20, nPx * 0.72, (s) => FB(s, 600), "#777", "center");
       ctx.restore();
@@ -759,7 +759,7 @@
       ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.lineTo(cw - sk, y + h); ctx.lineTo(0, y + h); ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(cw + 10, y); ctx.lineTo(cw + 22, y); ctx.lineTo(cw + 22 - sk, y + h); ctx.lineTo(cw + 10 - sk, y + h); ctx.fill();
       ctx.restore();
-      const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.4, 96), cab = Math.min(30, h * 0.12);
+      const tc = sobre(p.color), ax = 46, aw = cw - sk - 70, lado = Math.min(h * 0.52, 150), cab = Math.min(30, h * 0.12);
       ctx.font = FB(cab * 0.85, 700); const catW = espaciado(ctx, p.cat, ax, y + cab + 12, 4, tc);
       if (p.res) sets(ctx, p, cw - 34, y + cab * 0.62 + 12, cw - 34 - ax - catW - 30, cab * 0.85, { gana: p.color, pierde: rgba(tc === "#ffffff" ? "#ffffff" : "#111111", 0.6), align: "right", borde: tc });
       const cy = y + h * 0.53;
@@ -790,9 +790,9 @@
       const d = h - 28, fx = x + 14 + d / 2, fy = y + h / 2;
       ctx.save(); ctx.beginPath(); ctx.arc(fx, fy, d / 2, 0, Math.PI * 2); ctx.clip(); foto(ctx, p, fx - d / 2, fy - d / 2, d, d, 0.3, { x0: 0.12, x1: 0.88, y0: 0.12, y1: 0.88 }); ctx.restore();
       ctx.lineWidth = 6; ctx.strokeStyle = p.color; ctx.beginPath(); ctx.arc(fx, fy, d / 2 + 1, 0, Math.PI * 2); ctx.stroke();
-      const cx = x + d + 44, cw = w - d - 70, cab = Math.min(26, h * 0.12), lado = Math.min(h * 0.42, 100), nPx = Math.min(34, h * 0.15);
+      const cx = x + d + 44, cw = w - d - 70, cab = Math.min(26, h * 0.12), lado = Math.min(h * 0.5, 140), nPx = Math.min(34, h * 0.15);
       ctx.font = FB(cab * 0.9, 700); espaciado(ctx, p.cat, cx, y + cab + Math.min(20, h * 0.1), 4, mezcla(p.color, "#ffffff", 0.3));
-      const ly = y + h * 0.5;
+      const ly = y + h * 0.46;
       contener(ctx, p.local.logo, cx + lado / 2, ly, lado);
       contener(ctx, p.visit.logo, cx + cw - lado / 2, ly, lado);
       if (p.res) tanteo(ctx, p, cx + cw / 2, ly + 2, Math.min(h * 0.38, 96));

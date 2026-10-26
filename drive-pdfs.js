@@ -6,19 +6,24 @@
 //  mismo archivo: al actualizar se cambia su contenido, no el enlace, así
 //  que a los jugadores/as se les pasa una sola vez.
 //  Los enlaces se guardan en DrivePDFs/enlaces.json.
+//  «Programar Autom.»: la función de Supabase actualizar-drive hace lo
+//  mismo a la hora y los días elegidos (DrivePDFs/programada.json).
 // =====================================================================
 (function () {
   const ENLACES_FILE = "DrivePDFs/enlaces.json";
   const nombreDrive = key => `Partidos y Resultados - ${key}.pdf`;
 
-  async function leerEnlaces() {
-    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${ENLACES_FILE}`;
+  // null si no se pudo leer (sin conexión); {} si aún no existe
+  async function leerJson(ruta) {
+    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${ruta}`;
     try {
       const r = await fetch(url, { headers: { "Authorization": `token ${ghSettings.token}` }, cache: "no-store" });
       if (r.ok) return JSON.parse(b64_to_utf8((await r.json()).content)) || {};
-    } catch (e) { console.warn("Enlaces Drive:", e); }
-    return {};
+      if (r.status === 404) return {};
+    } catch (e) { console.warn(ruta, e); }
+    return null;
   }
+  const leerEnlaces = async () => (await leerJson(ENLACES_FILE)) || {};
 
   function equipos() {
     const keys = [];
@@ -122,4 +127,71 @@
     o.onclick = e => { if (e.target === o) o.remove(); };
   }
   window.verVinculosDrive = () => verVinculos();
+
+  // ---------- Programar Autom. (función de Supabase actualizar-drive) ----------
+  // Cada hora el servidor mira si está activada, si hoy es uno de los días elegidos y si es
+  // la hora elegida (hora de España); entonces hace lo mismo que «Actualizar vínculos».
+  const PROG_FILE = "DrivePDFs/programada.json";
+  const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
+  const DIAS_NOMBRE = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+  let prog = null;   // null = aún sin leer
+  const conDefecto = (p) => Object.assign({ activa: false, hora: 4, dias: DIAS.slice() }, p);
+
+  async function cargarProg() {
+    if (typeof ghSettings === "undefined" || !ghSettings.user || !navigator.onLine) return;
+    const p = await leerJson(PROG_FILE);
+    if (p) prog = conDefecto(p);
+    pintarProg();
+  }
+  function pintarProg() {
+    const box = document.getElementById("drvProg");
+    if (!box) return;
+    if (!prog) { box.innerHTML = ""; return; }
+    const pad = (n) => String(n).padStart(2, "0");
+    const horas = Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === +prog.hora ? " selected" : ""}>${pad(h)}:00</option>`).join("");
+    const u = prog.ultima;
+    box.classList.toggle("off", !prog.activa);
+    box.innerHTML = `
+      <div class="drv-prog-row">
+        <label class="drv-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="drvSetProg({ activa: this.checked })"> Programar Autom.</label>
+        <select aria-label="Hora (de España)" onchange="drvSetProg({ hora: +this.value })">${horas}</select>
+        <div class="drv-dias" role="group" aria-label="Días">${DIAS.map((d, i) => {
+          const on = prog.dias.includes(d);
+          return `<button type="button" class="drv-dia${on ? " on" : ""}" aria-pressed="${on}" title="${DIAS_NOMBRE[i]}" onclick="drvToggleDia('${d}')">${d}</button>`;
+        }).join("")}</div>
+      </div>
+      ${u ? `<div class="drv-prog-last">Última: ${escapeHtml(fechaCorta(u.fecha))}${u.manual ? " (a mano)" : ""} · ${u.equipos} equipo(s)${(u.resumen || []).some(l => l.startsWith("- ")) ? " · con avisos" : ""}
+        <button type="button" class="cp-chg-btn" onclick="drvVerResumen()">🔍 Ver resumen</button></div>` : ""}`;
+  }
+  window.drvSetProg = async function (cambio) {
+    if (!navigator.onLine) { alert("Sin conexión: no se puede cambiar ahora."); pintarProg(); return; }
+    const ultimo = await leerJson(PROG_FILE);   // lo último guardado (p. ej. el resumen de esta noche)
+    if (ultimo) prog = conDefecto(ultimo);
+    if (typeof cambio === "function") cambio(prog); else Object.assign(prog, cambio);
+    const p = window.nva && window.nva.perfil;
+    prog.cambiadoPor = p ? ((p.nombre || "").trim() || String(p.email || "").split("@")[0]) : "";
+    prog.cambiado = new Date().toISOString();
+    pintarProg();
+    const ok = await writeGitHubFile(PROG_FILE, prog, "Programar actualización de vínculos de Drive");
+    if (!ok) alert("No se pudo guardar el cambio. Revisa la conexión o los permisos.");
+  };
+  window.drvToggleDia = (d) => drvSetProg(p => {
+    p.dias = p.dias.includes(d) ? p.dias.filter(x => x !== d) : DIAS.filter(x => x === d || p.dias.includes(x));
+  });
+  window.drvVerResumen = function () {
+    const u = prog && prog.ultima;
+    if (!u) return;
+    const o = document.createElement("div");
+    o.className = "cp-modal";
+    o.innerHTML = `<div class="cp-modal-box imp-box">
+      <div class="cp-modal-title">Actualización ${u.manual ? "a mano" : "programada"} de los vínculos</div>
+      <div class="cp-modal-txt"><small>${escapeHtml(fechaCorta(u.fecha))}</small></div>
+      <div class="cp-modal-txt" style="white-space:pre-line">${escapeHtml((u.resumen || []).join("\n")) || "No se actualizó ningún equipo."}</div>
+      <button class="cp-modal-btn cp-modal-main">Cerrar</button>
+    </div>`;
+    o.addEventListener("click", (e) => { if (e.target === o || e.target.classList.contains("cp-modal-main")) o.remove(); });
+    document.body.appendChild(o);
+  };
+  cargarProg();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") cargarProg(); });
 })();

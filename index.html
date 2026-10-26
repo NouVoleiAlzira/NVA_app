@@ -189,10 +189,11 @@
     </div>
     <div data-nva-menu="direccion.drive">
     <div class="section-subtitle">PDFs Resultados en Drive</div>
-    <div style="display:flex; gap:8px; margin-bottom:20px;">
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="actualizarVinculosDrive()">🔄 Actualizar vínculos</button>
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
     </div>
+    <div id="drvProg" class="drv-prog"></div>
     </div>
 
     <div id="histSeccion" hidden>
@@ -921,6 +922,7 @@
 <script src="avisos.js" defer></script>
 <script src="anulaciones.js" defer></script>
 <script src="supabase/functions/_shared/lectura-calendarios.js" defer></script>
+<script src="supabase/functions/_shared/pdf-resultados.js" defer></script>
 <script src="calendario-partidos.js" defer></script>
 <script src="importar-datos.js" defer></script>
 <script src="partidos-semana.js" defer></script>

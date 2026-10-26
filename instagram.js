@@ -220,9 +220,11 @@
             <img class="ig-portada" alt="" data-src="${esc(b.id)}">
             <div style="flex:1; min-width:0;"><b>${titulo}</b><br><small>${detalle}</small><br>
               <span class="ig-estado ig-${esc(b.estado)}">${ESTADOS[b.estado] || esc(b.estado)}</span></div>
-            ${papelera ? `<button type="button" class="ig-papelera" title="Borrar" aria-label="Borrar" style="flex:none; align-self:flex-start; border:0; background:transparent; font-size:1.3rem; cursor:pointer; padding:4px;">🗑️</button>` : ""}
+            <div class="ig-acciones">
+              ${papelera ? `<button type="button" class="ig-papelera" title="Borrar" aria-label="Borrar" style="border:0; background:transparent; font-size:1.3rem; cursor:pointer; padding:4px;">🗑️</button>` : ""}
+              <button class="btn-pdf-mode ig-abrir" style="background:var(--azul-primary); color:#fff;">${b.estado === "borrador" ? "👀 REVISAR Y CONFIRMAR" : b.estado === "previa" ? "👀 VER PREVIA" : "👀 VER"}</button>
+            </div>
           </div>
-          <button class="btn-pdf-mode ig-abrir" style="width:100%; margin:8px 0 0; background:var(--azul-primary); color:#fff;">${b.estado === "borrador" ? "👀 REVISAR Y CONFIRMAR" : b.estado === "previa" ? "👀 VER PREVIA" : "👀 VER"}</button>
           <div class="ig-detalle" hidden></div>
         </div>`;
   }

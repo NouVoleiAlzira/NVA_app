@@ -26,7 +26,8 @@ function doPost(e) {
 
     let archivo = null;
     if (p.id) {
-      try { archivo = DriveApp.getFileById(p.id); if (archivo.isTrashed()) archivo = null; } catch (err) { archivo = null; }
+      // Solo archivos de la carpeta del club: nunca se toca nada más del Drive.
+      try { archivo = DriveApp.getFileById(p.id); if (archivo.isTrashed() || !estaEn(archivo, carpeta)) archivo = null; } catch (err) { archivo = null; }
     }
     if (!archivo) {
       const it = carpeta.getFilesByName(p.nombre);
@@ -52,6 +53,12 @@ function doPost(e) {
   } catch (err) {
     return salida({ error: String((err && err.message) || err) });
   }
+}
+
+function estaEn(archivo, carpeta) {
+  const padres = archivo.getParents();
+  while (padres.hasNext()) if (padres.next().getId() === carpeta.getId()) return true;
+  return false;
 }
 
 function carpetaClub() {

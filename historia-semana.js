@@ -228,10 +228,11 @@
   }
 
   // Imagen recortada para llenar el hueco
-  function cubrir(ctx, img, x, y, w, h, fx, fy, z) {
+  // ox, oy: desplazamiento extra en fracciones del hueco (para el editor de fotos)
+  function cubrir(ctx, img, x, y, w, h, fx, fy, z, ox, oy) {
     const k = Math.max(w / img.width, h / img.height) * (z || 1), iw = img.width * k, ih = img.height * k;
-    ctx.drawImage(img, x + (w - iw) * (fx == null ? 0.5 : fx), y + (h - ih) * (fy == null ? 0.35 : fy), iw, ih);
-    return { w, h, iw, ih };
+    ctx.drawImage(img, x + (w - iw) * (fx == null ? 0.5 : fx) + (ox || 0) * w, y + (h - ih) * (fy == null ? 0.35 : fy) + (oy || 0) * h, iw, ih);
+    return { w, h };
   }
   // Imagen entera dentro del hueco
   function contener(ctx, img, cx, cy, lado) {
@@ -402,13 +403,15 @@
     const club = p.nvaLocal ? p.local : p.visit;
     ctx.save(); ctx.globalAlpha = 0.28; contener(ctx, club.logo, x + w / 2, y + h / 2, Math.min(w, h) * 0.8); ctx.restore();
   }
-  // Foto del partido con su ajuste (zoom z ≥ 1 y posición fx, fy de 0 a 1); se apunta el hueco para el editor
+  // Foto del partido con su ajuste (zoom z y desplazamiento ox, oy libres); se apunta el hueco para el editor.
+  // Si la foto no llena el hueco, debajo se ve el fondo del equipo
   const huecos = {};
   function foto(ctx, p, x, y, w, h, fy) {
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
     if (p.foto) {
       const a = p.ajuste || {};
-      huecos[p.id] = cubrir(ctx, p.foto, x, y, w, h, a.fx == null ? 0.5 : a.fx, a.fy == null ? fy : a.fy, a.z);
+      if ((a.z || 1) < 1 || a.ox || a.oy) sinFoto(ctx, p, x, y, w, h);
+      huecos[p.id] = cubrir(ctx, p.foto, x, y, w, h, 0.5, fy, a.z, a.ox, a.oy);
     } else sinFoto(ctx, p, x, y, w, h);
     ctx.restore();
   }
@@ -1010,7 +1013,7 @@
   function ajustarFoto(it) {
     const pag = paginas().find(pg => pg.partidos.some(p => p.id === it.p.id));
     if (!pag) return Promise.resolve(false);
-    const a = Object.assign({ z: 1, fx: 0.5, fy: 0.35 }, it.ajuste || {});
+    const a = Object.assign({ z: 1, ox: 0, oy: 0 }, it.ajuste || {});
     const antes = it.ajuste;
     return new Promise((resolver) => {
       const capa = document.createElement("div");
@@ -1021,8 +1024,8 @@
           <div style="font-weight:800; font-size:1.05rem; color:#fff;">🔍 Encaja la foto</div>
           <canvas data-v style="width:100%; max-width:280px; align-self:center; aspect-ratio:9/16; border-radius:10px; touch-action:none; cursor:grab; box-shadow:0 4px 18px rgba(0,0,0,.4);"></canvas>
           <label style="display:flex; align-items:center; gap:8px; font-size:.9rem;">➖
-            <input type="range" data-z min="1" max="4" step="0.01" value="${a.z}" style="flex:1;">➕</label>
-          <small style="font-size:.8rem; opacity:.85;">Arrastra sobre la story para mover la foto de este partido y usa la barra para acercarla.</small>
+            <input type="range" data-z min="0.4" max="4" step="0.01" value="${a.z}" style="flex:1;">➕</label>
+          <small style="font-size:.8rem; opacity:.85;">Arrastra sobre la story para mover la foto de este partido y usa la barra para acercarla o alejarla.</small>
           <div style="display:flex; gap:8px;">
             <button type="button" data-e="reset" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-weight:700; cursor:pointer;">↺ Centrar</button>
             <button type="button" data-e="no" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-weight:700; cursor:pointer;">Cancelar</button>
@@ -1043,7 +1046,7 @@
         lienzoV.getContext("2d").drawImage(c, 0, 0);
       };
       const repintar = () => { if (!pendiente) { pendiente = true; requestAnimationFrame(pintar); } };
-      const cambiarZoom = (z) => { a.z = Math.min(4, Math.max(1, z)); zoom.value = String(a.z); repintar(); };
+      const cambiarZoom = (z) => { a.z = Math.min(4, Math.max(0.4, z)); zoom.value = String(a.z); repintar(); };
       zoom.oninput = () => cambiarZoom(+zoom.value);
       lienzoV.addEventListener("wheel", (e) => { e.preventDefault(); cambiarZoom(a.z * (e.deltaY < 0 ? 1.06 : 1 / 1.06)); }, { passive: false });
       const dedos = new Map();
@@ -1062,15 +1065,15 @@
         // Del movimiento en pantalla al desplazamiento de la foto dentro de su hueco
         const hu = huecos[it.p.id], k = W / lienzoV.getBoundingClientRect().width;
         if (!hu) return;
-        if (hu.iw > hu.w + 1) a.fx = Math.min(1, Math.max(0, a.fx - (e.clientX - prev.x) * k / (hu.iw - hu.w)));
-        if (hu.ih > hu.h + 1) a.fy = Math.min(1, Math.max(0, a.fy - (e.clientY - prev.y) * k / (hu.ih - hu.h)));
+        a.ox = Math.min(1.5, Math.max(-1.5, a.ox + (e.clientX - prev.x) * k / hu.w));
+        a.oy = Math.min(1.5, Math.max(-1.5, a.oy + (e.clientY - prev.y) * k / hu.h));
         repintar();
       });
       const soltar = (e) => { dedos.delete(e.pointerId); distancia = 0; };
       lienzoV.addEventListener("pointerup", soltar);
       lienzoV.addEventListener("pointercancel", soltar);
       const cerrar = (ok) => { capa.remove(); if (!ok) it.ajuste = antes; resolver(ok); };
-      capa.querySelector('[data-e="reset"]').onclick = () => { Object.assign(a, { z: 1, fx: 0.5, fy: 0.35 }); cambiarZoom(1); };
+      capa.querySelector('[data-e="reset"]').onclick = () => { Object.assign(a, { z: 1, ox: 0, oy: 0 }); cambiarZoom(1); };
       capa.querySelector('[data-e="no"]').onclick = () => cerrar(false);
       capa.querySelector('[data-e="si"]').onclick = () => cerrar(true);
       requestAnimationFrame(pintar);

@@ -14,6 +14,7 @@
 // Los PDF se guardan con la sesión de quien llama, así que los permisos de
 // Storage (RLS) deciden si puede escribir en Calendarios/.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { bajarPdf, idenValido, motivoFallo, pausa, rutaPdf } from "../_shared/federacion.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -24,29 +25,12 @@ const BUCKET = "privado";
 // y los que falten se piden en otra pulsación.
 const MARGEN_MS = 100_000;
 const MAX_EQUIPOS = 60;
-const FED_URL = (iden: string) => `https://fvbcv.com/exportar_competiciones.php?idens=${encodeURIComponent(iden)}`;
 
 function respuesta(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
-}
-
-// Igual que sanitizeFileName() de la app
-function nombreArchivo(nombre: string) {
-  return nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9_-]/g, "_");
-}
-
-async function bajarPdf(iden: string): Promise<Uint8Array> {
-  const r = await fetch(FED_URL(iden), {
-    headers: { "User-Agent": "Mozilla/5.0 (NVA calendarios)" },
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!r.ok) throw new Error(`la federación respondió ${r.status}`);
-  const datos = new Uint8Array(await r.arrayBuffer());
-  if (new TextDecoder().decode(datos.slice(0, 5)) !== "%PDF-") throw new Error("la respuesta no es un PDF");
-  return datos;
 }
 
 Deno.serve(async (req) => {
@@ -67,18 +51,18 @@ Deno.serve(async (req) => {
   const resultados: Record<string, string> = {};
   for (const [equipo, iden] of Object.entries(idens as Record<string, unknown>)) {
     if (Date.now() - inicio > MARGEN_MS) { resultados[equipo] = "no dio tiempo; vuelve a pulsar «Actualizar automáticamente»"; continue; }
-    if (typeof iden !== "string" || !/^\d{4,5}$/.test(iden)) { resultados[equipo] = "iden no válido"; continue; }
+    if (!idenValido(iden)) { resultados[equipo] = "iden no válido"; continue; }
     try {
       const pdf = await bajarPdf(iden);
-      const { error } = await comoUsuario.storage.from(BUCKET).upload(`Calendarios/${nombreArchivo(equipo)}.pdf`, pdf, {
+      const { error } = await comoUsuario.storage.from(BUCKET).upload(rutaPdf(equipo), pdf, {
         upsert: true,
         contentType: "application/pdf",
       });
       resultados[equipo] = error ? `no se pudo guardar: ${error.message}` : "ok";
     } catch (e) {
-      resultados[equipo] = e instanceof Error && e.name === "TimeoutError" ? "la federación no respondió" : e instanceof Error ? e.message : String(e);
+      resultados[equipo] = motivoFallo(e);
     }
-    await new Promise((r) => setTimeout(r, 1000)); // uno a uno, sin saturar la web de la federación
+    await pausa();
   }
   return respuesta(200, { resultados });
 });

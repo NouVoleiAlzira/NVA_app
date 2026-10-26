@@ -54,7 +54,7 @@ Los equipos de cada entrenador no se eligen al invitar: son los que tenga en **O
 Los workflows siguen en el repositorio privado `Registro_Entrenamientos` (allí no se ven los logs públicamente).
 Cuando la app guarda un archivo de solicitud (`Reels/solicitud.json`, `Reels/solicitud_historia.json`, `Reels/publicar.json` o `Reels/musica/solicitud.json`), llama a la Edge Function `lanzar-tarea`. Esta comprueba que el usuario tiene permiso de escritura en ese menú y arranca el workflow. El workflow baja los datos de Supabase, hace su trabajo y sube el resultado.
 
-Los PDF de la federación que se piden desde la app (botón «Actualizar automáticamente») ya no pasan por GitHub: los baja la Edge Function `descargar-calendarios` y los guarda en `Calendarios/`. La descarga programada diaria sigue siendo un workflow.
+Los PDF de la federación (botón «Actualizar automáticamente») no pasan por GitHub: los baja la Edge Function `descargar-calendarios` y los guarda en `Calendarios/`.
 
 Configuración:
 
@@ -62,15 +62,4 @@ Configuración:
    - `GITHUB_TOKEN`: un token *fine-grained* de GitHub con permiso **Actions: Read and write** solo sobre `Registro_Entrenamientos`.
    - `TAREAS_REPO` (opcional): `NouVoleiAlzira/Registro_Entrenamientos`.
 2. En GitHub, en `Registro_Entrenamientos` › Settings › Secrets and variables › Actions:
-   - secretos `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`;
-   - cuando los datos ya estén migrados, la variable `DATOS_EN_SUPABASE` = `si`, para que las tareas programadas (reels de los lunes y martes, PDF diarios) también usen Supabase.
-
-## Traspaso de los datos existentes
-
-```bash
-git clone https://github.com/NouVoleiAlzira/Registro_Entrenamientos
-SUPABASE_URL=https://avsovxrohruariydaned.supabase.co SUPABASE_SERVICE_ROLE_KEY=... \
-  node scripts/migrar-datos.mjs ./Registro_Entrenamientos
-```
-
-Se puede repetir sin problema: sobrescribe por ruta.
+   - secretos `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `IG_TOKEN`, `GH_SECRETS_PAT` (guarda el token renovado de Instagram) y `ANTHROPIC_API_KEY` (opcional).

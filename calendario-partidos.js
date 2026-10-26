@@ -585,20 +585,20 @@
     const teams = (typeof appData !== "undefined" && appData.teams) || [];
     if (!teams.length) { box.innerHTML = `<div class="cp-empty">No hay equipos configurados.</div>`; return; }
     box.innerHTML = `<div class="cp-update-btns">
-        <button type="button" class="btn-save-session cp-update-all" onclick="cpUpdateAll()">🔄 Actualizar automáticamente</button>
         <button type="button" class="btn-save-session cp-update-manual${manualMode ? " active" : ""}" aria-pressed="${manualMode}" onclick="cpToggleManual()">✋ Actualizar manualmente</button>
       </div>` + teams.map((t, i) => {
       const key = getTeamKey(t);
       const info = cp.teams[key];
-      let change = "";
-      if (info && info.changeStatus === "sin") change = `<span class="cp-chg cp-chg-sin">Sin cambios desde ${fmtDay((info.changedAt || info.uploadedAt).slice(0, 10))}${info.checkedAt ? ` · revisado ${fmtDay(info.checkedAt.slice(0, 10))}` : ""}</span>`;
-      else if (info && info.changeStatus === "con") change = `<span class="cp-chg cp-chg-con">Con cambios (${fmtDay((info.changedAt || info.uploadedAt).slice(0, 10))}) <button type="button" class="cp-chg-btn" data-key="${esc(key)}" onclick="cpShowChanges(this)">🔍 Ver cambios</button></span>`;
-      const status = info
-        ? `<span class="wk-mark wk-v">V</span><span class="cp-up">${fmtDay(info.uploadedAt.slice(0, 10))} · ${(info.matches || []).length} partidos</span>${change}`
-        : `<span class="cp-up cp-none">Sin PDF</span>`;
+      const desde = info ? fmtDay((info.changedAt || info.uploadedAt).slice(0, 10)) : "";
+      const revisado = info && info.checkedAt ? ` · revisado ${fmtDay(info.checkedAt.slice(0, 10))}` : "";
+      const status = !info ? `<span class="cp-up cp-none">Sin PDF</span>`
+        : info.changeStatus === "con" ? `<span class="cp-chg cp-chg-con">Con cambios desde ${desde}${revisado}</span>`
+        : info.changeStatus === "sin" ? `<span class="cp-chg cp-chg-sin">Sin cambios desde ${desde}${revisado}</span>`
+        : `<span class="cp-chg cp-chg-sin">Cargado el ${desde}${revisado}</span>`;
+      const verCambios = info && info.changeStatus === "con" ? ` <button type="button" class="cp-chg-btn" data-key="${esc(key)}" onclick="cpShowChanges(this)">🔍 Ver cambios</button>` : "";
       const iden = (cp.idens || {})[key] || "";
       return `<div class="cp-team">
-        <div class="cp-team-name">${esc(key)}<div class="cp-team-status">${status}</div></div>
+        <div class="cp-team-name">${esc(key)}${verCambios}<div class="cp-team-status">${status}</div></div>
         <label class="cp-iden"><span>Iden</span><input type="text" inputmode="numeric" maxlength="5" placeholder="0000" value="${esc(iden)}" data-key="${esc(key)}" onchange="cpSetIden(this)"></label>
         ${manualMode ? `<button class="cp-upload" onclick="cpPickPdf(${i})">📄 ${info ? "Cambiar" : "Subir"} PDF</button>` : ""}
       </div>`;
@@ -608,16 +608,6 @@
   // Botones de subir/cambiar PDF a mano: solo visibles tras pulsar «Actualizar manualmente»
   let manualMode = false;
   window.cpToggleManual = function () { manualMode = !manualMode; renderTeams(); };
-
-  // Línea del resumen final: «- Equipo: x partidos» y debajo si hay cambios o no
-  function fmtRes(key, res, extra) {
-    const m = /^«.*», (\d+) partidos · (.+)$/.exec(res);
-    if (!m) return `- ${key}: ${res}${extra || ""}`;
-    const info = cp.teams[key] || {};
-    let st = m[2] === "nuevo" ? "Nuevo (primera carga)" : m[2] === "con cambios" ? "Con cambios" : "Sin cambios";
-    if (m[2] === "sin cambios" && (info.changedAt || info.uploadedAt)) st += ` desde ${fmtDay((info.changedAt || info.uploadedAt).slice(0, 10))}`;
-    return `- ${key}: ${m[1]} partidos\n   ${st}${extra || ""}`;
-  }
 
   // ---------- Subida y análisis del PDF ----------
   let pickIdx = -1;
@@ -837,84 +827,12 @@
     } finally { ocultarCargando(); }
   }
 
-  // ---------- Actualizar automáticamente (función de Supabase) ----------
-  // La función descargar-calendarios baja los PDF desde la federación (el navegador no puede:
-  // fvbcv.com bloquea las descargas desde otras webs) y los guarda en Calendarios/<Equipo>.pdf.
-  function ghApi(path, opts) {
-    const headers = Object.assign({ "Authorization": `token ${ghSettings.token}`, "Accept": "application/vnd.github+json" }, (opts && opts.headers) || {});
-    return fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}${path}`, Object.assign({ cache: "no-store" }, opts || {}, { headers }));
-  }
-  // Devuelve { resultados } (por equipo: "ok" o el motivo del fallo) o { error }
-  async function runServerDownload(teams) {
-    const sb = window.nva && window.nva.cliente;
-    if (!sb) return { error: "no hay conexión con Supabase" };
-    mostrarCargando(`Descargando ${teams.length === 1 ? "el PDF" : `los ${teams.length} PDF`} de la federación...`);
-    try {
-      const idens = {};
-      teams.forEach(t => { idens[getTeamKey(t)] = cp.idens[getTeamKey(t)]; });
-      const { data, error } = await sb.functions.invoke("descargar-calendarios", { body: { idens } });
-      if (error) {
-        let msg = error.message;
-        try { msg = (await error.context.json()).error || msg; } catch (e) {}
-        return { error: msg };
-      }
-      return { resultados: (data && data.resultados) || {} };
-    } catch (e) { console.error(e); return { error: "error de conexión" }; }
-    finally { ocultarCargando(); }
-  }
-  async function readServerPdf(key) {
-    const r = await ghApi(`/contents/${PDF_FOLDER}/${sanitizeFileName(key)}.pdf`, { headers: { "Accept": "application/vnd.github.raw" } });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const blob = await r.blob();
-    const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
-    if (String.fromCharCode(...head) !== "%PDF-") throw new Error("No es un PDF");
-    return new File([blob], `${sanitizeFileName(key)}.pdf`, { type: "application/pdf" });
-  }
-
-  // Descarga en el servidor los PDF de todos los equipos con iden y, para cada uno,
-  // comprueba si los partidos han cambiado respecto a lo guardado (processPdf)
   let updating = false;
-  window.cpUpdateAll = async function () {
-    if (updating) return;
-    const teams = ((typeof appData !== "undefined" && appData.teams) || []).filter(t => (cp.idens || {})[getTeamKey(t)]);
-    if (!teams.length) { alert("Escribe primero el iden (4 o 5 dígitos) de algún equipo."); return; }
-    if (!navigator.onLine) { alert("Sin conexión: no se pueden descargar los PDF ahora."); return; }
-    updating = true;
-    const results = [], leidos = [];
-    try {
-      await fetchFromGitHub();   // comparar con los datos más recientes, no con los de este dispositivo
-      const run = await runServerDownload(teams);
-      if (run.error) {
-        alert(`No se pudo actualizar automáticamente: ${run.error}.\n\nPuedes subir los PDF a mano con «Actualizar manualmente».`);
-        return;
-      }
-      for (let i = 0; i < teams.length; i++) {
-        const team = teams[i], key = getTeamKey(team);
-        const st = run.resultados[key];
-        if (st !== "ok") { results.push(`- ${key}: no se pudo descargar (${st || "sin respuesta"})`); continue; }
-        mostrarCargando(`Comprobando ${i + 1}/${teams.length}: ${key}...`);
-        let file = null;
-        try { file = await readServerPdf(key); } catch (e) { console.warn(`Sin PDF guardado para ${key}:`, e); }
-        ocultarCargando();
-        if (!file) { results.push(`- ${key}: no se encontró el PDF descargado`); continue; }
-        const res = await processPdf(file, file.name, team, true);
-        if (/partidos · /.test(res)) leidos.push(key);
-        results.push(fmtRes(key, res));
-      }
-      const reg = await syncResults(leidos);
-      if (reg) results.push(reg);
-    } finally {
-      updating = false;
-      ocultarCargando();
-    }
-    render();
-    alert("Actualización terminada:\n\n" + results.join("\n\n"));
-  };
 
   // ---------- Actualización programada (función de Supabase actualizar-calendarios) ----------
   // Cada hora en punto el servidor mira si está activada y si es la hora elegida (hora de España);
-  // entonces hace lo mismo que «Actualizar automáticamente», sin preguntar nada: si un registro de
-  // partido ya tiene otro resultado no se toca. Lo elegido y el resumen van en su propio archivo
+  // entonces baja y revisa los PDF sin preguntar nada: si un registro de partido ya tiene otro
+  // resultado no se toca (se pregunta al pulsar «Actualizar ahora»). Lo elegido y el resumen van en su propio archivo
   // para que guardar los partidos desde un dispositivo no lo pise.
   const PROG_FILE = "CalendarioProgramada.json";
   let prog = null;   // null = aún sin leer
@@ -935,13 +853,12 @@
     const hora = prog.hora == null ? 5 : +prog.hora, u = prog.ultima;
     const horas = Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === hora ? " selected" : ""}>${pad(h)}:00</option>`).join("");
     const last = u
-      ? `Última: ${fmtDay(u.dia || u.fecha.slice(0, 10))} a las ${horaEs(u.fecha)}${u.manual ? " (prueba)" : ""} · ${u.equipos} equipo(s)${u.conCambios ? `, ${u.conCambios} con cambios` : ""} <button type="button" class="cp-chg-btn" onclick="cpShowProgResumen()">🔍 Ver resumen</button>`
+      ? `Última: ${fmtDay(u.dia || u.fecha.slice(0, 10))} a las ${horaEs(u.fecha)}${u.manual ? " (a mano)" : ""} · ${u.equipos} equipo(s)${u.conCambios ? `, ${u.conCambios} con cambios` : ""} <button type="button" class="cp-chg-btn" onclick="cpShowProgResumen()">🔍 Ver resumen</button>`
       : "Todavía no se ha hecho ninguna actualización programada.";
     box.innerHTML = `
       <label class="cp-prog-row cp-prog-check"><input type="checkbox"${prog.activa ? " checked" : ""} onchange="cpSetProg({ activa: this.checked })"> Actualizar los PDF automáticamente cada día</label>
       <div class="cp-prog-row"><label class="cp-prog-hora"><span>Hora</span><select onchange="cpSetProg({ hora: +this.value })"${prog.activa ? "" : " disabled"}>${horas}</select><span class="cp-prog-txt">hora de España</span></label>
-        <button type="button" class="btn-save-session cp-prog-probar" onclick="cpProbarProg()">▶️ Probar ahora</button></div>
-      <div class="cp-prog-txt">Hace lo mismo que «Actualizar automáticamente»: descarga los PDF de los equipos con iden, marca los cambios de fecha, hora o pabellón y pasa los resultados a los registros de partido que ya existen. Si un registro ya tiene otro resultado, no se toca: se decide al pulsar «Actualizar automáticamente».</div>
+        <button type="button" class="btn-save-session cp-prog-probar" onclick="cpProbarProg()">🔄 Actualizar ahora</button></div>
       <div class="cp-prog-last">${last}</div>`;
   }
   window.cpSetProg = async function (cambio) {
@@ -958,34 +875,47 @@
     const o = document.createElement("div");
     o.className = "cp-modal";
     o.innerHTML = `<div class="cp-modal-box imp-box">
-      <div class="cp-modal-title">Actualización ${u.manual ? "de prueba" : "programada"}</div>
+      <div class="cp-modal-title">Actualización ${u.manual ? "a mano" : "programada"}</div>
       <div class="cp-modal-txt"><small>${fmtDay(u.dia || u.fecha.slice(0, 10))} a las ${horaEs(u.fecha)}${u.quien ? ` · ${esc(u.quien)}` : ""}</small></div>
-      <div class="cp-modal-txt cp-prog-res">${esc((u.resumen || []).join("\n\n")) || "No había equipos con iden."}</div>
+      <div class="cp-modal-txt cp-prog-res">${esc(textoResumen(u.resumen)) || "No había equipos con iden."}</div>
       <button class="cp-modal-btn cp-modal-main">Cerrar</button>
     </div>`;
     o.addEventListener("click", (e) => { if (e.target === o || e.target.classList.contains("cp-modal-main")) o.remove(); });
     document.body.appendChild(o);
   };
-  // Lanza ahora la misma actualización que hará el servidor a la hora elegida
+  // Resúmenes guardados antes de quitar el botón «Actualizar automáticamente»: se adaptan los consejos
+  const textoResumen = (lineas) => (lineas || []).join("\n\n")
+    .replace("pulsa «Actualizar automáticamente» para elegirlo", "súbelo con «Actualizar manualmente» para elegirlo")
+    .replace(/«Actualizar automáticamente»/g, "«Actualizar ahora»");
+
+  // «Actualizar ahora»: la misma actualización que hará el servidor a la hora elegida. Después,
+  // aquí sí hay alguien delante: se pregunta por los resultados distintos a los ya grabados.
   window.cpProbarProg = async function () {
     if (updating) return;
     const sb = window.nva && window.nva.cliente;
-    if (!sb || !navigator.onLine) { alert("Sin conexión con Supabase."); return; }
-    if (!confirm("Se hará ahora en el servidor la misma actualización que la programada (descargar los PDF, comprobar cambios y pasar resultados). Puede tardar un par de minutos.\n\n¿Seguir?")) return;
+    if (!sb || !navigator.onLine) { alert("Sin conexión: no se pueden descargar los PDF ahora."); return; }
+    const keys = ((typeof appData !== "undefined" && appData.teams) || []).map(getTeamKey).filter(k => (cp.idens || {})[k]);
+    if (!keys.length) { alert("Escribe primero el iden (4 o 5 dígitos) de algún equipo."); return; }
     updating = true;
-    mostrarCargando("Actualizando en el servidor (puede tardar un par de minutos)...");
+    mostrarCargando("Descargando y comprobando los PDF de la federación (puede tardar un par de minutos)...");
     let msg;
     try {
       const { data, error } = await sb.functions.invoke("actualizar-calendarios", { body: { ahora: true } });
       if (error) {
         msg = error.message;
         try { msg = (await error.context.json()).error || msg; } catch (e) {}
-        msg = `No se pudo hacer la actualización: ${msg}.`;
-      } else msg = "Actualización terminada:\n\n" + ((data && data.ultima && data.ultima.resumen) || []).join("\n\n");
-    } catch (e) { console.error(e); msg = "No se pudo hacer la actualización: error de conexión."; }
+        msg = `No se pudo actualizar: ${msg}.\n\nPuedes subir los PDF a mano con «Actualizar manualmente».`;
+      } else msg = "Actualización terminada:\n\n" + textoResumen(data && data.ultima && data.ultima.resumen);
+      ocultarCargando();
+      await fetchFromGitHub();
+      await loadProg();
+      if (!error) {
+        const reg = await syncResults(keys);   // solo pregunta si hay resultados distintos a los grabados
+        if (/[1-9]\d* reescrito/.test(reg)) msg += "\n\n" + reg;
+      }
+    } catch (e) { console.error(e); msg = "No se pudo actualizar: error de conexión."; }
     finally { updating = false; ocultarCargando(); }
-    await fetchFromGitHub();
-    await loadProg();
+    render();
     alert(msg);
   };
 

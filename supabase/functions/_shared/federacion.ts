@@ -1,6 +1,6 @@
 // Descarga de los PDF de partidos de la federación (fvbcv.com).
-// La usan descargar-calendarios (botón «Actualizar automáticamente») y
-// actualizar-calendarios (actualización programada).
+// La usan actualizar-calendarios (botón «Actualizar ahora» y actualización
+// programada) y descargar-calendarios (el antiguo «Actualizar automáticamente»).
 
 export const FED_URL = (iden: string) => `https://fvbcv.com/exportar_competiciones.php?idens=${encodeURIComponent(iden)}`;
 export const idenValido = (iden: unknown): iden is string => typeof iden === "string" && /^\d{4,5}$/.test(iden);

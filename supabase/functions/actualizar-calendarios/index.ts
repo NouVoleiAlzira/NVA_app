@@ -1,13 +1,13 @@
 // Actualización programada de los PDF de partidos de la federación.
 //
-// Hace lo mismo que el botón «Actualizar automáticamente» de Calendario de
-// partidos, pero en el servidor y sin nadie delante:
+// Descarga y revisa los PDF de Calendario de partidos en el servidor, sin
+// nadie delante:
 //   1. baja el PDF de cada equipo con iden y lo guarda en Calendarios/<Equipo>.pdf
 //   2. lo lee y comprueba si han cambiado fechas, horas o pabellones
 //      (CalendarioPartidos.json: «Sin cambios» / «Con cambios» y su detalle)
 //   3. pasa los resultados a los registros de partido que YA existen
 //      (Partidos/…json). Si el registro tiene otro resultado no se toca:
-//      se decide a mano la próxima vez que se pulse «Actualizar automáticamente».
+//      se pregunta en la app la próxima vez que se pulse «Actualizar ahora».
 // Lo elegido en la app (activa, hora) y el resumen de la última vez están en
 // CalendarioProgramada.json; los partidos, en CalendarioPartidos.json.
 //
@@ -15,7 +15,7 @@
 //   · pg_cron, cada hora en punto (migración 20261026000003). Solo trabaja si
 //     la opción está activada en la app y es la hora elegida (hora de España),
 //     y una vez al día. Se identifica con la clave de public.tareas_clave.
-//   · la app, botón «Probar ahora» ({ ahora: true }), con la sesión de quien
+//   · la app, botón «Actualizar ahora» ({ ahora: true }), con la sesión de quien
 //     pulsa: tiene que poder escribir en Calendarios/.
 //   · ella misma ({ leer }) para leer cada PDF en una llamada aparte: Supabase
 //     da 2 s de CPU por llamada y leer todos los PDF en una sola no cabría.
@@ -142,7 +142,7 @@ async function actualizar(clave: string, quien: string) {
     try {
       const lines = await leerAparte(pdf, clave);
       const fed = L.previousFedName(lines, cp.teams[key]) || L.findFedName(lines, team).best;
-      if (!fed) resumen.push(`- ${key}: no se reconoce el equipo en el PDF (pulsa «Actualizar automáticamente» para elegirlo)`);
+      if (!fed) resumen.push(`- ${key}: no se reconoce el equipo en el PDF (súbelo con «Actualizar manualmente» para elegirlo)`);
       else {
         const matches = L.extractMatches(lines, fed);
         if (!matches.length) resumen.push(`- ${key}: «${fed}» sin partidos con fecha`);
@@ -189,7 +189,7 @@ async function actualizar(clave: string, quien: string) {
   const todo = lineasEquipo.concat(resumen);
   if (grabados + distintos + iguales + fallos) {
     todo.push(`Resultados en registros de partido: ${grabados} grabado(s), ${iguales} sin cambios` +
-      (distintos ? `, ${distintos} distinto(s) al grabado (se decide al pulsar «Actualizar automáticamente»)` : "") +
+      (distintos ? `, ${distintos} distinto(s) al grabado (se pregunta al pulsar «Actualizar ahora»)` : "") +
       (fallos ? `, ${fallos} sin guardar por un error` : "") + ".");
   }
   const { dia } = ahoraEnEspana();
@@ -210,7 +210,7 @@ async function actualizar(clave: string, quien: string) {
     }
     guardado = await guardarArchivo(CP_FILE, JSON.stringify(obj, null, 2), version);
   }
-  if (!guardado) ultima.resumen.unshift("⚠️ No se pudieron guardar los partidos (otros cambios a la vez). Pulsa «Actualizar automáticamente».");
+  if (!guardado) ultima.resumen.unshift("⚠️ No se pudieron guardar los partidos (otros cambios a la vez). Pulsa «Actualizar ahora».");
 
   // Resumen en CalendarioProgramada.json (sin tocar lo elegido en la app)
   for (let intento = 0; intento < 4; intento++) {
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
       return respuesta(200, { lineas: await lineasDe(deBase64(cuerpo.leer)) });
     }
 
-    // «Probar ahora» desde la app
+    // «Actualizar ahora» desde la app
     if (cuerpo.ahora) {
       const comoUsuario = createClient(URL_BASE, ANON, {
         global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },

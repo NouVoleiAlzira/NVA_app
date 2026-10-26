@@ -1637,6 +1637,12 @@
     .cp-chg { display: block; width: 100%; margin-top: 3px; font-size: 0.72rem; font-weight: 700; }
     .cp-chg-sin { color: var(--niebla); }
     .cp-chg-con { color: #e0a100; }
+    .cp-chg-mal { color: #fca5a5; }
+    .cp-st-ico { display: inline-flex; flex: 0 0 auto; margin-right: 6px; }
+    .cp-st-ico svg { display: block; }
+    .cp-team-status { margin-top: 4px; }
+    .cp-team-status .cp-chg { width: auto; flex: 1 1 0; min-width: 0; margin-top: 0; }
+    .cp-team-status .cp-chg-mal { flex-basis: 100%; margin-top: 3px; }
     .cp-none { font-style: italic; }
     .cp-upload { flex: 0 0 auto; border: none; border-radius: 10px; padding: 8px 12px; background: var(--btn-fondorAzul); color: #fff; font: inherit; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
 

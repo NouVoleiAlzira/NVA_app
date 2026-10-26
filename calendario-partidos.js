@@ -597,12 +597,27 @@
         : `<span class="cp-chg cp-chg-sin">Cargado el ${desde}${revisado}</span>`;
       const verCambios = info && info.changeStatus === "con" ? ` <button type="button" class="cp-chg-btn" data-key="${esc(key)}" onclick="cpShowChanges(this)">🔍 Ver cambios</button>` : "";
       const iden = (cp.idens || {})[key] || "";
+      const fallo = !iden ? "Sin iden: no hay vínculo para descargar el PDF" : !info ? "No hay PDF" : falloDescarga(key);
+      const icono = `<span class="cp-st-ico" title="${esc(fallo || "Actualizado correctamente")}">${fallo ? ICO_MAL : ICO_BIEN}</span>`;
       return `<div class="cp-team">
-        <div class="cp-team-name">${esc(key)}${verCambios}<div class="cp-team-status">${status}</div></div>
+        <div class="cp-team-name">${esc(key)}${verCambios}<div class="cp-team-status">${icono}${status}${fallo && info ? `<span class="cp-chg cp-chg-mal">${esc(fallo)}</span>` : ""}</div></div>
         <label class="cp-iden"><span>Iden</span><input type="text" inputmode="numeric" maxlength="5" placeholder="0000" value="${esc(iden)}" data-key="${esc(key)}" onchange="cpSetIden(this)"></label>
         ${manualMode ? `<button class="cp-upload" onclick="cpPickPdf(${i})">📄 ${info ? "Cambiar" : "Subir"} PDF</button>` : ""}
       </div>`;
     }).join("");
+  }
+
+  // Iconos de estado de cada equipo: tick verde = actualizado bien; X roja = falló la última
+  // descarga, no hay PDF o no tiene iden para descargarlo
+  const ICO_BIEN = `<svg viewBox="0 0 24 24" width="22" height="22" aria-label="Actualizado"><rect x="2" y="2" width="20" height="20" rx="3" fill="none" stroke="#22c55e" stroke-width="2.2"/><path d="M6.5 12.5l4 4 7.5-9" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const ICO_MAL = `<svg viewBox="0 0 24 24" width="22" height="22" aria-label="Con error"><circle cx="12" cy="12" r="10" fill="none" stroke="#ef4444" stroke-width="2.2"/><path d="M7.5 7.5l9 9M16.5 7.5l-9 9" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/></svg>`;
+  // Motivo del fallo del equipo en la última actualización (resumen de «Actualizar ahora» o programada), o ""
+  function falloDescarga(key) {
+    const lineas = (prog && prog.ultima && prog.ultima.resumen) || [];
+    const l = lineas.find(x => x.startsWith(`- ${key}: `));
+    if (!l) return "";
+    const resto = l.slice(key.length + 4);
+    return /^\d+ partidos/.test(resto) ? "" : resto.charAt(0).toUpperCase() + resto.slice(1);
   }
 
   // Botones de subir/cambiar PDF a mano: solo visibles tras pulsar «Actualizar manualmente»
@@ -844,6 +859,7 @@
       prog = res.ok ? JSON.parse(b64_to_utf8((await res.json()).content)) : (res.status === 404 ? {} : prog);
     } catch (e) { console.error(`Error al cargar ${PROG_FILE}:`, e); }
     renderProg();
+    renderTeams();   // iconos de estado según la última actualización
     return prog;
   }
   function renderProg() {

@@ -158,6 +158,7 @@
   const esc = escapeHtml;
   const fmt = (s) => { if (!s) return ""; const [y, m, d] = s.slice(0, 10).split("-"); return `${d}/${m}`; };
   const videos = {};   // id -> objectURL ya descargado
+  const fotosPrevia = {};   // ruta -> imagen de las fotos de una previa (para «Encajar las fotos»)
 
   const api = (path) => `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${path}`;
   const hdr = (extra) => Object.assign({ "Authorization": `token ${window.igGetToken()}` }, extra || {});
@@ -331,6 +332,7 @@
         ${Array.from({ length: n }, (_, i) => `<img data-i="${i + 1}" alt="Diapositiva ${i + 1}" style="flex:0 0 auto; width:46%; aspect-ratio:9/16; object-fit:cover; border-radius:8px; background:#0b163a; scroll-snap-align:start; cursor:zoom-in;">`).join("")}
       </div>
       ${BOTON_DESCARGA("⬇️ Descargar las imágenes")}
+      ${meta.fotosUsadas && Object.keys(meta.fotosUsadas).length ? `<button type="button" class="btn-save-session ig-encajar" style="width:100%; margin-top:8px; background:var(--azul-primary);">🔍 Encajar las fotos</button>` : ""}
       <label class="ig-label">Texto del post (puedes cambiarlo)</label>
       <textarea class="ig-texto" rows="6">${esc(meta.texto)}</textarea>
       <button class="btn-save-session ig-estilo" style="width:100%; margin-top:10px; background:#7c3aed;">🎨 Cambiar estilo</button>
@@ -349,6 +351,24 @@
     bajar.onclick = () => descargar([...det.querySelectorAll(".ig-slides img")].filter(im => im.src)
       .map(im => ({ url: im.src, nombre: `reel-${id}-${String(im.dataset.i).padStart(2, "0")}.jpg` })));
     const texto = () => det.querySelector(".ig-texto").value.trim();
+    const encajar = det.querySelector(".ig-encajar");
+    if (encajar) encajar.onclick = async () => {   // volver a encajar las fotos con el estilo ya dibujado
+      encajar.disabled = true;
+      const previos = (meta.solicitud && meta.solicitud.ajustes) || {}, items = [];
+      try {
+        for (const [pid, ruta] of Object.entries(meta.fotosUsadas)) {
+          if (!fotosPrevia[ruta]) fotosPrevia[ruta] = await cargarImagen(await blobUrl(ruta));
+          items.push({ id: pid, titulo: tituloPartido(pid), img: fotosPrevia[ruta], ajuste: previos[pid] ? Object.assign({}, previos[pid]) : null });
+        }
+      } catch (e) { encajar.disabled = false; alert(e.message); return; }
+      encajar.disabled = false;
+      const g = (meta.estilo && meta.estilo.partido && meta.estilo.partido.tipo) || "auto";
+      if (!(await encajarFotosReel(items, g, "🎨 Rehacer la previa"))) return;
+      const ajustes = Object.assign({}, previos);
+      items.forEach(it => { if (it.ajuste) ajustes[it.id] = it.ajuste; });
+      await pedirSobreBorrador({ tipo: "regenerar", borrador: id, estilo: meta.estilo, ajustes, texto: texto() }, `Encajar las fotos del reel ${id}`,
+        "Pedido. La previa se rehará con las fotos encajadas en unos minutos (pulsa 🔄 para actualizar).", det);
+    };
     det.querySelector(".ig-descartar").onclick = () => cambiarEstado(id, meta, "descartado");
     det.querySelector(".ig-estilo").onclick = async () => {
       const estilo = await elegirEstilo(meta.estilo, "🎨 Rehacer la previa");
@@ -992,8 +1012,10 @@
     try {
       const cards = await fotosGuardadas(resRango.desde, resRango.hasta);
       resPartidos.forEach(p => {
-        p.tiene = cards.some(c => (parecido(c.homeTeam, p.equipo) && parecido(c.awayTeam, p.rival)) ||
+        const c = cards.find(c => (parecido(c.homeTeam, p.equipo) && parecido(c.awayTeam, p.rival)) ||
                                   (parecido(c.awayTeam, p.equipo) && parecido(c.homeTeam, p.rival)));
+        p.tiene = !!c;
+        p.guardada = c ? `PartidosyResultados/${c.photo.file}` : "";
       });
     } catch (e) { console.warn(e); }
     if (resRango !== rango) return;   // se cambiaron las fechas mientras tanto
@@ -1020,8 +1042,10 @@
       const p = resPartidos[+inp.dataset.res], f = inp.files && inp.files[0];
       if (!f) return;
       inp.value = "";
-      const blob = await encuadrar(f, 1200, 900);
+      let blob;
+      try { blob = await reducirFoto(f); } catch (e) { alert(e.message); return; }
       if (!blob) return;
+      p.img = null; p.ajuste = null;
       if (p.url) URL.revokeObjectURL(p.url);
       Object.assign(p, { blob, url: URL.createObjectURL(blob) });
       pintarResultados();
@@ -1033,6 +1057,24 @@
     const elegidos = resPartidos.filter(p => p.sel);
     if (!elegidos.length) { alert("Marca al menos un partido."); return; }
     const conFoto = resConFotos ? elegidos.filter(p => p.blob) : [];
+    const estilo = await elegirEstilo();
+    if (!estilo) return;
+    // Después del estilo, cada foto se encaja en su hueco (a mano o con «Encajar todas»)
+    const ajustes = {};
+    if (resConFotos) {
+      const conImagen = elegidos.filter(p => p.blob || p.guardada);
+      try {
+        estado.textContent = "Preparando las fotos…";
+        for (const p of conImagen) {
+          if (!p.img) p.img = await cargarImagen(p.blob ? p.url : await blobUrl(p.guardada));
+          p.titulo = `${p.equipo} ${p.marcador} ${p.rival}`;
+        }
+      } catch (e) { console.warn(e); }
+      estado.textContent = "";
+      const items = conImagen.filter(p => p.img);
+      if (items.length && !(await encajarFotosReel(items, estilo.tipo, "🎬 Generar reel"))) return;
+      items.forEach(p => { if (p.ajuste) ajustes[p.id] = p.ajuste; });
+    }
     boton.disabled = true;
     const id = Date.now().toString(36);
     try {
@@ -1044,7 +1086,7 @@
         fotos[conFoto[i].id] = ruta;
       }
       estado.textContent = "";
-      await pedirPartidos("resultados", { desde: resRango.desde, hasta: resRango.hasta, fotos, id, partidos: elegidos.map(p => p.id), conFotos: resConFotos });
+      await pedirPartidos("resultados", { desde: resRango.desde, hasta: resRango.hasta, fotos, id, partidos: elegidos.map(p => p.id), conFotos: resConFotos, ajustes }, estilo);
     } catch (e) {
       estado.textContent = "";
       alert(e.message);
@@ -1052,6 +1094,214 @@
       boton.disabled = false;
     }
   }
+
+  /* ---------- Encajar las fotos del reel (después de elegir el estilo) ----------
+     En las diapositivas de partido la foto llena un hueco de 1016×782 (disenos.py: FOTO43
+     más 40 px por lado, recortado con la silueta de la plantilla). Se guarda un ajuste
+     {z, ox, oy} por partido, con las mismas cuentas que disenos.py (recorte): z es el zoom
+     sobre el encuadre que llena el hueco y ox, oy el desplazamiento en fracciones del hueco.
+     «Encajar todas» busca al grupo de jugadoras con el detector de las stories. */
+  const HUECO = { w: 1016, h: 782, fy: 0.42 };
+
+  // Parte del hueco que queda a la vista con la silueta de cada plantilla (fracciones)
+  function visibleReel(g) {
+    const borde = 40 + (["rasgado", "pancarta"].includes(g) ? 26 : 0), sesgo = ["corte", "diagonal", "franjas"].includes(g) ? 84 : 0;
+    return { x0: (borde + sesgo) / HUECO.w, x1: 1 - (borde + sesgo) / HUECO.w, y0: borde / HUECO.h, y1: 1 - borde / HUECO.h };
+  }
+
+  function cargarImagen(url) {
+    return new Promise((ok, mal) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => mal(new Error("No se ha podido leer la foto")); im.src = url; });
+  }
+
+  // Desenfoque sin ctx.filter (Safari): reducir y volver a ampliar
+  function borrosa(img, w, h) {
+    let c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w / 32)); c.height = Math.max(1, Math.round(h / 32));
+    const k = Math.max(c.width / img.width, c.height / img.height);
+    c.getContext("2d").drawImage(img, (c.width - img.width * k) / 2, (c.height - img.height * k) * 0.42, img.width * k, img.height * k);
+    const d = document.createElement("canvas"); d.width = w; d.height = h;
+    const x = d.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(c, 0, 0, w, h);
+    x.fillStyle = "rgba(0,0,0,.3)"; x.fillRect(0, 0, w, h);
+    return d;
+  }
+
+  // Dibuja el hueco (w × h en pantalla) como quedará en la diapositiva; fuera de la silueta, oscurecido
+  function pintarHueco(ctx, it, w, h, g) {
+    const a = it.ajuste || {}, z = a.z || 1;
+    if (!it.borrosa) it.borrosa = borrosa(it.img, HUECO.w / 2, HUECO.h / 2);
+    ctx.drawImage(it.borrosa, 0, 0, w, h);
+    const k = Math.max(w / it.img.width, h / it.img.height) * z, iw = it.img.width * k, ih = it.img.height * k;
+    ctx.drawImage(it.img, (w - iw) * 0.5 + (a.ox || 0) * w, (h - ih) * HUECO.fy + (a.oy || 0) * h, iw, ih);
+    // Silueta de la plantilla: el rectángulo FOTO43 (40 px dentro del hueco), inclinado en corte, diagonal y franjas
+    const sx = (v) => v / HUECO.w * w, sy = (v) => v / HUECO.h * h, sg = ["corte", "diagonal", "franjas"].includes(g) ? 84 : 0;
+    const sil = [[40 + sg, 40], [HUECO.w - 40, 40], [HUECO.w - 40 - sg, HUECO.h - 40], [40, HUECO.h - 40]].map(([x, y]) => [sx(x), sy(y)]);
+    const trazar = () => { sil.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); };
+    ctx.save(); ctx.fillStyle = "rgba(5,12,35,.62)"; ctx.beginPath(); ctx.rect(0, 0, w, h); trazar(); ctx.fill("evenodd");
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = Math.max(1.5, w / 400); ctx.setLineDash([w / 90, w / 120]);
+    ctx.beginPath(); trazar(); ctx.stroke(); ctx.restore();
+  }
+
+  async function encajarAuto(it, g) {
+    const sem = window.nvaSemana;
+    if (it.grupo === undefined) it.grupo = await sem.grupo(it.img);
+    if (!it.grupo) return false;
+    it.ajuste = sem.ajusteGrupo(it.img, it.grupo, Object.assign({ vis: visibleReel(g) }, HUECO));
+    return true;
+  }
+
+  // Ajuste a mano de una foto: arrastrar, barra de zoom, rueda o pellizco
+  function ajustarFotoReel(it, g) {
+    return new Promise(resolver => {
+      const antes = Object.assign({ z: 1, ox: 0, oy: 0 }, it.ajuste || {}), a = Object.assign({}, antes);
+      const capa = document.createElement("div");
+      capa.style.cssText = "position:fixed; inset:0; z-index:10000; background:rgba(5,12,35,.86); display:flex; align-items:center; justify-content:center; padding:16px;";
+      capa.innerHTML = `
+        <div class="modal-box" style="max-width:420px; width:100%;">
+          <div class="modal-header"><div class="modal-title">🔍 ${esc(it.titulo)}</div></div>
+          <canvas style="width:100%; aspect-ratio:${HUECO.w}/${HUECO.h}; border-radius:8px; touch-action:none; cursor:grab; display:block;"></canvas>
+          <label class="ig-label" style="display:flex; align-items:center; gap:8px; margin-top:10px;">➖
+            <input type="range" class="ig-zoom" min="0.4" max="4" step="0.01" style="flex:1;">➕</label>
+          <small class="ig-info">Arrastra la foto y usa la barra (o pellizca) para acercar o alejar. La línea discontinua es lo que se ve en la diapositiva.</small>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn-save-session" type="button" data-a="auto" style="flex:1; background:#7c3aed;">✨ Encajar</button>
+            <button class="btn-save-session" type="button" data-a="centrar" style="flex:1; background:var(--azul-primary);">↺ Centrar</button></div>
+          <small class="ig-info ig-aviso"></small>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn-save-session" type="button" data-a="no" style="flex:1; background:#64748b;">Cancelar</button>
+            <button class="btn-save-session" type="button" data-a="si" style="flex:2;">✅ Usar</button></div>
+        </div>`;
+      document.body.appendChild(capa);
+      const cv = capa.querySelector("canvas"), zoom = capa.querySelector(".ig-zoom");
+      const pintar = () => {
+        const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+        cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+        it.ajuste = a; pintarHueco(cv.getContext("2d"), it, cv.width, cv.height, g);
+        zoom.value = String(a.z);
+      };
+      const lim = (v) => Math.min(1.5, Math.max(-1.5, v));
+      const cambiarZoom = (nuevo) => { a.z = Math.min(4, Math.max(0.4, nuevo)); pintar(); };
+      zoom.oninput = () => cambiarZoom(+zoom.value);
+      cv.addEventListener("wheel", (e) => { e.preventDefault(); cambiarZoom(a.z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+      const dedos = new Map(); let distancia = 0;
+      cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); dedos.set(e.pointerId, { x: e.clientX, y: e.clientY }); });
+      cv.addEventListener("pointermove", (e) => {
+        const prev = dedos.get(e.pointerId);
+        if (!prev) return;
+        dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (dedos.size === 2) {
+          const [p, q] = [...dedos.values()], dist = Math.hypot(p.x - q.x, p.y - q.y);
+          if (distancia) cambiarZoom(a.z * dist / distancia);
+          distancia = dist; return;
+        }
+        const r = cv.getBoundingClientRect();
+        a.ox = lim(a.ox + (e.clientX - prev.x) / r.width); a.oy = lim(a.oy + (e.clientY - prev.y) / r.height);
+        pintar();
+      });
+      const soltar = (e) => { dedos.delete(e.pointerId); distancia = 0; };
+      cv.addEventListener("pointerup", soltar); cv.addEventListener("pointercancel", soltar);
+      const fin = (ok) => {
+        window.removeEventListener("resize", pintar); capa.remove();
+        if (ok) it.auto = false; else it.ajuste = antes;
+        resolver(ok);
+      };
+      window.addEventListener("resize", pintar);
+      capa.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-a]");
+        if (!b) return;
+        if (b.dataset.a === "no") return fin(false);
+        if (b.dataset.a === "si") return fin(true);
+        if (b.dataset.a === "centrar") { Object.assign(a, { z: 1, ox: 0, oy: 0 }); return pintar(); }
+        if (b.dataset.a === "auto") {
+          const aviso = capa.querySelector(".ig-aviso");
+          b.disabled = true; aviso.textContent = "Buscando al grupo de jugadoras…";
+          try {
+            const ok = await encajarAuto(it, g);
+            if (ok) Object.assign(a, it.ajuste);
+            aviso.textContent = ok ? "" : "No se ha encontrado a nadie en esta foto: encájala a mano.";
+          } catch (x) { aviso.textContent = "No se ha podido usar el detector (" + x.message + ")."; }
+          b.disabled = false; pintar();
+        }
+      });
+      requestAnimationFrame(pintar);
+    });
+  }
+
+  // items: [{ id, titulo, img, ajuste }]. g: plantilla del partido («auto» = al azar).
+  // Resuelve true para seguir (los ajustes quedan en cada item) o false si se cancela
+  function encajarFotosReel(items, g, textoBoton) {
+    return new Promise(resolver => {
+      document.getElementById("modalIgEncajar")?.remove();
+      document.body.insertAdjacentHTML("beforeend", `
+  <div class="modal-backdrop active" id="modalIgEncajar" style="z-index:3000;">
+    <div class="modal-box" style="max-width:460px; max-height:92vh; overflow:auto;">
+      <div class="modal-header">
+        <div class="modal-title">🔍 Encajar las fotos</div>
+        <button class="btn-close-modal" type="button" data-n="no">✕</button>
+      </div>
+      <small class="ig-info">Así quedará cada foto en su diapositiva${g === "auto" ? " (con 🎲 la silueta puede cambiar un poco)" : ""}. La línea discontinua es lo que se ve.</small>
+      <button class="btn-save-session" type="button" data-n="todas" style="width:100%; margin:8px 0; background:#7c3aed;">✨ Encajar todas (busca al grupo de jugadoras)</button>
+      <small class="ig-info ig-estado"></small>
+      <div class="ig-lista" style="display:flex; flex-direction:column; gap:10px; margin-top:6px;"></div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn-save-session" type="button" data-n="no" style="flex:1; background:#64748b;">Cancelar</button>
+        <button class="btn-save-session" type="button" data-n="si" style="flex:2;">${textoBoton}</button>
+      </div>
+    </div>
+  </div>`);
+      const m = document.getElementById("modalIgEncajar"), lista = m.querySelector(".ig-lista"), estado = m.querySelector(".ig-estado");
+      const pintar = () => {
+        lista.innerHTML = items.map((it, i) => `
+          <div style="border:1px solid #e2e8f0; border-radius:10px; padding:6px;">
+            <canvas data-i="${i}" style="width:100%; aspect-ratio:${HUECO.w}/${HUECO.h}; border-radius:6px; display:block;"></canvas>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+              <small style="flex:1; min-width:0; color:#1e293b;">${esc(it.titulo)}</small>
+              <button type="button" class="btn-save-session" data-ajustar="${i}" style="width:auto; flex:none; margin:0; padding:6px 10px; font-size:.75rem; background:var(--azul-primary);">✋ Ajustar</button>
+            </div></div>`).join("");
+        lista.querySelectorAll("canvas").forEach(cv => {
+          const r = cv.getBoundingClientRect();
+          cv.width = Math.round(r.width * 1.5) || 600; cv.height = Math.round(cv.width * HUECO.h / HUECO.w);
+          pintarHueco(cv.getContext("2d"), items[+cv.dataset.i], cv.width, cv.height, g);
+        });
+      };
+      const fin = (ok) => { m.remove(); resolver(ok); };
+      m.addEventListener("click", async (e) => {
+        if (e.target === m) return fin(false);
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.n === "no") return fin(false);
+        if (b.dataset.n === "si") return fin(true);
+        if (b.dataset.ajustar) { await ajustarFotoReel(items[+b.dataset.ajustar], g); pintar(); return; }
+        if (b.dataset.n === "todas") {
+          b.disabled = true;
+          let sinNadie = 0;
+          try {
+            for (let i = 0; i < items.length; i++) {
+              estado.textContent = `Buscando al grupo en la foto ${i + 1} de ${items.length}…`;
+              if (await encajarAuto(items[i], g)) items[i].auto = true; else sinNadie++;
+            }
+            estado.textContent = sinNadie ? `En ${sinNadie} foto(s) no se ha encontrado a nadie: encájala(s) a mano.` : "Listo. Revisa cada foto y ajústala a mano si hace falta.";
+          } catch (x) { estado.textContent = "No se ha podido usar el detector (" + x.message + ")."; }
+          b.disabled = false; pintar();
+        }
+      });
+      requestAnimationFrame(pintar);
+    });
+  }
+
+  // Foto reducida para subirla entera (sin recortar: se encaja después de elegir el estilo)
+  async function reducirFoto(file, lado = 2000) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await cargarImagen(url);
+      const k = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      const ctx = c.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, c.width, c.height);
+      return await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.9));
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  const tituloPartido = (id) => { const [eq, , rival] = String(id).split("|"); return `${(eq || "").replace(/\s*\(.*\)\s*$/, "")} – ${rival || ""}`; };
 
   // Botones de la sección: resultados, próximos o evento manual (sin tipo, el menú con los tres)
   function generar(tipo) {
@@ -1063,8 +1313,8 @@
     document.getElementById("modalIgGenerar").classList.add("active");
   }
 
-  async function pedirPartidos(tipo, extra) {
-    const estilo = await elegirEstilo();
+  async function pedirPartidos(tipo, extra, elegido) {
+    const estilo = elegido || await elegirEstilo();
     if (!estilo) return;
     cerrarMenu();
     try {

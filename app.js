@@ -1619,47 +1619,10 @@
     }
     return _nvaLogoPromise;
   }
-  // Banda de cabecera: azul noche, escudo en disco blanco, título y línea de ataque amarilla.
-  // Devuelve la coordenada Y (mm) donde empieza el contenido.
-  function nvaPdfBand(pdf, logo, { kicker, title, sub, h = 26 }) {
-    const W = pdf.internal.pageSize.getWidth();
-    pdf.setFillColor(13, 27, 69); pdf.rect(0, 0, W, h, "F");
-    pdf.setFillColor(21, 41, 106); pdf.triangle(W * 0.55, 0, W, 0, W, h, "F");
-    pdf.setFillColor(29, 53, 128); pdf.triangle(W * 0.78, 0, W, 0, W, h, "F");
-    pdf.setFillColor(245, 197, 24); pdf.rect(0, h, W, 1.4, "F");
-    const r = h * 0.36, cx = 12 + r, cy = h / 2;
-    pdf.setFillColor(255, 255, 255); pdf.setDrawColor(245, 197, 24); pdf.setLineWidth(0.7);
-    pdf.circle(cx, cy, r, "FD");
-    if (logo) pdf.addImage(logo, "PNG", cx - r * 0.88, cy - r * 0.88, r * 1.76, r * 1.76, "nvalogo", "FAST");
-    const tx = cx + r + 5;
-    pdf.setFont("helvetica", "bold"); pdf.setFontSize(7.5); pdf.setTextColor(245, 197, 24);
-    pdf.text(String(kicker || "CLUB NOU VÒLEI ALZIRA").toUpperCase(), tx, cy - 3.6, { charSpace: 0.6 });
-    pdf.setFontSize(h > 22 ? 16 : 13); pdf.setTextColor(255, 255, 255);
-    pdf.text(String(title || "").toUpperCase(), tx, cy + 2.6);
-    if (sub) {
-      pdf.setFont("helvetica", "normal"); pdf.setFontSize(8); pdf.setTextColor(147, 163, 207);
-      pdf.text(String(sub), tx, cy + 7.6);
-    }
-    pdf.setLineWidth(0.2);
-    return h + 1.4;
-  }
-  // Pie: fecha de generación, página y marca del club
-  function nvaPdfFooter(pdf, page, total) {
-    const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight(), M = 12;
-    pdf.setDrawColor(227, 232, 244); pdf.setLineWidth(0.25); pdf.line(M, H - 9, W - M, H - 9);
-    pdf.setFont("helvetica", "normal"); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184);
-    pdf.text("Generado el " + new Date().toLocaleDateString("es-ES"), M, H - 5);
-    if (total > 1) pdf.text(`Página ${page} de ${total}`, W / 2, H - 5, { align: "center" });
-    pdf.setFillColor(245, 197, 24); pdf.rect(W - M - 44, H - 6.4, 3.5, 1.1, "F");
-    pdf.setFillColor(214, 40, 57); pdf.rect(W - M - 39.5, H - 6.4, 3.5, 1.1, "F");
-    pdf.setFont("helvetica", "bold"); pdf.setTextColor(27, 58, 140);
-    pdf.text("NOU VÒLEI ALZIRA", W - M, H - 5, { align: "right", charSpace: 0.4 });
-  }
-  // Recorre todas las páginas al final y pone el pie
-  function nvaPdfFooters(pdf) {
-    const n = pdf.getNumberOfPages();
-    for (let i = 1; i <= n; i++) { pdf.setPage(i); nvaPdfFooter(pdf, i, n); }
-  }
+  // Banda de cabecera (azul noche, escudo, título y línea amarilla) y pie de página:
+  // están en supabase/functions/_shared/pdf-resultados.js, que también usa el servidor.
+  function nvaPdfBand(pdf, logo, opciones) { return window.nvaPdfResultados.banda(pdf, logo, opciones); }
+  function nvaPdfFooters(pdf) { window.nvaPdfResultados.pies(pdf); }
 
   // Captura el área oculta y la coloca en UNA sola página A4: si el contenido es más
   // alto que la página, se reduce proporcionalmente hasta que quepa.

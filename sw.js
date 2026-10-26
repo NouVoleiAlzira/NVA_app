@@ -1,6 +1,6 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v130";
+const VERSION = "nva-v131";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
@@ -18,7 +18,6 @@ const SHELL_FILES = [
   "inicio.css",
   "inicio.js",
   "instagram.js",
-  "historia-cartel.js",
   "historia-editor.js",
   "historia-semana.js",
   "app.js",
@@ -27,13 +26,11 @@ const SHELL_FILES = [
   "anulaciones.js",
   "calendario-partidos.js",
   "importar-datos.js",
-  "carteles-auto.js",
+  "partidos-semana.js",
   "cuadrante-pdf.js",
   "kilometraje.js",
   "manifest.json",
   "LOGO-NVA.png",
-  "Partidos.html",
-  "Resultados.html",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "fonts/barlow-latin-400-normal.woff2",
@@ -49,7 +46,7 @@ const CDN_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net"];
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE).then((cache) =>
-      // Se añaden uno a uno: si falta algún archivo (p.ej. Resultados.html) no se rompe la instalación
+      // Se añaden uno a uno: si falta algún archivo (p.ej. un icono) no se rompe la instalación
       Promise.all(SHELL_FILES.map((f) => cache.add(f).catch(() => null)))
     ).then(() => self.skipWaiting())
   );

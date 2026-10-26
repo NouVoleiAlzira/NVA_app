@@ -261,7 +261,6 @@ header h1 { text-shadow: none; }
 }
 #screenCoachTeam .cp-sub-head:active { transform: scale(0.985); }
 
-#screenCoachTeam .cartel-sub { color: var(--niebla); letter-spacing: 0.02em; }
 #screenCoachTeam .ig-info { color: var(--niebla); line-height: 1.45; }
 
 /* ---------------------------------------------------------------------

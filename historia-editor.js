@@ -1,5 +1,5 @@
 /* =====================================================================
-   Editor de Stories (index.html, Partidos.html y Resultados.html)
+   Editor de Stories (index.html)
    La imagen se publica SIN modificar: solo se coloca en un lienzo
    1080×1920 y el hueco se rellena con los colores del borde de la imagen.
    Se puede hacer zoom (también alejar) y moverla.

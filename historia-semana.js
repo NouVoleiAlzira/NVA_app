@@ -1,6 +1,6 @@
 /* =====================================================================
    Stories · Partidos y Resultados de la semana (Redes Sociales › Stories)
-   Los partidos salen de «Calendario de partidos» (carteles-auto.js) y la
+   Los partidos salen de «Calendario de partidos» (partidos-semana.js) y la
    story se dibuja aquí mismo en un lienzo 1080×1920, con 10 estilos
    (5 sin fotos y 5 con fotos). Por defecto, todos los partidos van en una
    sola story; se pueden repartir en varias páginas eligiendo cuáles van
@@ -153,7 +153,7 @@
 
   const limpiarClub = (n) => apos(n).replace(/nou\s+v[oò]le[iy]\s+alzira/gi, "NVA").replace(/\s+/g, " ").trim().toUpperCase();
 
-  // p: partido de cartelCollect -> datos listos para dibujar
+  // p: partido de partidosSemana (partidos-semana.js) -> datos listos para dibujar
   async function prepararPartido(p, fichas) {
     const nva = buscarFicha(fichas.nva, p.team.name, p.team.category);
     const rival = buscarFicha(fichas.otros, limpiarClub(p.rival), p.team.category);
@@ -939,7 +939,7 @@
     const tok = estado.carga = {};
     try {
       const fichas = await cargarFichas();
-      const crudos = window.cartelCollect ? window.cartelCollect(estado.desde, estado.hasta, estado.tipo === "resultados") : [];
+      const crudos = window.partidosSemana ? window.partidosSemana(estado.desde, estado.hasta, estado.tipo === "resultados") : [];
       const previos = new Map(estado.items.map(it => [it.p.id, it]));
       const nuevos = [];
       for (const c of crudos) {

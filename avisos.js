@@ -4,6 +4,8 @@
 // calendario) de sus equipos no tienen registro. Los avisos se guardan en
 // GitHub (Historial/avisos.json) y le salen a cada entrenador del equipo al
 // abrir la app con su usuario (el usuario que se llama igual que el entrenador).
+// Con «Aviso automático» marcado, además, a cada entrenador le sale al abrir la
+// app lo que le falta por registrar de la semana anterior y de esta (sin hoy).
 (function () {
   "use strict";
   const AV_FILE = "Historial/avisos.json";
@@ -70,6 +72,65 @@
     return out;
   }
 
+  // Entrenamientos (según Horarios.json) y partidos (según el calendario) de
+  // esos equipos esos días que no están registrados: { teamKey: [items] }
+  async function sinRegistrar(g, equipos, fechas) {
+    const hz = ((await leer(g, "Horarios.json")).data || {}).trainings || {};
+    let cp = window.cpGetData ? window.cpGetData() : null;
+    if (!cp || !cp.teams || !Object.keys(cp.teams).length) cp = (await leer(g, "CalendarioPartidos.json")).data || {};
+    const teams = cp.teams || {};
+    const porEquipo = {};
+    const tareas = [];
+    equipos.forEach(e => {
+      if (porEquipo[e.teamKey]) return;
+      const items = porEquipo[e.teamKey] = [];
+      fechas.forEach(f => {
+        const dow = (new Date(f + "T12:00:00").getDay() + 6) % 7 + 1;   // 1 = lunes
+        const tr = (hz[e.teamKey] || []).filter(t => Number(t.day) === dow).sort((a, b) => a.start < b.start ? -1 : 1);
+        if (tr.length && !anulE(e.teamKey, f)) items.push({ tipo: "train", team: e.teamKey, equipo: e.name, date: f, hora: tr[0].start });
+        ((teams[e.teamKey] || {}).matches || []).filter(m => m.date === f && !/DESCANSA/i.test(m.rival || "") && !anulP(e.teamKey, f, m.rival || "")).forEach(m =>
+          items.push({ tipo: "match", team: e.teamKey, equipo: e.name, date: f, hora: m.time && m.time !== "00:00" ? m.time : "", rival: m.rival || "" }));
+      });
+      tareas.push(...items);
+    });
+    const ok = await enLotes(tareas, it => registrado(g, it).catch(() => true), 6);
+    const falta = new Set(tareas.filter((t, i) => !ok[i]));
+    Object.keys(porEquipo).forEach(k => { porEquipo[k] = porEquipo[k].filter(it => falta.has(it)); });
+    return porEquipo;
+  }
+  function ordenar(items) { return items.sort((a, b) => (a.date + a.hora) < (b.date + b.hora) ? -1 : 1); }
+
+  // «Aviso automático»: se guarda en el mismo fichero que los avisos
+  async function guardarAvisos(g, cambiar) {
+    for (let intento = 0; intento < 3; intento++) {
+      const { sha, data } = await leer(g, AV_FILE);
+      const nuevo = { automatico: !!(data && data.automatico), avisos: (data && data.avisos) || {} };
+      cambiar(nuevo);
+      const body = { message: "Avisos de registros pendientes", content: b64enc(JSON.stringify(nuevo, null, 1)) };
+      if (sha) body.sha = sha;
+      const r = await fetch(url(g, AV_FILE), { method: "PUT", headers: { Authorization: `token ${g.token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (r.ok) return true;
+      if (r.status !== 409 && r.status !== 422) return false;
+    }
+    return false;
+  }
+
+  async function cargarAutomatico() {
+    const chk = document.getElementById("avAuto");
+    chk.disabled = true;
+    const g = gh();
+    if (!navigator.onLine || !g || !g.user || !g.token) return;
+    try { chk.checked = !!((await leer(g, AV_FILE)).data || {}).automatico; chk.disabled = false; } catch (e) {}
+  }
+  window.avAutomatico = async function (chk) {
+    const g = gh(), valor = chk.checked;
+    chk.disabled = true;
+    let ok = false;
+    try { ok = !!g && await guardarAvisos(g, d => { d.automatico = valor; }); } catch (e) {}
+    chk.disabled = false;
+    if (!ok) { chk.checked = !valor; alert("❌ No se pudo guardar el aviso automático. Inténtalo de nuevo."); }
+  };
+
   // ---------- Ventana de Dirección ----------
   let semana = 0;              // 0 = esta semana, -1 = la anterior
   let resultado = null;        // { coachId: { nombre, items: [] } }
@@ -93,6 +154,7 @@
     document.getElementById("modalAvisos").classList.add("active");
     document.getElementById("avEstado").textContent = "";
     pintarDias();
+    cargarAutomatico();
   };
   window.closeAvisos = function () { document.getElementById("modalAvisos").classList.remove("active"); };
   window.avSemana = function (s) { semana = s; pintarDias(); document.getElementById("avEstado").textContent = ""; };
@@ -106,33 +168,12 @@
     est.textContent = "Revisando registros…";
     document.getElementById("avRes").innerHTML = "";
     try {
-      const hz = ((await leer(g, "Horarios.json")).data || {}).trainings || {};
-      let cp = window.cpGetData ? window.cpGetData() : null;
-      if (!cp || !cp.teams || !Object.keys(cp.teams).length) cp = (await leer(g, "CalendarioPartidos.json")).data || {};
-      const teams = cp.teams || {};
-      // Lo que tocaba cada equipo esos días
-      const porEquipo = {};
-      const tareas = [];
-      coaches().forEach(c => equiposDe(c).forEach(e => {
-        if (porEquipo[e.teamKey]) return;
-        const items = porEquipo[e.teamKey] = [];
-        fechas.forEach(f => {
-          const dow = (new Date(f + "T12:00:00").getDay() + 6) % 7 + 1;   // 1 = lunes
-          const tr = (hz[e.teamKey] || []).filter(t => Number(t.day) === dow).sort((a, b) => a.start < b.start ? -1 : 1);
-          if (tr.length && !anulE(e.teamKey, f)) items.push({ tipo: "train", team: e.teamKey, equipo: e.name, date: f, hora: tr[0].start });
-          ((teams[e.teamKey] || {}).matches || []).filter(m => m.date === f && !/DESCANSA/i.test(m.rival || "") && !anulP(e.teamKey, f, m.rival || "")).forEach(m =>
-            items.push({ tipo: "match", team: e.teamKey, equipo: e.name, date: f, hora: m.time && m.time !== "00:00" ? m.time : "", rival: m.rival || "" }));
-        });
-        tareas.push(...items);
-      }));
-      const ok = await enLotes(tareas, it => registrado(g, it).catch(() => true), 6);
-      const falta = new Set(tareas.filter((t, i) => !ok[i]));
+      const porEquipo = await sinRegistrar(g, coaches().flatMap(equiposDe), fechas);
       resultado = {};
       coaches().forEach(c => {
         const items = [];
-        equiposDe(c).forEach(e => (porEquipo[e.teamKey] || []).forEach(it => { if (falta.has(it)) items.push(it); }));
-        items.sort((a, b) => (a.date + a.hora) < (b.date + b.hora) ? -1 : 1);
-        resultado[c.id] = { nombre: c.name, items };
+        equiposDe(c).forEach(e => items.push(...(porEquipo[e.teamKey] || [])));
+        resultado[c.id] = { nombre: c.name, items: ordenar(items) };
       });
       await cargarConUsuario();
       pintarResultado();
@@ -166,24 +207,15 @@
     est.textContent = "Enviando avisos…";
     document.getElementById("avEnviar").disabled = true;
     try {
-      for (let intento = 0; intento < 3; intento++) {
-        const { sha, data } = await leer(g, AV_FILE);
-        const av = (data && data.avisos) || {};
-        const creado = new Date().toISOString();
-        sel.forEach(id => { av[id] = { creado, nombre: resultado[id].nombre, items: resultado[id].items }; });
-        const body = { message: "Avisos de registros pendientes", content: b64enc(JSON.stringify({ avisos: av }, null, 1)) };
-        if (sha) body.sha = sha;
-        const r = await fetch(url(g, AV_FILE), { method: "PUT", headers: { Authorization: `token ${g.token}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        if (r.ok) {
-          const nombresSel = sel.map(id => resultado[id].nombre).join(", ");
-          est.textContent = "";
-          document.getElementById("avEnviar").hidden = true;
-          document.getElementById("avRes").innerHTML = `<div style="margin-top:10px;padding:14px;border-radius:10px;background:#dcfce7;color:#14532d;border:1px solid #86efac;text-align:center;font-size:1em;">✅ <b>Aviso enviado</b><br>Para: ${esc(nombresSel)}.<br>Les saldrá al abrir la app con su usuario.</div>`;
-          document.getElementById("avRes").scrollIntoView({ block: "nearest" });
-          alert("✅ Aviso enviado a: " + nombresSel);
-          return;
-        }
-        if (r.status !== 409 && r.status !== 422) break;
+      const creado = new Date().toISOString();
+      if (await guardarAvisos(g, d => sel.forEach(id => { d.avisos[id] = { creado, nombre: resultado[id].nombre, items: resultado[id].items }; }))) {
+        const nombresSel = sel.map(id => resultado[id].nombre).join(", ");
+        est.textContent = "";
+        document.getElementById("avEnviar").hidden = true;
+        document.getElementById("avRes").innerHTML = `<div style="margin-top:10px;padding:14px;border-radius:10px;background:#dcfce7;color:#14532d;border:1px solid #86efac;text-align:center;font-size:1em;">✅ <b>Aviso enviado</b><br>Para: ${esc(nombresSel)}.<br>Les saldrá al abrir la app con su usuario.</div>`;
+        document.getElementById("avRes").scrollIntoView({ block: "nearest" });
+        alert("✅ Aviso enviado a: " + nombresSel);
+        return;
       }
       est.textContent = "";
       alert("❌ No se pudo enviar el aviso. Inténtalo de nuevo.");
@@ -203,10 +235,22 @@
       if (!c) return;
       const { data } = await leer(g, AV_FILE);
       const av = data && data.avisos && data.avisos[c.id];
-      if (!av || !(av.items || []).length) return;
-      const ok = await enLotes(av.items, it => registrado(g, it).catch(() => false), 6);
-      const pend = av.items.filter((it, i) => !ok[i] && !(it.tipo === "match" ? anulP(it.team, it.date, it.rival || "") : anulE(it.team, it.date)));
+      let pend = [];
+      if (av && (av.items || []).length) {
+        const ok = await enLotes(av.items, it => registrado(g, it).catch(() => false), 6);
+        pend = av.items.filter((it, i) => !ok[i] && !(it.tipo === "match" ? anulP(it.team, it.date, it.rival || "") : anulE(it.team, it.date)));
+      }
+      // Aviso automático: desde el lunes de la semana anterior hasta ayer
+      if (data && data.automatico) {
+        const fechas = [], d = lunes(-1), hoy = ymd(new Date());
+        while (ymd(d) < hoy) { fechas.push(ymd(d)); d.setDate(d.getDate() + 1); }
+        const porEquipo = await sinRegistrar(g, equiposDe(c), fechas);
+        const clave = it => [it.tipo, it.team, it.date, it.rival || ""].join("|");
+        const ya = new Set(pend.map(clave));
+        Object.values(porEquipo).flat().forEach(it => { if (!ya.has(clave(it))) { ya.add(clave(it)); pend.push(it); } });
+      }
       if (!pend.length) return;
+      ordenar(pend);
       document.getElementById("avAvisoTxt").innerHTML =
         `<p><b>${esc(c.name || av.nombre || "")}</b>, no constan registrados:</p><ul>${pend.map(it => `<li>${esc(lineaItem(it))}</li>`).join("")}</ul><p>Por favor, regístralos lo antes posible. ¡Gracias!</p>`;
       document.getElementById("modalAvisoEntrenador").classList.add("active");

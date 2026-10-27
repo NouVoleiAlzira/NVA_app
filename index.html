@@ -596,6 +596,7 @@
         <button class="hist-cerrar" onclick="closeAvisos()" aria-label="Cerrar">✕</button>
       </div>
       <div class="hist-list">
+        <label class="av-auto"><input type="checkbox" id="avAuto" onchange="avAutomatico(this)" disabled> <span><b>Aviso automático</b><small>Al abrir la app, a cada entrenador le sale lo que le falta por registrar de la semana anterior y de esta (sin contar hoy).</small></span></label>
         <div class="av-semanas">
           <button class="hist-chip av-sem" data-s="-1" onclick="avSemana(-1)">◀ Semana anterior</button>
           <button class="hist-chip av-sem on" data-s="0" onclick="avSemana(0)">Esta semana</button>

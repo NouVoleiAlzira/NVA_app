@@ -40,7 +40,9 @@
     direccion: ["#secHead_direccion", "#secBody_direccion"],
     opciones: ["[onclick=\"promptOwnerPassword()\"]"],
     // Subsecciones («menú.subsección»): solo se muestran u ocultan
+    "informes.entrenadores": ["[data-nva-menu=\"informes.entrenadores\"]"],
     "informes.pdf": ["[data-nva-menu=\"informes.pdf\"]"],
+    "informes.drive": ["[data-nva-menu=\"informes.drive\"]"],
     "informes.kilometraje": ["[data-nva-menu=\"informes.kilometraje\"]"],
     "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],
     "calendario.avisos": ["#cpSubHead_warn", "#cpSub_warn"],
@@ -50,8 +52,7 @@
     "direccion.avisos": ["#btnDireccionNVA", "#direccionTeamsContainer"],
     "direccion.consultas": ["[data-nva-menu=\"direccion.consultas\"]"],
     "direccion.horarios": ["[data-nva-menu=\"direccion.horarios\"]"],
-    "direccion.drive": ["[data-nva-menu=\"direccion.drive\"]"],
-    "direccion.registros": ["#histSeccion"],
+    "direccion.registros": ["[data-nva-menu=\"direccion.registros\"]"],
     "instagram.reels": ["#igSubHead_reels", "#igSub_reels"],
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
@@ -806,9 +807,9 @@
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <p id="nvaPermFijo" class="nva-nota" hidden>El propietario siempre puede editarlo todo.</p>
-        <table class="nva-tabla nva-permisos"><thead><tr><th>Menú</th><th class="nva-col-acceso">Acceso</th></tr></thead>
+        <table class="nva-tabla nva-permisos"><thead><tr><th>Sección</th><th class="nva-col-acceso">Acceso</th></tr></thead>
         <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
-        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores y equipos. Pulsa un menú con ▸ para elegir qué subsecciones ve.</p>
+        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores y equipos. Pulsa una sección con ▸ para elegir qué subsecciones ve.</p>
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>`) +
       seccion("roles", "Roles", `
         <table class="nva-tabla nva-roles"><thead><tr><th>Rol</th><th class="nva-col-num">Usuarios</th><th class="nva-col-borrar"></th></tr></thead>

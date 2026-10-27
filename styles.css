@@ -1071,13 +1071,9 @@
       flex: 1; border: none; border-radius: 8px; padding: 7px 8px; font-weight: 700;
       font-size: 0.75rem; color: white; cursor: pointer; box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
     }
-    /* ===== OTROS: Fichas de Federación ===== */
-    .ficha-edit {
-      flex: none; margin-left: 10px; padding: 4px 10px; border-radius: 8px;
-      background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35);
-      font-size: 1rem; line-height: 1.2; cursor: pointer;
-    }
-    .ficha-edit:active { background: rgba(255, 255, 255, 0.4); }
+    /* Fichas de Federación: por debajo del aviso «Cargando...» */
+    .cp-modal.fichas-modal { z-index: 900; }
+    .fichas-modal .cp-modal-btn { font-size: 0.8rem; padding: 9px 6px; white-space: nowrap; }
     .rte-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .rte-toolbar button {
       min-width: 36px; height: 32px; padding: 0 8px; border: 1px solid var(--gray-border);
@@ -1589,6 +1585,12 @@
       color: var(--noche);
     }
     .btn-close-modal { width: 36px; height: 36px; border-radius: 10px; }
+    /* Ventana «Otras INFOs»: mismo fondo que la pantalla para que los botones se vean igual */
+    .modal-box.otros-box { background: var(--noche); border: 1px solid var(--linea); color: var(--tiza); max-width: 520px; }
+    .otros-box .modal-header { border-bottom-color: var(--linea); }
+    .otros-box .modal-title { color: #fff; font-size: 1.1rem; }
+    .otros-box .btn-close-modal { color: var(--niebla); }
+    .otros-list { overflow-y: auto; flex: 1; min-height: 0; padding: 2px 2px 4px; }
     @media (hover: hover) and (pointer: fine) { .btn-close-modal:hover { background: #F1F4FA; color: var(--noche); } }
     .tab-btn.active { color: var(--morado-accent); }
     .app-input, .app-select { border-radius: 8px; padding: 10px 12px; font-family: var(--font-body); font-size: 0.88rem; }

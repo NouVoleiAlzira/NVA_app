@@ -3157,8 +3157,8 @@
       renderWarningPlayers();
     }
 
-    const screenOtrosEl = document.getElementById("screenOtros");
-    if (screenOtrosEl && screenOtrosEl.classList.contains("active")) {
+    const modalOtrosEl = document.getElementById("modalOtros");
+    if (modalOtrosEl && modalOtrosEl.classList.contains("active")) {
       renderOtros();
     }
 
@@ -4784,7 +4784,7 @@
   };
   // =====================================================================
   //  MÓDULO OTROS
-  //  Pantalla con botones de información/instrucciones. Todos los botones
+  //  Ventana «Otras INFOs» (botón del Tablón) con botones de información/instrucciones. Todos los botones
   //  (incluido "Protocolo Accidentes") viven en OTROS.json (GitHub, con copia
   //  local, igual que el Tablón). Se crean con "+ NUEVO" (nombre + texto
   //  enriquecido) y se pueden editar o eliminar desde su panel.
@@ -4885,20 +4885,22 @@
     if (!ok) alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
   }
 
-  // --- Pantalla ---
+  // --- Ventana ---
   function openOtros() {
     otrosOpenId = null;
     renderOtros();
-    showScreen("screenOtros");
-    document.getElementById("btnBack").style.display = "flex";
+    document.getElementById("modalOtros").classList.add("active");
     if (ghSettings.user && ghSettings.repo && navigator.onLine) {
       (async () => {
         await fetchOtrosFromGitHub();
-        await refreshFichasList();
-        const el = document.getElementById("screenOtros");
+        const el = document.getElementById("modalOtros");
         if (el && el.classList.contains("active")) renderOtros();
       })();
     }
+  }
+
+  function closeOtros() {
+    document.getElementById("modalOtros").classList.remove("active");
   }
 
   function toggleOtros(id) {
@@ -4938,207 +4940,6 @@
     nuevo.textContent = "+ NUEVO";
     nuevo.onclick = () => openOtrosEditor(null);
     box.appendChild(nuevo);
-
-    renderFichasFederacion(box);
-  }
-
-  // --- Fichas de Federación: un botón por equipo que abre Fichas/Licencias_<equipo>.pdf ---
-  const FICHAS_FOLDER = "Fichas";
-  let fichaUploadTeam = null;
-
-  function fichaFileName(team) {
-    return `Licencias_${sanitizeFileName(getTeamKey(team))}.pdf`;
-  }
-
-  function fichaVersions() {
-    try { return JSON.parse(localStorage.getItem("NVA_FICHAS_VER")) || {}; } catch (e) { return {}; }
-  }
-
-  // Lista (en caché) de los PDF de la carpeta "Fichas". Se refresca al abrir OTROS
-  // y al pulsar una ficha que no se encuentra en la caché.
-  let fichasFilesCache = (() => {
-    try { return JSON.parse(localStorage.getItem("NVA_FICHAS_FILES")) || []; } catch (e) { return []; }
-  })();
-
-  async function refreshFichasList() {
-    const files = await listGitHubFolder(FICHAS_FOLDER);
-    if (!files) return false; // sin conexión / GitHub sin configurar: se conserva la caché
-    fichasFilesCache = files.filter(f => f.name && /\.pdf$/i.test(f.name)).map(f => f.name);
-    localStorage.setItem("NVA_FICHAS_FILES", JSON.stringify(fichasFilesCache));
-    return true;
-  }
-
-  // Localiza el PDF del equipo sin distinguir mayúsculas, acentos, espacios ni signos:
-  // "Licencias NVA A (Infantil).pdf", "licencias_nva_a_infantil.pdf"... valen igual.
-  // Si no hay uno con categoría, se admite "Licencias <nombre>.pdf" o "Licencias <categoría>.pdf".
-  function findFichaName(team) {
-    const norm = s => sanitizeFileName(s).replace(/_/g, "").toLowerCase();
-    const strip = n => n.replace(/\.pdf$/i, "");
-    const wanted = [
-      norm("Licencias " + getTeamKey(team)),
-      norm("Licencias " + team.name),
-      norm("Licencias " + team.category)
-    ];
-    for (const w of wanted) {
-      const hit = fichasFilesCache.find(n => norm(strip(n)) === w);
-      if (hit) return hit;
-    }
-    return null;
-  }
-
-  function fichaUrl(name) {
-    const ver = fichaVersions()[name];
-    // Ruta relativa: la carpeta "Fichas" está en el mismo repositorio que esta página.
-    return `${FICHAS_FOLDER}/${encodeURIComponent(name)}${ver ? "?v=" + ver : ""}`;
-  }
-
-  // Descarga el PDF por la API de GitHub (mismo repositorio que usa el resto de la app).
-  // Así no depende de dónde esté publicada esta página ni de la caché de GitHub Pages,
-  // y siempre se ve la última versión subida.
-  async function fetchFichaBlob(name) {
-    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${FICHAS_FOLDER}/${encodeURIComponent(name)}`;
-    const headers = { "Accept": "application/vnd.github.raw+json" };
-    if (ghSettings.token) headers["Authorization"] = `token ${ghSettings.token}`;
-    const res = await fetch(url, { headers, cache: "no-store" });
-    if (!res.ok) {
-      const err = new Error("HTTP " + res.status);
-      err.status = res.status;
-      throw err;
-    }
-    return new Blob([await res.arrayBuffer()], { type: "application/pdf" });
-  }
-
-  async function openFicha(team) {
-    const label = `${team.name} (${team.category})`;
-    const canApi = !!(ghSettings.user && ghSettings.repo && navigator.onLine);
-
-    // La pestaña se abre ya (gesto del usuario) para que el navegador no la bloquee.
-    const w = window.open("", "_blank");
-    if (!w) { alert("El navegador ha bloqueado la ventana emergente. Permítela e inténtalo de nuevo."); return; }
-    w.opener = null;
-    try { w.document.write("<p style='font-family:sans-serif;padding:20px'>Cargando ficha…</p>"); } catch (e) {}
-
-    let name = findFichaName(team);
-    if (!name && canApi) { await refreshFichasList(); name = findFichaName(team); }
-    if (!name) name = fichaFileName(team); // nombre estándar: Licencias_<equipo>.pdf
-
-    if (canApi) {
-      try {
-        const blob = await fetchFichaBlob(name);
-        w.location.href = URL.createObjectURL(blob);
-        return;
-      } catch (e) {
-        if (e.status) {
-          w.close();
-          const hint = e.status === 404
-            ? "Comprueba que el PDF está en esa carpeta y repositorio (las mayúsculas cuentan)."
-            : "Comprueba el token de GitHub o inténtalo más tarde.";
-          alert(`No se pudo abrir la ficha de ${label}.\nGitHub responde ${e.status} para "${FICHAS_FOLDER}/${name}" en ${ghSettings.user}/${ghSettings.repo}.\n${hint}`);
-          return;
-        }
-        // Fallo de red: se intenta la ruta relativa como último recurso.
-      }
-    }
-    w.location.href = fichaUrl(name);
-  }
-
-  function pickFichaPdf(team) {
-    fichaUploadTeam = team;
-    const input = document.getElementById("fichaFileInput");
-    input.value = "";
-    input.click();
-  }
-
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(",")[1]);
-      reader.onerror = () => reject(reader.error || new Error("No se pudo leer el archivo"));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function uploadFichaPdf(team, file) {
-    await refreshFichasList();
-    const name = findFichaName(team) || fichaFileName(team);
-    const path = `${FICHAS_FOLDER}/${encodeURIComponent(name)}`;
-    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${path}`;
-    const auth = { "Authorization": `token ${ghSettings.token}` };
-
-    const content = await fileToBase64(file);
-    let sha = "";
-    const getRes = await fetch(url, { headers: auth, cache: "no-store" });
-    if (getRes.ok) {
-      sha = (await getRes.json()).sha || "";
-    } else if (getRes.status !== 404) {
-      throw new Error(`HTTP ${getRes.status} al consultar ${path}`);
-    }
-    const body = {
-      message: `Actualizar ficha de federación: ${getTeamKey(team)}`,
-      content,
-      ...(sha && { sha })
-    };
-    const putRes = await fetch(url, {
-      method: "PUT",
-      headers: { ...auth, "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!putRes.ok) throw new Error(`HTTP ${putRes.status} al subir ${path}`);
-
-    if (!fichasFilesCache.includes(name)) {
-      fichasFilesCache.push(name);
-      localStorage.setItem("NVA_FICHAS_FILES", JSON.stringify(fichasFilesCache));
-    }
-    const vers = fichaVersions();
-    vers[name] = Date.now();
-    localStorage.setItem("NVA_FICHAS_VER", JSON.stringify(vers));
-  }
-
-  document.getElementById("fichaFileInput").addEventListener("change", async (e) => {
-    const file = e.target.files && e.target.files[0];
-    const team = fichaUploadTeam;
-    fichaUploadTeam = null;
-    if (!file || !team) return;
-
-    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-    if (!isPdf) { alert("El archivo debe ser un PDF."); return; }
-    if (file.size > 25 * 1024 * 1024) { alert("El PDF es demasiado grande (máximo 25 MB)."); return; }
-    if (!navigator.onLine || !ghSettings.user || !ghSettings.repo || !ghSettings.token) {
-      alert("Para subir el PDF hace falta conexión y tener configurado GitHub (usuario, repositorio y token).");
-      return;
-    }
-    if (!confirm(`¿Sustituir la ficha de ${team.name} (${team.category}) por "${file.name}"?`)) return;
-
-    await withLoading(async () => {
-      try {
-        await uploadFichaPdf(team, file);
-        alert("Ficha actualizada. Puede tardar un minuto en verse publicada.");
-      } catch (err) {
-        console.error("Error al subir la ficha:", err);
-        alert("No se pudo subir el PDF. Revisa la conexión y el token de GitHub.");
-      }
-    }, "Subiendo ficha...");
-  });
-
-  function renderFichasFederacion(box) {
-    const title = document.createElement("div");
-    title.className = "section-title";
-    title.style.marginTop = "20px";
-    title.textContent = "Fichas de Federación";
-    box.appendChild(title);
-
-    (appData.teams || []).forEach(team => {
-      const btn = document.createElement("div");
-      btn.className = "coach-btn";
-      btn.setAttribute("role", "button");
-      btn.tabIndex = 0;
-      btn.innerHTML = `<span>📄 ${escapeHtml(team.name)} (${escapeHtml(team.category)})</span>
-                       <span class="ficha-edit" role="button" title="Subir un PDF nuevo">✏️</span>`;
-      btn.onclick = () => openFicha(team);
-      btn.onkeydown = (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openFicha(team); } };
-      btn.querySelector(".ficha-edit").onclick = (ev) => { ev.stopPropagation(); pickFichaPdf(team); };
-      box.appendChild(btn);
-    });
   }
 
   // --- Editor (nombre + cuadro de texto enriquecido) ---

@@ -118,7 +118,10 @@
     <!-- ===== Sección plegable: Entrenamientos y Partidos ===== -->
     <div class="section-title section-toggle" id="secHead_trainings" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_trainings" onclick="toggleSection('trainings')" onkeydown="sectionKey(event,'trainings')">Entrenamientos y Partidos <span class="sec-arrow">▾</span></div>
     <div class="section-body" id="secBody_trainings">
+      <div data-nva-menu="informes.entrenadores">
+      <div class="section-subtitle" style="margin-top:4px;">Entrenadores/Equipos</div>
       <div id="coachTeamList"></div>
+      </div>
 
       <div data-nva-menu="informes.pdf">
       <div class="section-subtitle" style="margin-top:14px;">Informes PDF</div>
@@ -127,6 +130,14 @@
         <button class="btn-pdf-mode" id="btnPdfJugadora" onclick="openPlayerPdfModal()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🧑 POR DEPORTISTA</button>
         <button class="btn-pdf-mode" id="btnPdfCuadrante" onclick="togglePdfCuadranteMode()" style="flex:1.6; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🏆 PARTIDOS Y RESULTADOS</button>
       </div>
+      </div>
+      <div data-nva-menu="informes.drive">
+      <div class="section-subtitle" style="margin-top:14px;">PDFs Resultados en Drive</div>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="actualizarVinculosDrive()">🔄 Actualizar vínculos</button>
+        <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
+      </div>
+      <div id="drvProg" class="drv-prog"></div>
       </div>
       <div data-nva-menu="informes.kilometraje">
       <div class="section-subtitle" style="margin-top:14px;">Informes de Entrenadores</div>
@@ -187,16 +198,8 @@
     <div class="section-subtitle">Horarios de entrenamiento</div>
     <button class="btn-pdf-mode2" style="margin-bottom:20px;" onclick="openHorarios()">🗓️ Horarios</button>
     </div>
-    <div data-nva-menu="direccion.drive">
-    <div class="section-subtitle">PDFs Resultados en Drive</div>
-    <div style="display:flex; gap:8px; margin-bottom:12px;">
-      <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="actualizarVinculosDrive()">🔄 Actualizar vínculos</button>
-      <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
-    </div>
-    <div id="drvProg" class="drv-prog"></div>
-    </div>
 
-    <div id="histSeccion" hidden>
+    <div id="histSeccion" data-nva-menu="direccion.registros">
     <div class="section-subtitle">Control de registros</div>
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openHistorial()">📜 Historial de cambios</button>
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openAvisos()">⚠️ Mensaje de aviso</button>

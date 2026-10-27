@@ -17,7 +17,7 @@
   const abiertos = new Set();   // entrenadores desplegados en la ventana
   let equipoSubida = null;
 
-  const puedeEditar = () => !window.nva || !window.nva.acceso || window.nva.acceso("informes") === "escritura";
+  const puedeEditar = () => !window.nva || !window.nva.acceso || window.nva.acceso("informes.fichas") === "escritura";
 
   function equipos() {
     const keys = [];

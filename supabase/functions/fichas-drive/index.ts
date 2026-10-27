@@ -9,9 +9,9 @@
 //
 // Llamadas desde la app:
 //   supabase.functions.invoke("fichas-drive", { body: { accion: "subir", equipo: "NVA A (Cadete)", pdf: "<base64>" } })
-//     → { id, actualizado }   (quien pueda editar Entrenamientos y Partidos; un entrenador, solo sus equipos)
+//     → { id, actualizado }   (quien pueda editar Fichas de Federación; un entrenador, solo sus equipos)
 //   supabase.functions.invoke("fichas-drive", { body: { accion: "leer", equipo: "NVA A (Cadete)" } })
-//     → { pdf: "<base64>", nombre }   (quien pueda ver Entrenamientos y Partidos)
+//     → { pdf: "<base64>", nombre }   (quien pueda ver la subsección Fichas de Federación)
 // Qué equipo tiene ficha y cuándo se subió: Fichas/drive.json
 //   { "<equipo>": { id, actualizado, por } }
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -52,8 +52,9 @@ Deno.serve(async (req) => {
 
   try {
     if (accion === "leer") {
-      const { data: puede } = await comoUsuario.rpc("puede_leer", { p_ruta: INDICE });
-      if (!puede) return respuesta(403, { error: "Sin permiso para ver las fichas" });
+      // Llevan datos de menores: hace falta ver la subsección, no basta con la sección
+      const { data: acceso } = await comoUsuario.rpc("acceso_menu", { p_menu: "informes.fichas" });
+      if (acceso !== "lectura" && acceso !== "escritura") return respuesta(403, { error: "Sin permiso para ver las fichas" });
       const d = await llamarScript({ accion: "leer", carpeta: "fichas", id: indice[equipo]?.id || "", nombre: nombreFicha(equipo) });
       if (!d.pdf) throw new ErrorDrive("Drive no devolvió el PDF");
       return respuesta(200, { pdf: d.pdf, nombre: d.nombre || nombreFicha(equipo) });

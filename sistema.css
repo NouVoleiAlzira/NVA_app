@@ -584,23 +584,71 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .screen > .btn-save-session { margin-top: 14px; }
 
 /* ---------------------------------------------------------------------
+   Borradores de Reels y Stories: tarjetas oscuras, como los paneles
+   --------------------------------------------------------------------- */
+.ig-reel {
+  background: linear-gradient(180deg, var(--nv-card-top, rgba(36, 80, 200, 0.2)), var(--nv-card, rgba(21, 41, 106, 0.55)));
+  color: var(--txt-1);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.75);
+}
+.ig-reel-head b { color: #fff; }
+.ig-reel-head small, .ig-reel .ig-info { color: var(--txt-2); }
+.ig-portada { border-radius: var(--r-sm); box-shadow: 0 0 0 1px var(--borde); }
+.ig-estado { color: var(--txt-link); }
+.ig-borrador { color: var(--txt-aviso); }
+.ig-confirmado { color: var(--txt-link); }
+.ig-publicado { color: var(--txt-ok); }
+.ig-error { color: var(--txt-mal); }
+.ig-label { color: var(--txt-1); }
+.ig-texto {
+  background: var(--sf-campo);
+  color: var(--txt-1);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  color-scheme: dark;
+}
+.ig-texto:focus { outline: none; border-color: var(--balon); box-shadow: var(--foco); }
+.ig-texto[readonly] { background: var(--sf-fila); color: var(--txt-2); }
+.ig-reel a { color: var(--txt-link); }
+/* Descargar = secundario (tiza); Cambiar estilo = abrir otra cosa (azul) */
+.btn-save-session.ig-descargar {
+  background: rgba(233, 238, 250, 0.07) !important;
+  border-color: rgba(233, 238, 250, 0.16);
+  color: var(--txt-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.btn-save-session.ig-estilo { background: var(--g-azul) !important; }
+.ig-mu-btn {
+  min-height: 34px;
+  background: rgba(233, 238, 250, 0.08) !important;
+  border-color: var(--borde-fuerte) !important;
+  color: var(--txt-1) !important;
+  border-radius: var(--r-sm) !important;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------
    Puente de tema: colores claros escritos a mano dentro de lo oscuro
    --------------------------------------------------------------------- */
-:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(
   [style*="color:#64748b"], [style*="color: #64748b"],
   [style*="color:#475569"], [style*="color: #475569"],
   [style*="color:#94a3b8"], [style*="color: #94a3b8"]) { color: var(--txt-2) !important; }
-:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(
   [style*="color:#1e293b"], [style*="color: #1e293b"],
   [style*="color:#0f172a"], [style*="color: #0f172a"],
   [style*="color:#334155"], [style*="color: #334155"],
   [style*="color:#1e3a8a"], [style*="color: #1e3a8a"],
   [style*="color:var(--azul-dark)"], [style*="color: var(--azul-dark)"],
   [style*="color:var(--text-dark)"], [style*="color: var(--text-dark)"]) { color: var(--txt-1) !important; }
-:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(
   [style*="color:#b91c1c"], [style*="color: #b91c1c"],
   [style*="color:#ef4444"], [style*="color: #ef4444"]) { color: var(--txt-mal) !important; }
-:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(
   [style*="background:#fff"], [style*="background: #fff"],
   [style*="background:white"], [style*="background: white"],
   [style*="background:#f8fafc"], [style*="background: #f8fafc"],
@@ -611,7 +659,7 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
   background-color: var(--sf-fila) !important;
   color: var(--txt-1);
 }
-:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(
   [style*="#cbd5e1"], [style*="#e2e8f0"], [style*="var(--gray-border)"], [style*="#fca5a5"]) { border-color: var(--borde-fuerte) !important; }
 
 /* ---------------------------------------------------------------------

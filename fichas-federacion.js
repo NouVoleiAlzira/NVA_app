@@ -5,18 +5,16 @@
 //  Las fichas llevan datos de menores, así que se guardan en una carpeta
 //  privada del Drive del club con la función de Supabase «fichas-drive»
 //  (la app nunca habla con Drive). Qué equipo tiene ficha y cuándo se
-//  subió: Fichas/drive.json.
-//  Antes las fichas estaban en la app (Fichas/Licencias_<equipo>.pdf): se
-//  siguen pudiendo ver y el botón «Pasar al Drive» las copia al Drive.
+//  subió: Fichas/drive.json. Los equipos se agrupan por entrenador en
+//  secciones desplegables.
 // =====================================================================
 (function () {
   const INDICE = "Fichas/drive.json";
-  const CARPETA_ANTIGUA = "Fichas";
   const MAX_BYTES = 10 * 1024 * 1024;   // lo que acepta fichas-drive
   const nombreFicha = key => `Licencias - ${key}.pdf`;
   const cacheBlobs = {};   // equipo → { actualizado, blob } (solo mientras la app está abierta)
   let indice = {};
-  let antiguas = [];       // nombres de los PDF que siguen en la carpeta antigua de la app
+  const abiertos = new Set();   // entrenadores desplegados en la ventana
   let equipoSubida = null;
 
   const puedeEditar = () => !window.nva || !window.nva.acceso || window.nva.acceso("informes") === "escritura";
@@ -26,7 +24,20 @@
     (appData.teams || []).forEach(t => { const k = getTeamKey(t); if (!keys.includes(k)) keys.push(k); });
     return keys.sort((a, b) => a.localeCompare(b, "es"));
   }
-  const equipoDe = key => (appData.teams || []).find(t => getTeamKey(t) === key) || { name: key, category: "" };
+
+  // [{ nombre, equipos: [key] }] por entrenador; al final los equipos sin entrenador
+  function grupos() {
+    const todos = equipos();
+    const conEntrenador = new Set();
+    const out = (appData.coaches || []).map(c => {
+      const keys = getCoachTeamEntries(c).map(e => e.teamKey).filter(k => todos.includes(k));
+      keys.forEach(k => conEntrenador.add(k));
+      return { nombre: c.name, equipos: keys.sort((a, b) => a.localeCompare(b, "es")) };
+    }).filter(g => g.equipos.length).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    const sueltos = todos.filter(k => !conEntrenador.has(k));
+    if (sueltos.length) out.push({ nombre: "Sin entrenador", equipos: sueltos });
+    return out;
+  }
 
   // null si no se pudo leer (sin conexión); {} si aún no existe
   async function leerIndice() {
@@ -37,26 +48,6 @@
       if (r.status === 404) return {};
     } catch (e) { console.warn(INDICE, e); }
     return null;
-  }
-
-  // --- Fichas antiguas (guardadas en la app antes de pasar al Drive) ---
-  // Se reconocen sin distinguir mayúsculas, acentos, espacios ni signos:
-  // "Licencias NVA A (Infantil).pdf", "licencias_nva_a_infantil.pdf"... valen igual.
-  function nombreAntiguo(key) {
-    const t = equipoDe(key);
-    const norm = s => sanitizeFileName(s).replace(/_/g, "").toLowerCase();
-    const buscados = [norm("Licencias " + key), norm("Licencias " + t.name), norm("Licencias " + t.category)];
-    for (const b of buscados) {
-      const hit = antiguas.find(n => norm(n.replace(/\.pdf$/i, "")) === b);
-      if (hit) return hit;
-    }
-    return null;
-  }
-  async function blobAntiguo(nombre) {
-    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${CARPETA_ANTIGUA}/${encodeURIComponent(nombre)}`;
-    const r = await fetch(url, { headers: { "Accept": "application/vnd.github.raw+json", "Authorization": `token ${ghSettings.token}` }, cache: "no-store" });
-    if (!r.ok) throw new Error(`no se pudo leer la ficha antigua (${r.status})`);
-    return new Blob([await r.arrayBuffer()], { type: "application/pdf" });
   }
 
   // --- Llamadas a fichas-drive ---
@@ -89,17 +80,13 @@
 
   async function blobDe(key) {
     const enDrive = indice[key];
-    if (enDrive) {
-      const c = cacheBlobs[key];
-      if (c && c.actualizado === enDrive.actualizado) return c.blob;
-      const d = await llamar({ accion: "leer", equipo: key });
-      const blob = deBase64(d.pdf);
-      cacheBlobs[key] = { actualizado: enDrive.actualizado, blob };
-      return blob;
-    }
-    const antiguo = nombreAntiguo(key);
-    if (antiguo) return blobAntiguo(antiguo);
-    throw new Error(`${key} todavía no tiene ficha.`);
+    if (!enDrive) throw new Error(`${key} todavía no tiene ficha.`);
+    const c = cacheBlobs[key];
+    if (c && c.actualizado === enDrive.actualizado) return c.blob;
+    const d = await llamar({ accion: "leer", equipo: key });
+    const blob = deBase64(d.pdf);
+    cacheBlobs[key] = { actualizado: enDrive.actualizado, blob };
+    return blob;
   }
 
   async function verFicha(key) {
@@ -162,26 +149,6 @@
     } finally { ocultarCargando(); }
   });
 
-  // Copia al Drive las fichas que siguen guardadas en la app
-  async function pasarAntiguas() {
-    const keys = equipos().filter(k => !indice[k] && nombreAntiguo(k));
-    if (!keys.length) return;
-    if (!confirm(`Se van a copiar al Drive del club las fichas de ${keys.length} equipos que estaban guardadas en la app. ¿Continuar?`)) return;
-    const fallos = [];
-    try {
-      for (let i = 0; i < keys.length; i++) {
-        mostrarCargando(`Pasando al Drive (${i + 1}/${keys.length}): ${keys[i]}...`);
-        try {
-          const blob = await blobAntiguo(nombreAntiguo(keys[i]));
-          if (blob.size > MAX_BYTES) throw new Error("ocupa más de 10 MB");
-          await subirFicha(keys[i], blob);
-        } catch (e) { fallos.push(`- ${keys[i]}: ${e.message}`); }
-      }
-    } finally { ocultarCargando(); }
-    pintar();
-    if (fallos.length) alert(`No se han podido pasar:\n${fallos.join("\n")}`);
-  }
-
   function fechaCorta(iso) {
     const d = new Date(iso);
     return isNaN(d) ? "" : d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -191,29 +158,35 @@
   function pintar() {
     if (!ventana) return;
     const editar = puedeEditar();
-    const keys = equipos();
-    const pendientes = keys.filter(k => !indice[k] && nombreAntiguo(k)).length;
-    ventana.querySelector(".imp-list").innerHTML = keys.length ? keys.map((k, i) => {
+    const gs = grupos();
+    const keys = [];   // índice de cada botón → equipo
+    const fila = k => {
+      const i = keys.push(k) - 1;
       const f = indice[k];
-      const antigua = !f && nombreAntiguo(k);
-      const estado = f ? `${fechaCorta(f.actualizado)}${f.por ? " · " + f.por : ""}`
-        : antigua ? "en la app (sin pasar al Drive)" : "sin ficha";
+      const estado = f ? `${fechaCorta(f.actualizado)}${f.por ? " · " + f.por : ""}` : "sin ficha";
       return `<div class="imp-group">
         <div class="imp-group-title">${escapeHtml(k)} <small>· ${escapeHtml(estado)}</small></div>
         <div class="cp-modal-row">
-          ${f || antigua ? `<button class="cp-modal-btn" data-ver="${i}">👁 Ver</button>
+          ${f ? `<button class="cp-modal-btn" data-ver="${i}">👁 Ver</button>
           <button class="cp-modal-btn" data-bajar="${i}">⬇ Descargar</button>` : ""}
           ${editar ? `<button class="cp-modal-btn" data-subir="${i}">${f ? "✏️ Cambiar" : "⬆ Subir PDF"}</button>` : ""}
-          ${!editar && !f && !antigua ? `<div class="cp-modal-txt"><small>Todavía no se ha subido.</small></div>` : ""}
+          ${!editar && !f ? `<div class="cp-modal-txt"><small>Todavía no se ha subido.</small></div>` : ""}
         </div>
       </div>`;
+    };
+    ventana.querySelector(".imp-list").innerHTML = gs.length ? gs.map(g => {
+      const conFicha = g.equipos.filter(k => indice[k]).length;
+      return `<details class="fichas-coach"${abiertos.has(g.nombre) ? " open" : ""} data-coach="${escapeHtml(g.nombre)}">
+        <summary>${escapeHtml(g.nombre)} <small>· ${conFicha}/${g.equipos.length} con ficha</small></summary>
+        <div class="fichas-coach-body">${g.equipos.map(fila).join("")}</div>
+      </details>`;
     }).join("") : `<div class="cp-modal-txt">No hay equipos dados de alta.</div>`;
+    ventana.querySelectorAll("details.fichas-coach").forEach(d => {
+      d.ontoggle = () => { if (d.open) abiertos.add(d.dataset.coach); else abiertos.delete(d.dataset.coach); };
+    });
     ventana.querySelectorAll("[data-ver]").forEach(b => { b.onclick = () => verFicha(keys[+b.dataset.ver]); });
     ventana.querySelectorAll("[data-bajar]").forEach(b => { b.onclick = () => descargarFicha(keys[+b.dataset.bajar]); });
     ventana.querySelectorAll("[data-subir]").forEach(b => { b.onclick = () => elegirPdf(keys[+b.dataset.subir]); });
-    const pasar = ventana.querySelector("[data-pasar]");
-    pasar.hidden = !(editar && pendientes);
-    pasar.textContent = `📤 Pasar al Drive las fichas de la app (${pendientes})`;
   }
 
   window.openFichasFederacion = async function () {
@@ -222,20 +195,16 @@
     ventana.className = "cp-modal fichas-modal";
     ventana.innerHTML = `<div class="cp-modal-box imp-box">
       <div class="cp-modal-title">📇 Fichas de Federación</div>
-      <div class="cp-modal-txt">Las fichas de cada equipo, guardadas en una carpeta privada del Drive del club.</div>
       <div class="imp-list"><div class="cp-modal-txt">Cargando...</div></div>
-      <button class="cp-modal-btn" data-pasar hidden></button>
       <button class="cp-modal-btn cp-modal-stop">Cerrar</button>
     </div>`;
     document.body.appendChild(ventana);
     const cerrar = () => { if (ventana) { ventana.remove(); ventana = null; } };
     ventana.querySelector(".cp-modal-stop").onclick = cerrar;
-    ventana.querySelector("[data-pasar]").onclick = pasarAntiguas;
     ventana.onclick = e => { if (e.target === ventana) cerrar(); };
 
-    const [i, lista] = await Promise.all([leerIndice(), listGitHubFolder(CARPETA_ANTIGUA)]);
+    const i = await leerIndice();
     if (i) indice = i;
-    if (lista) antiguas = lista.filter(f => f.name && /\.pdf$/i.test(f.name)).map(f => f.name);
     if (!i && !navigator.onLine && ventana) {
       ventana.querySelector(".imp-list").innerHTML = `<div class="cp-modal-txt">Sin conexión: las fichas no se pueden ver ahora.</div>`;
       return;

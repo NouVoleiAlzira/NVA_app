@@ -254,7 +254,7 @@
       const det = (b) => b.tipo === "evento" ? `${esc(b.titulo || "")} · ${b.fotos || 0} fotos` : `${fmt(b.desde)} – ${fmt(b.hasta)} · ${b.partidos || 0} partidos`;
       const borr = todos.filter(b => b.estado !== "publicado").slice(0, 12), publ = todos.filter(b => b.estado === "publicado").slice(0, 30);
       el.innerHTML = borr.length ? borr.map(b => tarjeta(b, TIPOS[b.tipo] || esc(b.tipo), det(b), false)).join("")
-        : `<p class="ig-info">No hay borradores pendientes. Se crean solos el lunes a las 18:00 (resultados) y el martes a las 21:00 (próximos partidos), o con los botones de arriba.</p>`;
+        : `<p class="ig-info">No hay borradores pendientes.</p>`;
       if (pub) pub.innerHTML = publ.length ? publ.map(b => tarjeta(b, TIPOS[b.tipo] || esc(b.tipo), det(b), true)).join("") : `<p class="ig-info">Todavía no hay reels publicados.</p>`;
       [el, pub].filter(Boolean).forEach(cont => {
         cont.querySelectorAll(".ig-portada").forEach(async img => {
@@ -1443,7 +1443,7 @@
       const det = (b) => `${b.tipo === "evento" ? esc(b.titulo || "") : `${fmt(b.desde)} – ${fmt(b.hasta)}`} · ${b.n || 0} stories`;
       const borr = todos.filter(b => b.estado !== "publicado").slice(0, 12), publ = todos.filter(b => b.estado === "publicado").slice(0, 30);
       el.innerHTML = borr.length ? borr.map(b => tarjeta(b, TIPOS_H[b.tipo] || esc(b.tipo), det(b), false)).join("")
-        : `<p class="ig-info">No hay borradores pendientes. Créalos con los botones de arriba.</p>`;
+        : `<p class="ig-info">No hay borradores pendientes.</p>`;
       if (pub) pub.innerHTML = publ.length ? publ.map(b => tarjeta(b, TIPOS_H[b.tipo] || esc(b.tipo), det(b), true)).join("") : `<p class="ig-info">Todavía no hay stories publicadas.</p>`;
       [el, pub].filter(Boolean).forEach(cont => {
         cont.querySelectorAll(".ig-portada").forEach(async img => {

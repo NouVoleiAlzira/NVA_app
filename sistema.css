@@ -1,0 +1,624 @@
+/* =====================================================================
+   SISTEMA DE DISEÑO NVA — capa final (va después de inicio.css)
+   Lleva a toda la app el estilo de la pantalla principal:
+   - Un solo tipo de ventana: oscura, de cristal azul, con esquinas de 20px.
+   - Un solo juego de botones con 6 variantes de color con significado:
+       rojo     = guardar / acción principal      (.btn-save-session)
+       azul     = abrir / ir a otra cosa           (.btn-pdf-mode2)
+       tiza     = secundario / generar PDF         (.btn-pdf-mode)
+       verde    = refrescar / confirmar
+       amarillo = información (Otras INFOs)
+       gris     = cancelar · peligro = borrar
+   - Campos, pestañas, listas y paneles con los mismos tokens.
+   - «Puente de tema»: dentro de las ventanas y paneles oscuros, los colores
+     claros escritos a mano en el HTML/JS (style="color:#64748b"…) se
+     traducen a los colores del tema oscuro.
+   Solo apariencia: no cambia ninguna función.
+   ===================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Superficies */
+  --sf-win: linear-gradient(180deg, #1A3278 0%, #132662 100%);
+  --sf-win-solid: #15296A;
+  --sf-campo: rgba(7, 15, 43, 0.45);
+  --sf-fila: rgba(233, 238, 250, 0.06);
+  --sf-fila-hover: rgba(233, 238, 250, 0.11);
+  --borde: rgba(233, 238, 250, 0.13);
+  --borde-fuerte: rgba(233, 238, 250, 0.24);
+
+  /* Texto */
+  --txt-1: #E9EEFA;
+  --txt-2: #A9B6DA;
+  --txt-ok: #7BE0AB;
+  --txt-mal: #FF9AA5;
+  --txt-aviso: #FFD866;
+  --txt-link: #9CBBFF;
+
+  /* Radios y sombras */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --sombra-btn: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 10px 20px -10px rgba(0, 0, 0, 0.7);
+  --sombra-win: 0 30px 70px -20px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --foco: 0 0 0 3px rgba(245, 197, 24, 0.35);
+
+  /* Degradados de los botones */
+  --g-rojo: linear-gradient(135deg, #F04A5D, #B81C30);
+  --g-azul: linear-gradient(135deg, #3B67EC, #1B3A8C);
+  --g-verde: linear-gradient(135deg, #34C784, #1E8A57);
+  --g-amarillo: linear-gradient(135deg, #FFE070, #F5C518);
+  --g-peligro: linear-gradient(135deg, #E5484D, #8F1424);
+
+  --ease-sis: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------- */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
+::selection { background: rgba(245, 197, 24, 0.35); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: rgba(233, 238, 250, 0.25) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(233, 238, 250, 0.22); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------------------------------------------------------------
+   Botones de acción (mismo aspecto en todas las pantallas y ventanas)
+   --------------------------------------------------------------------- */
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action) {
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  box-shadow: var(--sombra-btn);
+  transition: transform 200ms var(--ease-sis), box-shadow 220ms ease, border-color 200ms ease, filter 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+.btn-save-session { background: var(--g-rojo); }
+.btn-pdf-mode2 { background: var(--g-azul); }
+.btn-danger-action { background: var(--g-peligro); }
+.btn-pdf-mode {
+  background: rgba(233, 238, 250, 0.07);
+  border-color: rgba(233, 238, 250, 0.16);
+  color: var(--txt-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Variantes de color puestas a mano en el HTML/JS (style="background:…") */
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondoVerde"],
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#16a34a"] { background-image: var(--g-verde) !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="azul-primary"],
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondorAzul"],
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#2563eb"] { background-image: var(--g-azul) !important; color: #fff !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondoAmarillo"] { background-image: var(--g-amarillo) !important; color: var(--noche) !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#64748b"] {
+  background: rgba(233, 238, 250, 0.08) !important;
+  border-color: var(--borde-fuerte) !important;
+  color: var(--txt-1) !important;
+  box-shadow: none;
+}
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#ef4444"],
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#b91c1c"] { background-image: var(--g-peligro) !important; }
+
+/* Brillo diagonal al pasar el ratón */
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action)::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 60%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-120%) skewX(-12deg);
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action):not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 16px 26px -12px rgba(0, 0, 0, 0.8);
+    filter: brightness(1.08);
+  }
+  .btn-pdf-mode:not(:disabled):hover { border-color: rgba(245, 197, 24, 0.55); background: rgba(233, 238, 250, 0.12); }
+  :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action):not(:disabled):hover::before {
+    transform: translateX(230%) skewX(-12deg);
+    transition: transform 700ms var(--ease-sis);
+  }
+}
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: saturate(0.6);
+}
+
+/* Botones secundarios pequeños: misma familia, versión compacta */
+:is(.btn-history, .btn-add, .btn-edit-history, .btn-delete-history, .reason-add-btn,
+    .btn-history-more, .cp-upload, .cp-tl-btn, .calendar-nav-btn, .anul-barra button) {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 6px 14px -8px rgba(0, 0, 0, 0.7);
+  transition: transform 160ms var(--ease-sis), filter 150ms ease, border-color 150ms ease;
+}
+:is(.btn-add, .btn-edit-history, .reason-add-btn, .btn-history-more, .cp-upload) { background: var(--g-azul); }
+.btn-add { min-width: 44px; font-size: 1rem; }
+.btn-add-pdf { font-size: 0.78rem; }
+.btn-delete-history { background: var(--g-peligro); }
+:is(.btn-history, .cp-tl-btn, .calendar-nav-btn) {
+  background: rgba(233, 238, 250, 0.08);
+  border-color: var(--borde-fuerte);
+  color: var(--txt-1);
+  box-shadow: none;
+}
+.cp-tl-btn-red { border-color: var(--alzira); color: var(--txt-mal); }
+.anul-barra button { background: var(--g-amarillo); color: var(--noche); }
+@media (hover: hover) and (pointer: fine) {
+  :is(.btn-history, .btn-add, .btn-edit-history, .btn-delete-history, .reason-add-btn,
+      .btn-history-more, .cp-upload, .cp-tl-btn, .calendar-nav-btn, .anul-barra button):hover { filter: brightness(1.12); }
+  :is(.btn-history, .cp-tl-btn, .calendar-nav-btn):hover { border-color: rgba(245, 197, 24, 0.55); }
+}
+
+/* Al pulsar, todos se hunden igual */
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action, .btn-history, .btn-add,
+    .btn-edit-history, .btn-delete-history, .reason-add-btn, .btn-history-more, .cp-upload,
+    .cp-tl-btn, .calendar-nav-btn, .cp-modal-btn, .coach-btn, .team-btn, .hist-chip, .tab-btn,
+    .hz-sub-btn, .hz-team-btn, .hz-mini-btn, .player-pdf-item, .mode-swap):not(:disabled):active {
+  transform: scale(0.96);
+  transition-duration: 90ms;
+}
+
+/* Onda al pulsar (inicio.js) en botones de toda la app */
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action, .cp-modal-btn, .coach-btn)::after {
+  content: "";
+  position: absolute;
+  left: var(--rx, 50%); top: var(--ry, 50%);
+  width: var(--rs, 100px); height: var(--rs, 100px);
+  min-width: 0; flex: none;
+  margin: calc(var(--rs, 100px) / -2) 0 0 calc(var(--rs, 100px) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.12) 45%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.nv-rip::after { animation: nvRipple 620ms var(--ease-sis); }
+
+/* ---------------------------------------------------------------------
+   Botones-lista (entrenador, secciones de Horarios, Otras INFOs)
+   --------------------------------------------------------------------- */
+.coach-btn {
+  position: relative;
+  overflow: hidden;
+  min-height: 52px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(36, 80, 200, 0.28), rgba(21, 41, 106, 0.85));
+  border: 1px solid var(--nv-borde, var(--borde));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 22px -12px rgba(0, 0, 0, 0.7);
+  color: var(--txt-1);
+  transition: transform 200ms var(--ease-sis), border-color 200ms ease, box-shadow 250ms ease;
+}
+.coach-btn > span:last-child:not(:first-child) {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(233, 238, 250, 0.08);
+  font-size: 0.85rem;
+}
+.coach-btn.selected {
+  border-color: rgba(245, 197, 24, 0.75);
+  box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.14), 0 14px 28px -12px rgba(0, 0, 0, 0.75);
+}
+.coach-btn.otros-nuevo { background: transparent; border: 1.5px dashed var(--borde-fuerte); box-shadow: none; }
+@media (hover: hover) and (pointer: fine) {
+  .coach-btn:hover { border-color: rgba(233, 238, 250, 0.24); }
+}
+
+/* ---------------------------------------------------------------------
+   Ventanas: .modal-box (HTML) y .cp-modal-box (JS) son iguales
+   --------------------------------------------------------------------- */
+.modal-backdrop, .cp-modal {
+  background: rgba(5, 11, 32, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.modal-box, .cp-modal-box {
+  background: var(--sf-win);
+  color: var(--txt-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sombra-win);
+  padding: 18px;
+}
+.cp-modal-box { max-height: calc(100vh - 32px); overflow-y: auto; }
+/* «Otras INFOs» ya era oscura: ahora usa el mismo fondo que el resto */
+.modal-box.otros-box { background: var(--sf-win); border-color: var(--borde); }
+
+.modal-header {
+  border-bottom: 1px solid var(--borde);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  gap: 10px;
+}
+.modal-title, .cp-modal-title, .otros-box .modal-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: 0.005em;
+  color: #fff;
+}
+.cp-modal-txt { color: var(--txt-1); }
+
+/* Cerrar: botón redondo de cristal (igual que los de la cabecera) */
+.btn-close-modal, .hist-cerrar, .otros-box .btn-close-modal {
+  flex: none;
+  width: 40px; height: 40px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(233, 238, 250, 0.08);
+  box-shadow: inset 0 0 0 1px var(--borde);
+  color: var(--txt-1);
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 160ms var(--ease-sis);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-close-modal:hover, .hist-cerrar:hover { background: rgba(233, 238, 250, 0.16); color: #fff; }
+}
+.btn-close-modal:active, .hist-cerrar:active { transform: scale(0.92); }
+
+/* Botones de las ventanas hechas en JS */
+.cp-modal-btn {
+  position: relative;
+  overflow: hidden;
+  min-height: 44px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--borde-fuerte);
+  background: rgba(233, 238, 250, 0.08);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 200ms var(--ease-sis), filter 150ms ease, border-color 150ms ease;
+}
+.cp-modal-main { background: var(--g-verde); border-color: transparent; box-shadow: var(--sombra-btn); }
+.cp-modal-stop { border-color: var(--alzira); color: var(--txt-mal); }
+@media (hover: hover) and (pointer: fine) {
+  .cp-modal-btn:hover { filter: brightness(1.1); border-color: rgba(245, 197, 24, 0.55); }
+  .cp-modal-main:hover { border-color: transparent; }
+}
+
+/* ---------------------------------------------------------------------
+   Campos de texto, listas desplegables y editor
+   --------------------------------------------------------------------- */
+.app-input, .app-select, .comment-input-long:not(.player-card *), .rte-editor,
+.cp-modal-box :is(input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="search"], input[type="password"], input[type="email"], select, textarea),
+.modal-box :is(input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="search"], input[type="password"], input[type="email"], select, textarea) {
+  background: var(--sf-campo);
+  color: var(--txt-1);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--r-sm);
+  font-family: var(--font-body);
+  color-scheme: dark;
+  opacity: 1;
+  transition: border-color 150ms ease, box-shadow 200ms ease;
+}
+.app-input, .app-select { min-height: 42px; padding: 10px 12px; font-size: 0.9rem; }
+:is(.app-input, .app-select, .comment-input-long, .rte-editor)::placeholder,
+.modal-box :is(input, textarea)::placeholder, .cp-modal-box :is(input, textarea)::placeholder { color: var(--txt-2); opacity: 0.8; }
+.rte-editor:empty:before { color: var(--txt-2); }
+:is(.app-input, .app-select, .comment-input-long, .rte-editor):focus,
+.modal-box :is(input, select, textarea):focus, .cp-modal-box :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--balon);
+  box-shadow: var(--foco);
+}
+select option, .app-select option { background: var(--sf-win-solid); color: #fff; }
+/* «botones» con aspecto de campo (motivos de falta, «Cancelar selección» de liga) */
+button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
+@media (hover: hover) and (pointer: fine) {
+  button.app-input:hover { background: var(--sf-fila-hover); border-color: rgba(245, 197, 24, 0.55); }
+}
+
+.rte-toolbar button {
+  height: 36px;
+  border: 1px solid var(--borde-fuerte);
+  background: rgba(233, 238, 250, 0.08);
+  color: var(--txt-1);
+  border-radius: var(--r-sm);
+}
+.rte-toolbar button:active { background: rgba(233, 238, 250, 0.18); }
+.rte-editor a { color: var(--txt-link); }
+
+/* ---------------------------------------------------------------------
+   Pestañas (Opciones)
+   --------------------------------------------------------------------- */
+.tabs-nav {
+  background: rgba(7, 15, 43, 0.45);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-md);
+  padding: 4px;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  min-height: 38px;
+  border-radius: var(--r-sm);
+  color: var(--txt-2);
+  font-size: 0.76rem;
+  line-height: 1.15;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.tab-btn.active {
+  background: rgba(245, 197, 24, 0.16);
+  color: var(--balon);
+  box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.45);
+}
+@media (hover: hover) and (pointer: fine) { .tab-btn:not(.active):hover { color: #fff; background: rgba(233, 238, 250, 0.06); } }
+
+/* ---------------------------------------------------------------------
+   Bloques, filas y etiquetas dentro de las ventanas
+   --------------------------------------------------------------------- */
+.config-section {
+  background: var(--sf-fila);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-md);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.config-subtitle {
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+  margin-bottom: 8px;
+}
+.badge {
+  background: rgba(245, 197, 24, 0.16);
+  color: var(--balon);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0;
+}
+.item-list { max-height: 180px; gap: 6px; }
+.item-row, #draggablePlayerList > *, #draggableLeagueList > * {
+  background: var(--sf-fila);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-sm);
+  color: var(--txt-1);
+}
+.item-row { padding: 8px 12px; font-size: 0.85rem; }
+.btn-del { color: var(--txt-mal); min-width: 32px; min-height: 32px; border-radius: 8px; }
+@media (hover: hover) and (pointer: fine) { .btn-del:hover { background: rgba(214, 40, 57, 0.18); } }
+
+.history-card {
+  background: var(--sf-fila);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-md);
+  padding: 12px;
+  gap: 10px;
+  color: var(--txt-1);
+}
+.hist-stats { color: var(--txt-2); }
+
+.player-pdf-item {
+  min-height: 44px;
+  border: 1px solid var(--borde);
+  background: var(--sf-fila);
+  color: var(--txt-1);
+  border-radius: var(--r-md);
+}
+.player-pdf-item:active { background: var(--sf-fila-hover); }
+@media (hover: hover) and (pointer: fine) { .player-pdf-item:hover { border-color: rgba(245, 197, 24, 0.55); } }
+
+/* Selector de color (avisos, consultas) */
+.color-circle { width: 32px; height: 32px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2); }
+.color-circle.selected { border-color: #fff; box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.5); }
+
+/* Calendario del selector de período */
+.calendar-header { color: #fff; font-family: var(--font-display); font-style: italic; font-size: 1.15rem; }
+.calendar-weekdays { color: var(--txt-2); }
+.cal-day { background: var(--sf-fila); color: var(--txt-1); border-radius: 8px; }
+@media (hover: hover) and (pointer: fine) { .cal-day:not(.empty):hover { background: var(--sf-fila-hover); } }
+.cal-day.empty { background: transparent; }
+.cal-day.range-start, .cal-day.range-end { background: var(--balon) !important; color: var(--noche) !important; }
+.cal-day.range-in-between { background: rgba(245, 197, 24, 0.3) !important; color: #FFE070; box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.35); }
+
+/* Motivos de falta (dentro de la tarjeta blanca de jugadora) se quedan claros */
+
+/* Fichas / importar / kilometraje: grupos dentro de ventanas */
+.imp-group { background: var(--sf-fila); }
+
+/* ---------------------------------------------------------------------
+   Historial de cambios, avisos y anulaciones
+   --------------------------------------------------------------------- */
+.hist-chip {
+  min-height: 36px;
+  border: 1px solid var(--borde-fuerte);
+  background: rgba(233, 238, 250, 0.06);
+  color: var(--txt-1);
+  font-weight: 600;
+}
+.hist-chip.on { background: rgba(245, 197, 24, 0.16); color: var(--balon); border-color: rgba(245, 197, 24, 0.55); }
+.hist-estado, .hist-vacio, .hist-quien, .hist-deshecho { color: var(--txt-2); }
+.hist-dia {
+  background: #1A3175;
+  color: var(--balon);
+  border: 1px solid var(--borde);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hist-item { border-bottom-color: var(--borde); color: var(--txt-1); }
+.hist-hora { color: var(--txt-2); }
+.hist-deshacer { background: rgba(233, 238, 250, 0.06); border-color: var(--borde-fuerte); color: var(--txt-1); }
+
+.av-dia { border-color: var(--borde-fuerte); color: var(--txt-1); background: var(--sf-fila); }
+.av-dia small { color: var(--txt-2); }
+.av-coach { border-color: var(--borde); background: var(--sf-fila); color: var(--txt-1); }
+.av-aviso { color: var(--txt-1); }
+.av-sin { color: var(--txt-aviso); }
+.av-ok { color: var(--txt-ok); }
+
+.anul-barra {
+  background: rgba(245, 197, 24, 0.12);
+  color: var(--txt-1);
+  border: 1px solid rgba(245, 197, 24, 0.5);
+  border-radius: var(--r-md);
+}
+.anul-part { border-color: var(--borde); background: var(--sf-fila); color: var(--txt-1); border-radius: var(--r-sm); }
+.anul-part em { color: var(--txt-ok); }
+.anul-part .anul-tag { color: var(--txt-mal); }
+.anul-si { background: repeating-linear-gradient(45deg, rgba(214, 40, 57, 0.14), rgba(214, 40, 57, 0.14) 8px, rgba(233, 238, 250, 0.04) 8px, rgba(233, 238, 250, 0.04) 16px); }
+#btnDeselEntrenos.anul-on { outline: 3px solid var(--balon); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------------
+   Paneles de Otras INFOs y Horarios: oscuros, como las tarjetas de inicio
+   --------------------------------------------------------------------- */
+.otros-panel, .hz-panel {
+  background: var(--nv-card, rgba(21, 41, 106, 0.55));
+  color: var(--txt-1);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  box-shadow: 0 16px 34px -16px rgba(0, 0, 0, 0.75);
+}
+.otros-panel h3, .otros-panel h4 { color: #fff; }
+.otros-panel a { color: var(--txt-link); }
+.otros-block { background: var(--sf-fila); border-left-color: var(--balon); color: var(--txt-1); }
+.otros-actions { border-top-color: var(--borde); }
+.otros-actions button { border-radius: var(--r-sm); min-height: 40px; box-shadow: var(--sombra-btn); }
+
+.hz-hint, .hz-label { color: var(--txt-2); }
+.hz-warn { color: var(--txt-mal); }
+.hz-info { color: var(--txt-link); }
+.hz-sub-btn, .hz-team-btn {
+  min-height: 44px;
+  background: var(--sf-fila);
+  color: var(--txt-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-md);
+}
+.hz-sub-btn.open, .hz-team-btn.open { background: rgba(245, 197, 24, 0.1); border-color: rgba(245, 197, 24, 0.55); }
+.hz-sub-panel { border-left-color: var(--balon); }
+.hz-court, .hz-train { background: var(--sf-fila); border-color: var(--borde); border-radius: var(--r-md); }
+.hz-train.draft { background: transparent; border-color: var(--borde-fuerte); }
+.hz-win { background: var(--sf-campo); border-color: var(--borde); border-radius: var(--r-sm); }
+.hz-team-set { border-bottom-color: var(--borde); }
+.hz-team-set input[type="color"] { background: var(--sf-campo); border-color: var(--borde-fuerte); }
+.hz-chip { background: var(--sf-fila); color: var(--txt-2); border-color: var(--borde-fuerte); border-radius: 8px; min-height: 34px; }
+.hz-chip.on { background: var(--g-azul); color: #fff; border-color: transparent; }
+.hz-mini-btn {
+  min-height: 38px;
+  background: rgba(36, 80, 200, 0.18);
+  color: var(--txt-1);
+  border: 1px dashed rgba(156, 187, 255, 0.55);
+  border-radius: var(--r-sm);
+}
+.hz-mini-btn.danger { background: rgba(214, 40, 57, 0.14); color: var(--txt-mal); border-color: rgba(255, 154, 165, 0.55); }
+.hz-draft-title { color: var(--balon); }
+.hz-dot { border-color: rgba(255, 255, 255, 0.5); }
+.hz-panel :is(input, select) { background: var(--sf-campo); color: var(--txt-1); border-color: var(--borde-fuerte); color-scheme: dark; }
+
+/* ---------------------------------------------------------------------
+   Pantallas de registro (entrenamiento, partido, avisos, horarios)
+   --------------------------------------------------------------------- */
+.screen:not(#screenCoachTeam) > .section-title,
+.reg-sticky .section-title { font-size: 1.45rem; }
+.reg-sticky {
+  background: linear-gradient(180deg, rgba(13, 27, 69, 0.97), rgba(13, 27, 69, 0.9));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--borde);
+}
+.date-container {
+  background: rgba(233, 238, 250, 0.06);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--r-sm);
+  min-height: 40px;
+}
+.date-input {
+  background: var(--sf-campo);
+  color: #fff;
+  border: 1px solid var(--borde);
+  color-scheme: dark;
+}
+.date-input:focus { border-color: var(--balon); box-shadow: var(--foco); }
+.mode-swap { background: var(--g-azul); border-color: transparent; box-shadow: var(--sombra-btn); }
+
+/* Tarjetas de jugadora: siguen claras (se leen mejor los estados de color),
+   pero con el mismo radio y sombra que el resto de tarjetas */
+.player-card {
+  border-radius: var(--r-md);
+  box-shadow: inset 0 -2px 0 rgba(13, 27, 69, 0.08), 0 8px 18px -10px rgba(0, 0, 0, 0.7);
+  margin-bottom: 8px;
+}
+.state-strip { border-top-left-radius: var(--r-md); border-bottom-left-radius: var(--r-md); }
+
+/* Pantallas largas: el botón de guardar queda separado de la lista */
+.screen > .btn-save-session { margin-top: 14px; }
+
+/* ---------------------------------------------------------------------
+   Puente de tema: colores claros escritos a mano dentro de lo oscuro
+   --------------------------------------------------------------------- */
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+  [style*="color:#64748b"], [style*="color: #64748b"],
+  [style*="color:#475569"], [style*="color: #475569"],
+  [style*="color:#94a3b8"], [style*="color: #94a3b8"]) { color: var(--txt-2) !important; }
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+  [style*="color:#1e293b"], [style*="color: #1e293b"],
+  [style*="color:#0f172a"], [style*="color: #0f172a"],
+  [style*="color:#334155"], [style*="color: #334155"],
+  [style*="color:#1e3a8a"], [style*="color: #1e3a8a"],
+  [style*="color:var(--azul-dark)"], [style*="color: var(--azul-dark)"],
+  [style*="color:var(--text-dark)"], [style*="color: var(--text-dark)"]) { color: var(--txt-1) !important; }
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+  [style*="color:#b91c1c"], [style*="color: #b91c1c"],
+  [style*="color:#ef4444"], [style*="color: #ef4444"]) { color: var(--txt-mal) !important; }
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+  [style*="background:#fff"], [style*="background: #fff"],
+  [style*="background:white"], [style*="background: white"],
+  [style*="background:#f8fafc"], [style*="background: #f8fafc"],
+  [style*="background:#f1f5f9"], [style*="background: #f1f5f9"],
+  [style*="background:#e2e8f0"], [style*="background: #e2e8f0"],
+  [style*="background:#fef2f2"], [style*="background: #fef2f2"],
+  [style*="background:#eff6ff"], [style*="background:#eef2ff"]):not(img, video, canvas) {
+  background-color: var(--sf-fila) !important;
+  color: var(--txt-1);
+}
+:is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel) :is(
+  [style*="#cbd5e1"], [style*="#e2e8f0"], [style*="var(--gray-border)"], [style*="#fca5a5"]) { border-color: var(--borde-fuerte) !important; }
+
+/* ---------------------------------------------------------------------
+   Movimiento reducido
+   --------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action)::before { display: none; }
+  .nv-rip::after { animation: none; }
+  :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action, .coach-btn, .cp-modal-btn):is(:hover, :active) { transform: none; }
+}

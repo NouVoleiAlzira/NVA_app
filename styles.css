@@ -1738,17 +1738,9 @@
     .cp-change-undo { flex: 0 0 auto; border: 1px solid var(--linea); background: none; color: var(--balon); border-radius: 8px; width: 32px; height: 32px; font-size: 1rem; cursor: pointer; }
     .cp-change-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 
-/* Configuración del Club: texto oscuro legible sobre fondo claro */
-#modalOptions .modal-box { color: var(--text-dark); }
-#modalOptions .item-list > *, #modalOptions .item-list span:not(.badge),
-#modalOptions #coachTeamsCheckboxes, #modalOptions #coachTeamsCheckboxes label,
-#modalOptions #draggablePlayerList, #modalOptions #draggablePlayerList > *,
-#modalOptions #draggableLeagueList, #modalOptions #draggableLeagueList > *,
-#modalOptions .tab-content label, #modalOptions .tab-content p { color: var(--text-dark); }
-
-/* Avisos y ventanas: texto oscuro sobre tarjetas claras (si no hay color propio) */
+/* Avisos: texto oscuro sobre la tarjeta clara de jugadora (si no hay color propio).
+   Las ventanas ya son oscuras: su texto es claro (sistema.css). */
 .warn-line { color: var(--text-dark); }
-.modal-box { color: var(--text-dark); }
     .cp-iden { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--niebla); font-size: 0.62rem; font-weight: 700; text-transform: uppercase; }
     .cp-iden input { width: 58px; padding: 6px 4px; border-radius: 8px; border: 1px solid var(--linea); background: rgba(233,238,250,0.08); color: #fff; font: inherit; font-size: 0.85rem; text-align: center; }
     .cp-iden input.cp-iden-bad { border-color: var(--alzira); }

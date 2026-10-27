@@ -1061,15 +1061,15 @@
     resultsCandidateLogs.forEach((log, i) => {
       const sm = matchLogSummary(log);
       const label = document.createElement("label");
-      label.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 10px; background:#f8fafc; border:1px solid var(--gray-border); border-radius:10px; cursor:pointer; font-size:0.82rem;";
+      label.style.cssText = "display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--sf-fila); border:1px solid var(--borde); border-radius:12px; cursor:pointer; font-size:0.82rem; color:var(--txt-1);";
       const scoreTxt = sm.hasScore
         ? `${escapeHtml(sm.home)} <b>${sm.sl} - ${sm.sv}</b> ${escapeHtml(sm.visit)}`
-        : `<span style="color:#94a3b8;">Sin resultado</span>`;
+        : `<span style="color:var(--txt-2);">Sin resultado</span>`;
       label.innerHTML = `
         <input type="checkbox" class="results-match-check" data-idx="${i}" checked onchange="updateResultsSelectionUI()" style="width:18px; height:18px; flex-shrink:0;">
         <span style="min-width:0;">
-          <span style="font-weight:700; color:var(--azul-dark);">${fmtDate(log.fecha)} · ${escapeHtml(log.equipo)}</span><br>
-          <span style="color:#334155;">${scoreTxt}</span>
+          <span style="font-weight:700; color:var(--txt-1);">${fmtDate(log.fecha)} · ${escapeHtml(log.equipo)}</span><br>
+          <span style="color:var(--txt-2);">${scoreTxt}</span>
         </span>`;
       list.appendChild(label);
     });
@@ -2439,7 +2439,7 @@
 
   (function () {
     const st = document.createElement("style");
-    st.textContent = ".hist-fecha-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hist-reg-fechas{font-size:0.68rem;line-height:1.3;color:#475569;font-weight:500}";
+    st.textContent = ".hist-fecha-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hist-reg-fechas{font-size:0.68rem;line-height:1.3;color:var(--txt-2);font-weight:500}";
     document.head.appendChild(st);
   })();
 
@@ -4928,8 +4928,8 @@
         const actions = document.createElement("div");
         actions.className = "otros-actions";
         actions.innerHTML = `
-          <button style="background:linear-gradient(135deg,#0284c7,#0369a1);" onclick="openOtrosEditor(${jsArg(entry.id)})">✏️ Editar</button>
-          <button style="background:linear-gradient(135deg,#ef4444,#b91c1c);" onclick="deleteOtros(${jsArg(entry.id)})">🗑️ Eliminar</button>`;
+          <button style="background:var(--g-azul);" onclick="openOtrosEditor(${jsArg(entry.id)})">✏️ Editar</button>
+          <button style="background:var(--g-peligro);" onclick="deleteOtros(${jsArg(entry.id)})">🗑️ Eliminar</button>`;
         panel.appendChild(actions);
         box.appendChild(panel);
       }

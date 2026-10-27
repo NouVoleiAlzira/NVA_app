@@ -391,8 +391,6 @@
     .nva-plegar[aria-expanded=true]::before{content:"▾"}
     .nva-permisos .nva-hijo td{background:#f1f5f9}
     .nva-permisos .nva-hijo td:first-child{padding-left:22px;color:#475569}
-    .nva-mostrar{display:flex;align-items:center;gap:6px;height:32px;font-size:.8rem;cursor:pointer}
-    .nva-mostrar input{margin:0;width:18px;height:18px}
     .nva-roles td{vertical-align:middle}
     .nva-tabla .nva-col-num{width:70px;text-align:center}
     .nva-tabla .nva-col-borrar{width:40px;text-align:center}
@@ -768,11 +766,13 @@
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
 
-    // Permisos: cada menú tiene su nivel; sus subsecciones solo se muestran u ocultan.
-    // Una subsección sin fila propia sigue a su menú.
+    // Permisos: cada menú y cada subsección tienen su nivel. En una subsección
+    // vale el menor entre el suyo y el de su menú; sin fila propia sigue a su menú.
     const nivel = (rol, menu) => (p.data.find(x => x.rol === rol && x.menu === menu) || {}).acceso;
-    const opcAcceso = sel => [["ninguno", "—"], ["lectura", "Ver"], ["escritura", "Editar"]]
-      .map(([v, t]) => `<option value="${v}"${v === sel ? " selected" : ""}>${t}</option>`).join("");
+    const NIVELES = ["ninguno", "lectura", "escritura"];
+    const opcAcceso = (sel, max) => [["ninguno", "—"], ["lectura", "Ver"], ["escritura", "Editar"]]
+      .map(([v, t]) => `<option value="${v}"${v === sel ? " selected" : ""}${max && NIVELES.indexOf(v) > NIVELES.indexOf(max) ? " disabled" : ""}>${t}</option>`).join("");
+    const tope = (v, max) => NIVELES[Math.min(NIVELES.indexOf(v), NIVELES.indexOf(max))];
     if (!roles.some(x => x.id === rolPermisosElegido)) rolPermisosElegido = (roles.find(x => x.id !== "propietario") || roles[0] || {}).id;
     const filasPermisos = roles.map(ro => principales.map(mn => {
       const fijo = ro.id === "propietario";
@@ -784,7 +784,7 @@
       return `<tr data-rol="${esc(ro.id)}"><td>${titulo}</td>
         <td><select data-rol="${esc(ro.id)}" data-menu="${esc(mn.id)}"${fijo ? " disabled" : ""}>${opcAcceso(nivelMenu)}</select></td></tr>` +
         hs.map(h => `<tr class="nva-hijo" data-rol="${esc(ro.id)}" data-padre="${esc(mn.id)}"><td>${esc(h.nombre)}</td>
-        <td><label class="nva-mostrar"><input type="checkbox" data-rol="${esc(ro.id)}" data-menu="${esc(h.id)}" data-padre="${esc(mn.id)}"${(nivel(ro.id, h.id) || nivelMenu) !== "ninguno" ? " checked" : ""}${fijo || nivelMenu === "ninguno" ? " disabled" : ""}>Mostrar</label></td></tr>`).join("");
+        <td><select data-rol="${esc(ro.id)}" data-menu="${esc(h.id)}" data-padre="${esc(mn.id)}"${fijo || nivelMenu === "ninguno" ? " disabled" : ""}>${opcAcceso(tope(nivel(ro.id, h.id) || nivelMenu, nivelMenu), nivelMenu)}</select></td></tr>`).join("");
     }).join("")).join("");
 
     const usuariosDeRol = id => u.data.filter(x => x.rol === id).length;
@@ -810,7 +810,7 @@
         <p id="nvaPermFijo" class="nva-nota" hidden>El propietario siempre puede editarlo todo.</p>
         <table class="nva-tabla nva-permisos"><thead><tr><th>Sección</th><th class="nva-col-acceso">Acceso</th></tr></thead>
         <tbody id="nvaPermisos">${filasPermisos}</tbody></table>
-        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores y equipos. Pulsa una sección con ▸ para elegir qué subsecciones ve.</p>
+        <p class="nva-nota">«Ver»: solo lectura. «Editar»: lectura y escritura. Una subsección nunca tiene más acceso que su sección. Los entrenadores solo editan los equipos que tengan asignados en Opciones › Entrenadores y equipos. Pulsa una sección con ▸ para ver sus subsecciones.</p>
         <button class="btn-save-session" id="nvaGuardarPermisos">💾 Guardar permisos</button>`) +
       seccion("roles", "Roles", `
         <table class="nva-tabla nva-roles"><thead><tr><th>Rol</th><th class="nva-col-num">Usuarios</th><th class="nva-col-borrar"></th></tr></thead>
@@ -845,10 +845,15 @@
       caja.querySelectorAll(`.nva-plegar[data-menu="${b.dataset.menu}"]`).forEach(x => x.setAttribute("aria-expanded", abrir));
       pintarFilasPermisos();
     });
-    caja.querySelectorAll("#nvaPermisos select").forEach(s => s.onchange = () => {
-      // Con el menú en «—» sus subsecciones no se ven, da igual lo que marquen
-      caja.querySelectorAll(`#nvaPermisos input[data-rol="${s.dataset.rol}"][data-padre="${s.dataset.menu}"]`)
-        .forEach(x => { x.disabled = s.value === "ninguno"; });
+    caja.querySelectorAll("#nvaPermisos select:not([data-padre])").forEach(s => s.onchange = () => {
+      // Las subsecciones no pueden pasar del nivel de su menú; con el menú en «—» no se ven
+      caja.querySelectorAll(`#nvaPermisos select[data-rol="${s.dataset.rol}"][data-padre="${s.dataset.menu}"]`).forEach(x => {
+        const estaba = x.disabled;
+        x.disabled = s.value === "ninguno";
+        Array.from(x.options).forEach(o => { o.disabled = NIVELES.indexOf(o.value) > NIVELES.indexOf(s.value); });
+        if (s.value === "ninguno") return;
+        x.value = estaba ? s.value : tope(x.value, s.value);   // al volver a mostrar el menú, sus subsecciones empiezan igual
+      });
     });
     pintarFilasPermisos();
 
@@ -885,10 +890,7 @@
     };
     caja.querySelector("#nvaGuardarPermisos").onclick = async () => {
       const filas = Array.from(caja.querySelectorAll("#nvaPermisos select:not([disabled])"))
-        .map(s => ({ rol: s.dataset.rol, menu: s.dataset.menu, acceso: s.value }))
-        .concat(Array.from(caja.querySelectorAll("#nvaPermisos input[type=checkbox]"))
-          .filter(x => x.dataset.rol !== "propietario")
-          .map(x => ({ rol: x.dataset.rol, menu: x.dataset.menu, acceso: x.checked ? "lectura" : "ninguno" })));
+        .map(s => ({ rol: s.dataset.rol, menu: s.dataset.menu, acceso: s.value }));
       const { error: e } = await sb.from("permisos_rol").upsert(filas);
       if (e) return alert("Error guardando permisos: " + e.message);
       alert("Permisos guardados. Cada usuario los verá al volver a abrir la app.");

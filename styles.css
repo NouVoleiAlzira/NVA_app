@@ -2247,6 +2247,10 @@
 
 
 /* ===== Mensaje de aviso (avisos.js) ===== */
+#avEnviar[hidden] { display: none; }
+.av-auto { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; color: #1e293b; font-size: .88em; cursor: pointer; }
+.av-auto input { margin-top: 3px; transform: scale(1.2); }
+.av-auto small { display: block; color: #64748b; font-size: .9em; margin-top: 2px; }
 .av-semanas { display: flex; gap: 6px; margin-bottom: 8px; }
 .av-semanas .hist-chip { flex: 1; }
 .av-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }

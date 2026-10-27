@@ -479,6 +479,8 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .hist-hora { color: var(--txt-2); }
 .hist-deshacer { background: rgba(233, 238, 250, 0.06); border-color: var(--borde-fuerte); color: var(--txt-1); }
 
+.av-auto { border-color: var(--borde-fuerte); color: var(--txt-1); background: var(--sf-fila); }
+.av-auto small { color: var(--txt-2); }
 .av-dia { border-color: var(--borde-fuerte); color: var(--txt-1); background: var(--sf-fila); }
 .av-dia small { color: var(--txt-2); }
 .av-coach { border-color: var(--borde); background: var(--sf-fila); color: var(--txt-1); }

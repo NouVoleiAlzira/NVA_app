@@ -11,10 +11,14 @@
     if (!screen) return;
 
     // ---------- Onda al pulsar ----------
+    // En la pantalla principal también títulos y equipos; en el resto de la
+    // app (pantallas y ventanas) los botones de acción (estilos en sistema.css)
     const RIPPLE = [
-      ".coach-btn", ".team-btn", ".btn-pdf-mode", ".btn-pdf-mode2",
-      ".btn-save-session", ".section-toggle", ".cp-sub-head"
-    ].map(s => "#screenCoachTeam " + s).concat("header .btn-header-icon").join(", ");
+      ".team-btn", ".section-toggle", ".cp-sub-head"
+    ].map(s => "#screenCoachTeam " + s).concat(
+      ".coach-btn", ".btn-pdf-mode", ".btn-pdf-mode2", ".btn-save-session",
+      ".btn-danger-action", ".cp-modal-btn", "header .btn-header-icon"
+    ).join(", ");
 
     document.addEventListener("pointerdown", e => {
       if (reduce.matches || e.button > 0) return;

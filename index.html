@@ -15,7 +15,7 @@
 
   <!-- ===== PWA ===== -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3c72">
+  <meta name="theme-color" content="#0D1B45">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <!-- iPhone / iPad -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="animaciones.css">
   <link rel="stylesheet" href="inicio.css">
+  <link rel="stylesheet" href="sistema.css">
   <!-- Intro de marca: solo la primera vez en cada sesión -->
   <script>
     try {
@@ -973,7 +974,7 @@
     history.back();                                   // de la entrada de control a la inicial
 
     var m = document.createElement("div");
-    m.style.cssText = "position:fixed;left:16px;right:16px;bottom:24px;z-index:100001;background:#0f172a;color:#fff;padding:14px 16px;border-radius:12px;font-size:15px;font-weight:600;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4);";
+    m.style.cssText = "position:fixed;left:16px;right:16px;bottom:24px;z-index:100001;background:#15296A;border:1px solid rgba(233,238,250,.13);color:#fff;padding:14px 16px;border-radius:14px;font-size:15px;font-weight:600;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4);";
     m.textContent = "Pulsa ATRÁS una vez más para enviar la app a segundo plano";
     document.body.appendChild(m);
 
@@ -990,12 +991,12 @@
     o.id = "nvaSalirOverlay";
     o.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;";
     o.innerHTML =
-      '<div style="background:#fff;border-radius:14px;max-width:320px;width:100%;padding:22px 20px;text-align:center;font-family:inherit;box-shadow:0 10px 30px rgba(0,0,0,.4);">' +
-      '<div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:8px;">¿Salir de la app?</div>' +
-      '<div style="font-size:14px;color:#475569;margin-bottom:18px;">Pulsa SALIR y, después, ATRÁS una vez más para enviarla a segundo plano.</div>' +
-      '<div style="display:flex;gap:10px;">' +
-      '<button id="nvaSalirNo" style="flex:1;padding:12px;border:none;border-radius:10px;background:#1e3c72;color:#fff;font-weight:700;font-size:15px;">Quedarme</button>' +
-      '<button id="nvaSalirSi" style="flex:1;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font-weight:700;font-size:15px;">Salir</button>' +
+      '<div class="cp-modal-box" style="max-width:320px;text-align:center;">' +
+      '<div class="cp-modal-title">¿Salir de la app?</div>' +
+      '<div class="cp-modal-txt" style="color:var(--txt-2);margin-bottom:6px;">Pulsa SALIR y, después, ATRÁS una vez más para enviarla a segundo plano.</div>' +
+      '<div class="cp-modal-row">' +
+      '<button id="nvaSalirNo" class="cp-modal-btn cp-modal-main">Quedarme</button>' +
+      '<button id="nvaSalirSi" class="cp-modal-btn">Salir</button>' +
       '</div></div>';
     document.body.appendChild(o);
     document.getElementById("nvaSalirNo").onclick = function () { o.remove(); };

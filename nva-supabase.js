@@ -347,26 +347,28 @@
   // ------------------------------------------------------------------
   const CSS = `
     [data-nva-oculto]{display:none!important}
-    .nva-pantalla{position:fixed;inset:0;z-index:100000;background:#0f172a;display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit}
-    .nva-pantalla .caja{background:#fff;border-radius:16px;max-width:360px;width:100%;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.4);text-align:center}
+    .nva-pantalla{position:fixed;inset:0;z-index:100000;background:radial-gradient(60% 40% at 30% 20%,rgba(47,91,224,.35),transparent 70%),radial-gradient(50% 35% at 80% 80%,rgba(214,40,57,.18),transparent 70%),#0D1B45;display:flex;align-items:center;justify-content:center;padding:16px;font-family:inherit}
+    .nva-pantalla .caja{background:linear-gradient(180deg,#1A3278,#132662);color:#E9EEFA;border:1px solid rgba(233,238,250,.13);border-radius:20px;max-width:360px;width:100%;padding:26px 22px;box-shadow:0 30px 70px -20px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.07);text-align:center}
     .nva-pantalla img{width:84px;height:84px;object-fit:contain;margin-bottom:8px}
-    .nva-pantalla h1{font-size:1.2rem;margin:0 0 4px;color:#0f172a}
-    .nva-pantalla p{font-size:.85rem;color:#64748b;margin:0 0 16px}
-    .nva-pantalla input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd5e1;border-radius:10px;margin-bottom:10px;font-size:1rem}
-    .nva-pantalla button{width:100%;padding:12px;border:0;border-radius:10px;background:#1e3a8a;color:#fff;font-weight:700;font-size:1rem;cursor:pointer}
-    .nva-pantalla button.link{background:none;color:#1e3a8a;font-weight:600;font-size:.85rem;margin-top:8px}
-    .nva-pantalla button.bio{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;margin-bottom:12px;display:flex;flex-direction:column;align-items:center;gap:6px}
+    .nva-pantalla h1{font-family:var(--font-display);font-style:italic;font-weight:800;font-size:1.6rem;line-height:1.1;margin:0 0 6px;color:#fff}
+    .nva-pantalla p{font-size:.88rem;color:#A9B6DA;margin:0 0 16px}
+    .nva-pantalla input{width:100%;box-sizing:border-box;padding:12px;border:1px solid rgba(233,238,250,.24);border-radius:10px;margin-bottom:10px;font-size:1rem;background:rgba(7,15,43,.45);color:#E9EEFA;color-scheme:dark}
+    .nva-pantalla input::placeholder{color:#A9B6DA}
+    .nva-pantalla input:focus{outline:none;border-color:#F5C518;box-shadow:0 0 0 3px rgba(245,197,24,.35)}
+    .nva-pantalla button{width:100%;min-height:46px;padding:12px;border:0;border-radius:14px;background:linear-gradient(135deg,#F04A5D,#B81C30);color:#fff;font-weight:700;font-size:1rem;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 10px 20px -10px rgba(0,0,0,.7)}
+    .nva-pantalla button.link{background:none;box-shadow:none;color:#9CBBFF;font-weight:600;font-size:.85rem;margin-top:8px}
+    .nva-pantalla button.bio{background:rgba(233,238,250,.08);color:#E9EEFA;border:1px solid rgba(233,238,250,.24);box-shadow:none;margin-bottom:12px;display:flex;flex-direction:column;align-items:center;gap:6px}
     .nva-pantalla button.bio svg{width:56px;height:56px}
     .nva-pantalla .huella{display:block;width:72px;height:72px;margin:0 auto 8px}
-    .nva-pantalla .error{color:#b91c1c;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
+    .nva-pantalla .error{color:#FF9AA5;font-size:.85rem;min-height:1.2em;margin-bottom:6px}
     #nvaUsuario{font-size:.75rem;opacity:.85;margin-left:6px;cursor:pointer;white-space:nowrap}
-    .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem;color:#0f172a;table-layout:fixed}
-    .nva-tabla th,.nva-tabla td{border-bottom:1px solid #e2e8f0;padding:8px 4px;text-align:left;vertical-align:top}
-    .nva-tabla th{vertical-align:middle;font-size:.75rem;color:#475569}
-    .nva-tabla .nva-email{display:block;font-size:.72rem;color:#64748b;margin-top:4px;overflow-wrap:anywhere}
+    .nva-tabla{width:100%;border-collapse:collapse;font-size:.8rem;color:#E9EEFA;table-layout:fixed}
+    .nva-tabla th,.nva-tabla td{border-bottom:1px solid rgba(233,238,250,.13);padding:8px 4px;text-align:left;vertical-align:top}
+    .nva-tabla th{vertical-align:middle;font-size:.72rem;color:#A9B6DA;text-transform:uppercase;letter-spacing:.06em}
+    .nva-tabla .nva-email{display:block;font-size:.72rem;color:#A9B6DA;margin-top:4px;overflow-wrap:anywhere}
     .nva-tabla .nva-email[hidden]{display:none}
-    .nva-tabla select,.nva-tabla input[type=text]{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.8rem;color:#0f172a;margin:0}
-    .nva-tabla select:disabled{background:#f1f5f9;color:#94a3b8}
+    .nva-tabla select,.nva-tabla input[type=text]{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(233,238,250,.24);border-radius:8px;background:rgba(7,15,43,.45);font-size:.8rem;color:#E9EEFA;margin:0;color-scheme:dark}
+    .nva-tabla select:disabled{background:rgba(233,238,250,.04);color:#A9B6DA;opacity:.7}
     .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
     .nva-check input{width:18px;height:18px;margin:0}
     .nva-tabla .nva-col-rol{width:30%}
@@ -376,25 +378,25 @@
     .nva-seccion{display:block;width:100%;box-sizing:border-box}
     .nva-seccion > summary{cursor:pointer;list-style:none;user-select:none}
     .nva-seccion > summary::-webkit-details-marker{display:none}
-    .nva-seccion > summary::after{content:"▸";color:#64748b;font-size:.9rem}
+    .nva-seccion > summary::after{content:"▸";color:#A9B6DA;font-size:.9rem}
     .nva-seccion[open] > summary::after{content:"▾"}
     .nva-seccion:not([open]) > summary{margin-bottom:0}
     .nva-nombre{display:flex;align-items:center;gap:4px}
     .nva-nombre input{flex:1;min-width:0}
-    .nva-info{flex:none;width:24px;height:24px;border-radius:50%;border:1px solid #cbd5e1;background:#f1f5f9;color:#1e3a8a;font-weight:700;font-size:.75rem;padding:0;cursor:pointer}
-    .nva-nota{font-size:.75rem;color:#64748b;margin:4px 0}
-    .nva-subtitulo{font-size:.8rem;font-weight:700;color:#475569;margin:12px 0 6px}
-    .nva-linea{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#0f172a;margin:0 0 8px}
+    .nva-info{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid rgba(233,238,250,.24);background:rgba(233,238,250,.08);color:#9CBBFF;font-weight:700;font-size:.75rem;padding:0;cursor:pointer}
+    .nva-nota{font-size:.75rem;color:#A9B6DA;margin:4px 0}
+    .nva-subtitulo{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#A9B6DA;margin:12px 0 6px}
+    .nva-linea{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#E9EEFA;margin:0 0 8px}
     .nva-linea input{margin:0;width:18px;height:18px}
-    .nva-plegar{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:#1e3a8a;font-weight:600;text-align:left;cursor:pointer}
-    .nva-plegar::before{content:"▸";color:#64748b}
+    .nva-plegar{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;color:#9CBBFF;font-weight:600;text-align:left;cursor:pointer}
+    .nva-plegar::before{content:"▸";color:#A9B6DA}
     .nva-plegar[aria-expanded=true]::before{content:"▾"}
-    .nva-permisos .nva-hijo td{background:#f1f5f9}
-    .nva-permisos .nva-hijo td:first-child{padding-left:22px;color:#475569}
+    .nva-permisos .nva-hijo td{background:rgba(233,238,250,.05)}
+    .nva-permisos .nva-hijo td:first-child{padding-left:22px;color:#A9B6DA}
     .nva-roles td{vertical-align:middle}
     .nva-tabla .nva-col-num{width:70px;text-align:center}
     .nva-tabla .nva-col-borrar{width:40px;text-align:center}
-    .nva-borrar{background:none;border:0;font-size:1rem;cursor:pointer;padding:4px}
+    .nva-borrar{background:none;border:0;font-size:1rem;cursor:pointer;padding:4px;min-width:32px;min-height:32px;border-radius:8px}
   `;
 
   function pintarLogin(modo, mensaje) {
@@ -799,7 +801,7 @@
         <input type="text" id="nvaInvNombre" class="app-input" placeholder="Nombre">
         <select id="nvaInvRol" class="app-input">${roles.filter(x => x.id !== "propietario").map(x => `<option value="${esc(x.id)}"${x.id === "entrenador" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
-        <p style="font-size:.75rem;color:#64748b">Le llegará un email para elegir su contraseña.</p>`) +
+        <p style="font-size:.75rem;color:var(--txt-2)">Le llegará un email para elegir su contraseña.</p>`) +
       seccion("usuarios", "Usuarios", `
         <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
@@ -818,7 +820,7 @@
         <div class="nva-subtitulo">Crear un rol</div>
         <input type="text" id="nvaRolNombre" class="app-input" placeholder="Nombre del rol (p. ej. Coordinador)">
         <label class="nva-linea"><input type="checkbox" id="nvaRolEquipos">Solo puede editar los equipos que tenga asignados</label>
-        <div style="font-size:.8rem;color:#475569;margin-bottom:4px">Empezar con los permisos de:</div>
+        <div style="font-size:.8rem;color:var(--txt-2);margin-bottom:4px">Empezar con los permisos de:</div>
         <select id="nvaRolCopia" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === "lectura" ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
         <button class="btn-save-session" id="nvaCrearRol">➕ Crear rol</button>
         <p class="nva-nota">Después ajusta sus permisos en «Permisos por rol». Los roles de partida no se pueden borrar.</p>`);

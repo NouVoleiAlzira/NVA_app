@@ -1238,7 +1238,7 @@
       ESTILOS.filter(e => e.foto === conFoto && (!e.solo || e.solo === estado.tipo)).forEach(e => {
         const b = document.createElement("button");
         b.type = "button"; b.dataset.estilo = e.id;
-        b.style.cssText = "padding:3px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; cursor:pointer; color:#1e293b; min-width:0;";
+        b.style.cssText = "padding:3px; border-radius:10px; border:2px solid var(--borde-fuerte); background:var(--sf-fila); cursor:pointer; color:var(--txt-1); min-width:0;";
         const c = dibujarPagina(e.id, muestra, 0.16);
         c.style.cssText = "width:100%; height:auto; display:block; border-radius:5px;";
         b.appendChild(c);

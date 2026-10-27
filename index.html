@@ -131,6 +131,11 @@
         <button class="btn-pdf-mode" id="btnPdfCuadrante" onclick="togglePdfCuadranteMode()" style="flex:1.6; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🏆 PARTIDOS Y RESULTADOS</button>
       </div>
       </div>
+      <div data-nva-menu="informes.fichas">
+      <div class="section-subtitle" style="margin-top:14px;">Fichas de Federación</div>
+      <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openFichasFederacion()">📇 Fichas de Federación</button>
+      <input type="file" id="fichaFileInput" accept="application/pdf,.pdf" style="display:none;">
+      </div>
       <div data-nva-menu="informes.drive">
       <div class="section-subtitle" style="margin-top:14px;">PDFs Resultados en Drive</div>
       <div style="display:flex; gap:8px; margin-bottom:12px;">
@@ -152,7 +157,7 @@
       <div style="display:flex; gap:8px;">
         <button class="btn-save-session" style="flex:1;" onclick="withLoading(saveTablon, 'Guardando Tablón...')">💾 Guardar Tablón</button>
         <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; background: var(--btn-fondoVerde);" onclick="withLoading(refreshTablon, 'Refrescando Tablón...')">🔄 Refrescar</button>
-        <button class="btn-save-session" style="flex:1; background: var(--btn-fondoAmarillo);" onclick="openOtros()">🗃️ OTROS</button>
+        <button class="btn-save-session" style="flex:1; background: var(--btn-fondoAmarillo);" onclick="openOtros()">🗃️ Otras INFOs</button>
       </div>
     </div>
 
@@ -254,13 +259,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- PANTALLA OTROS: botones de información e instrucciones -->
-  <div class="screen" id="screenOtros">
-    <div class="section-title">Otros · Información e Instrucciones</div>
-    <div id="otrosList"></div>
-    <input type="file" id="fichaFileInput" accept="application/pdf,.pdf" style="display:none;">
   </div>
 
   <!-- PANTALLA: HORARIOS DE ENTRENAMIENTO -->
@@ -376,6 +374,17 @@
       </div>
 
       <button class="btn-save-session" onclick="confirmWarningReason()">💾 Guardar Motivo</button>
+    </div>
+  </div>
+
+  <!-- VENTANA «Otras INFOs»: botones de información e instrucciones -->
+  <div class="modal-backdrop" id="modalOtros" onclick="if(event.target===this)closeOtros()">
+    <div class="modal-box otros-box">
+      <div class="modal-header">
+        <div class="modal-title">Otros · Información e Instrucciones</div>
+        <button class="btn-close-modal" onclick="closeOtros()">✕</button>
+      </div>
+      <div id="otrosList" class="otros-list"></div>
     </div>
   </div>
 
@@ -931,6 +940,7 @@
 <script src="partidos-semana.js" defer></script>
 <script src="cuadrante-pdf.js" defer></script>
 <script src="drive-pdfs.js" defer></script>
+<script src="fichas-federacion.js" defer></script>
 <script src="kilometraje.js" defer></script>
 <script src="animaciones.js" defer></script>
 <script src="inicio.js" defer></script>

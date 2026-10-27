@@ -20,8 +20,8 @@ Viene del repositorio `Entrenadores`. Los datos ya no se guardan en GitHub, sino
 | --- | --- |
 | Propietario | Todo. Invita usuarios, cambia roles y edita la tabla de permisos. |
 | Administrador | Todo menos gestionar usuarios. Opciones del club en solo lectura. |
-| Entrenador | Pasa lista y rellena partidos e informes **solo de sus equipos**. Ve el tablón, «Otros» y el calendario. |
-| Solo lectura | Consulta el inicio, el tablón, «Otros» y el calendario. |
+| Entrenador | Pasa lista y rellena partidos e informes **solo de sus equipos**. Ve el tablón, «Otras INFOs», las fichas de federación y el calendario. |
+| Solo lectura | Consulta el inicio, el tablón, «Otras INFOs» y el calendario. |
 
 El propietario cambia todo esto desde **⚙️ Opciones › Usuarios y permisos**, donde puede poner para cada rol y cada menú: sin acceso, «Ver» o «Editar».
 

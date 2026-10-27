@@ -1074,6 +1074,13 @@
     /* Fichas de Federación: por debajo del aviso «Cargando...» */
     .cp-modal.fichas-modal { z-index: 900; }
     .fichas-modal .cp-modal-btn { font-size: 0.8rem; padding: 9px 6px; white-space: nowrap; }
+    .fichas-coach { border: 1px solid var(--linea); border-radius: 10px; }
+    .fichas-coach > summary { cursor: pointer; padding: 10px 12px; font-weight: 800; color: #fff; font-size: 0.92rem; list-style: none; display: flex; align-items: center; gap: 6px; }
+    .fichas-coach > summary::-webkit-details-marker { display: none; }
+    .fichas-coach > summary::after { content: "▾"; margin-left: auto; color: var(--niebla); transition: transform 0.15s; }
+    .fichas-coach:not([open]) > summary::after { transform: rotate(-90deg); }
+    .fichas-coach > summary small { color: var(--niebla); font-weight: 400; }
+    .fichas-coach-body { display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px; }
     .rte-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .rte-toolbar button {
       min-width: 36px; height: 32px; padding: 0 8px; border: 1px solid var(--gray-border);

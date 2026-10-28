@@ -277,13 +277,27 @@
     });
 
     const qPicker = document.getElementById("queryColorPicker");
-    qPicker.querySelectorAll(".color-circle").forEach(c => {
+    qPicker.querySelectorAll(".color-circle[data-color]").forEach(c => {
       c.onclick = () => {
         qPicker.querySelectorAll(".color-circle").forEach(x => x.classList.remove("selected"));
         c.classList.add("selected");
         tempQueryColor = c.dataset.color;
       };
     });
+    // Color personalizado: el círculo abre el selector de color del sistema
+    const customCircle = document.getElementById("queryCustomColorCircle");
+    const customInput = document.getElementById("queryCustomColor");
+    if (customCircle && customInput) {
+      const pickCustom = () => {
+        qPicker.querySelectorAll(".color-circle").forEach(x => x.classList.remove("selected"));
+        customCircle.classList.add("selected", "chosen");
+        customCircle.style.background = customInput.value;
+        tempQueryColor = customInput.value;
+      };
+      customInput.addEventListener("input", pickCustom);
+      customInput.addEventListener("change", pickCustom);
+      customCircle.addEventListener("click", () => { if (customCircle.classList.contains("chosen")) pickCustom(); });
+    }
   }
 
   function toggleDireccionNVA() {
@@ -567,6 +581,202 @@
     document.getElementById("modalQueryTeams").classList.remove("active");
   }
 
+  // ---------------------------------------------------------------------
+  //  CONSULTAS: guardado por operaciones
+  //  Consultas.json es un único archivo con todas las consultas. Antes cada
+  //  dispositivo lo sobrescribía entero con su copia local: si esa copia era
+  //  vieja (una entrenadora con la app abierta desde antes de crear la
+  //  consulta, o una respuesta guardada sin conexión que se enviaba horas
+  //  después) borraba las consultas nuevas o las respuestas de los demás.
+  //  Ahora cada cambio es una operación (crear, responder, completar, borrar)
+  //  que se aplica sobre la versión más reciente del servidor justo antes de
+  //  escribir; si otro dispositivo escribe a la vez, se vuelve a leer y a
+  //  aplicar. Sin conexión se guarda la operación, no una copia del archivo.
+  // ---------------------------------------------------------------------
+  const QUERIES_FILE = "Consultas.json";
+
+  function applyQueryOp(list, op) {
+    if (!op) return;
+    const q = op.id != null ? list.find(x => x.id === op.id) : null;
+    if (op.type === "create") {
+      if (op.query && !list.some(x => x.id === op.query.id)) list.push(JSON.parse(JSON.stringify(op.query)));
+    } else if (op.type === "answer") {
+      if (!q) return;
+      if (!q.responses) q.responses = {};
+      if (!q.responseTimes) q.responseTimes = {};
+      q.responses[op.player] = op.option;
+      q.responseTimes[op.player] = op.at;
+    } else if (op.type === "complete") {
+      if (!q) return;
+      // hidden se mantiene para que las versiones anteriores de la app también la oculten
+      q.completed = true; q.completedAt = op.at;
+      q.hidden = true; q.hiddenAt = q.hiddenAt || op.at;
+    } else if (op.type === "delete") {
+      const i = list.findIndex(x => x.id === op.id);
+      if (i >= 0) list.splice(i, 1);
+    } else if (op.type === "merge") {
+      // Copia completa que dejó en cola una versión anterior de la app: solo
+      // se aprovechan sus respuestas, nunca se quitan consultas ni respuestas.
+      (Array.isArray(op.data) ? op.data : []).forEach(sq => {
+        const dst = list.find(x => x.id === sq.id);
+        if (!dst || !sq.responses) return;
+        if (!dst.responses) dst.responses = {};
+        if (!dst.responseTimes) dst.responseTimes = {};
+        Object.keys(sq.responses).forEach(p => {
+          if (dst.responses[p]) return;
+          dst.responses[p] = sq.responses[p];
+          if (sq.responseTimes && sq.responseTimes[p]) dst.responseTimes[p] = sq.responseTimes[p];
+        });
+      });
+    }
+  }
+
+  function pendingQueryOps() {
+    return offlineQueue.filter(op => op.fileName === QUERIES_FILE)
+      .map(op => op.queryOp || { type: "merge", data: op.dataObject });
+  }
+
+  // Lee Consultas.json del servidor, aplica las operaciones y lo escribe con
+  // el sha leído. Devuelve true si quedó guardado.
+  async function pushQueryOps(ops) {
+    if (!navigator.onLine || !ghSettings.user || !ghSettings.repo || !ghSettings.token) return false;
+    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${QUERIES_FILE}`;
+    const auth = { "Authorization": `token ${ghSettings.token}` };
+    for (let intento = 0; intento < 4; intento++) {
+      try {
+        let sha = "", remoto = [];
+        const getRes = await fetch(url, { headers: auth, cache: "no-store" });
+        if (getRes.ok) {
+          const getJson = await getRes.json();
+          sha = getJson.sha;
+          try { remoto = JSON.parse(b64_to_utf8(getJson.content)); } catch (e) { return false; }
+          if (!Array.isArray(remoto)) return false;
+        } else if (getRes.status !== 404) {
+          return false;
+        }
+        ops.forEach(op => applyQueryOp(remoto, op));
+        const body = { message: "Actualizar consultas del club", content: utf8_to_b64(JSON.stringify(remoto, null, 2)), ...(sha && { sha }) };
+        const putRes = await fetch(url, {
+          method: "PUT",
+          headers: { ...auth, "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (putRes.ok) {
+          // La copia local pasa a ser la del servidor más lo que siga en cola
+          queriesData = remoto;
+          pendingQueryOps().forEach(op => applyQueryOp(queriesData, op));
+          saveQueriesToLocalStorage();
+          return true;
+        }
+        // 409/422: otro dispositivo escribió entre medias -> leer de nuevo
+        if (putRes.status !== 409 && putRes.status !== 422) return false;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  // Las operaciones de este dispositivo se envían de una en una y en orden
+  let queryOpsChain = Promise.resolve();
+  function saveQueryOp(op) {
+    applyQueryOp(queriesData, op);
+    saveQueriesToLocalStorage();
+    const run = queryOpsChain.then(async () => {
+      const ok = await pushQueryOps([op]);
+      if (!ok) {
+        offlineQueue.push({ fileName: QUERIES_FILE, queryOp: op, commitMessage: "Actualizar consultas del club", timestamp: Date.now() });
+        localStorage.setItem("NVA_OFFLINE_QUEUE", JSON.stringify(offlineQueue));
+      }
+      return ok;
+    });
+    queryOpsChain = run.catch(() => false);
+    return run;
+  }
+
+  function isQueryClosed(q) { return !!(q && (q.completed || q.hidden)); }
+  function queryClosedAt(q) { return q.completedAt || q.hiddenAt || null; }
+
+  // Emoji del tablón según el color de la consulta (el más parecido si es
+  // un color personalizado).
+  const QUERY_COLOR_TAGS = [
+    ["🔵", "#0284c7"], ["🟣", "#7e22ce"], ["🟠", "#f97316"], ["🔴", "#dc2626"], ["🟡", "#eab308"],
+    ["🟢", "#16a34a"], ["🟤", "#92400e"], ["⚫", "#1e293b"], ["⚪", "#f1f5f9"]
+  ];
+  function hexToRgb(hex) {
+    let h = String(hex || "").replace("#", "");
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    if (!/^[0-9a-f]{6}/i.test(h)) return null;
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function queryColorTag(color) {
+    const exact = QUERY_COLOR_TAGS.find(t => t[1] === color);
+    if (exact) return exact[0];
+    const rgb = hexToRgb(color);
+    if (!rgb) return "🟠";
+    let best = "🟠", dist = Infinity;
+    QUERY_COLOR_TAGS.forEach(([tag, c]) => {
+      const o = hexToRgb(c);
+      const d = (rgb[0] - o[0]) ** 2 + (rgb[1] - o[1]) ** 2 + (rgb[2] - o[2]) ** 2;
+      if (d < dist) { dist = d; best = tag; }
+    });
+    return best;
+  }
+  // Texto blanco u oscuro según lo claro que sea el color de fondo
+  function queryTextColor(bg) {
+    const rgb = hexToRgb(bg);
+    if (!rgb) return "#ffffff";
+    return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) > 170 ? "#0f172a" : "#ffffff";
+  }
+  function queryNoticeLine(q) { return `${queryColorTag(q.color)} CONSULTA: ${q.text}`; }
+  function removeQueryNoticeFromTablon(q) {
+    const notice = queryNoticeLine(q).trim();
+    const lines = (tablonData.tablonText || "").split('\n');
+    const kept = lines.filter(l => l.trim() !== notice);
+    if (kept.length === lines.length) return;
+    tablonData.tablonText = kept.join('\n');
+    const tablonEl = document.getElementById("tablonTextarea");
+    if (tablonEl) { tablonEl.value = tablonData.tablonText; autoResizeTablon(tablonEl); }
+    saveTablonToGitHub();
+  }
+
+  // Las respuestas Sí/No se guardan como V/X (compatibilidad con lo ya
+  // respondido); en pantalla se muestran como Sí y No.
+  function queryOptionLabel(opt) { return opt === 'V' ? 'Sí' : (opt === 'X' ? 'No' : opt); }
+
+  // Cápsulas de las consultas pendientes de una jugadora en el registro.
+  // Se muestran todas las que tenga pendientes, no solo la primera.
+  function queryCapsulesHtml(playerName, answerFnName) {
+    return queriesData
+      .filter(q => !isQueryClosed(q) && q.teams && q.teams.includes(currentTeam) && (!q.responses || !q.responses[playerName]))
+      .map(q => {
+        const opts = (q.options && q.options.length > 0) ? q.options : ['V', 'X'];
+        const bg = safeColor(q.color, "#0284c7");
+        const btnsHtml = opts.map(opt =>
+          `<button class="query-btn" style="color:inherit;" onclick="${answerFnName}(${Number(q.id)}, ${jsArg(playerName)}, ${jsArg(opt)})">${escapeHtml(queryOptionLabel(opt))}</button>`
+        ).join('');
+        return `
+          <div class="query-capsule" style="background:${bg}; color:${queryTextColor(bg)};">
+            <button type="button" class="query-info-btn" onclick="showQueryQuestion(${Number(q.id)})" title="Ver la pregunta">❓</button>
+            ${btnsHtml}
+          </div>`;
+      }).join('');
+  }
+
+  function showQueryQuestion(queryId) {
+    const q = queriesData.find(x => x.id === queryId);
+    if (!q) return;
+    const opts = (q.options && q.options.length > 0) ? q.options : ['V', 'X'];
+    document.getElementById("queryQuestionText").textContent = q.text;
+    document.getElementById("queryQuestionOptions").textContent = "Respuestas: " + opts.map(queryOptionLabel).join(" · ");
+    document.getElementById("queryQuestionBar").style.background = safeColor(q.color, "#0284c7");
+    document.getElementById("modalQueryQuestion").classList.add("active");
+  }
+
+  function closeQueryQuestionModal() {
+    document.getElementById("modalQueryQuestion").classList.remove("active");
+  }
+
   async function confirmSaveQuery() {
     const selectedTeams = [];
     document.querySelectorAll(".query-team-check:checked").forEach(cb => selectedTeams.push(cb.value));
@@ -588,31 +798,25 @@
       responseTimes: {}
     };
 
-    queriesData.push(newQuery);
-    saveQueriesToLocalStorage();
-
-    const colorTag = tempQueryColor === '#0284c7' ? '🔵' : (tempQueryColor === '#7e22ce' ? '🟣' : '🟠');
-    const queryNotice = `${colorTag} CONSULTA: ${tempQueryText}`;
+    const queryNotice = queryNoticeLine(newQuery);
     tablonData.tablonText = tablonData.tablonText ? `${tablonData.tablonText}\n${queryNotice}` : queryNotice;
     const tablonEl = document.getElementById("tablonTextarea");
     tablonEl.value = tablonData.tablonText;
     autoResizeTablon(tablonEl);
 
     closeQueryTeamsModal();
-    await saveQueriesToGitHub();
+    const ok = await saveQueryOp({ type: "create", id: newQuery.id, query: newQuery });
     await saveTablonToGitHub();
-    alert("Consulta creada y publicada en el tablón.");
+    alert(ok
+      ? `Consulta creada para ${selectedTeams.length} equipo${selectedTeams.length === 1 ? "" : "s"} y publicada en el tablón.`
+      : "Consulta creada en este dispositivo. Se enviará a los equipos en cuanto haya conexión.");
   }
 
   function answerQuery(queryId, playerName, option) {
     const q = queriesData.find(x => x.id === queryId);
     if (!q) return;
 
-    if (!q.responses) q.responses = {};
-    q.responses[playerName] = option;
-    // Día y hora de cada respuesta (se muestra en el PDF de la consulta)
-    if (!q.responseTimes) q.responseTimes = {};
-    q.responseTimes[playerName] = new Date().toISOString();
+    saveQueryOp({ type: "answer", id: queryId, player: playerName, option: option, at: new Date().toISOString() });
 
     let allAnswered = true;
     q.teams.forEach(teamKey => {
@@ -621,21 +825,8 @@
         if (!q.responses[p]) allAnswered = false;
       });
     });
+    if (allAnswered) removeQueryNoticeFromTablon(q);
 
-    if (allAnswered) {
-      const colorTag = q.color === '#0284c7' ? '🔵' : (q.color === '#7e22ce' ? '🟣' : '🟠');
-      const queryNotice = `${colorTag} CONSULTA: ${q.text}`;
-      let lines = (tablonData.tablonText || "").split('\n');
-      lines = lines.filter(l => l.trim() !== queryNotice.trim());
-      tablonData.tablonText = lines.join('\n');
-      const tablonEl = document.getElementById("tablonTextarea");
-      tablonEl.value = tablonData.tablonText;
-      autoResizeTablon(tablonEl);
-      saveTablonToGitHub();
-    }
-
-    saveQueriesToLocalStorage();
-    saveQueriesToGitHub();
     renderPlayersMain();
   }
 
@@ -646,14 +837,28 @@
     if (queriesData.length === 0) {
       container.innerHTML = `<p style="font-size:0.8rem; color:#64748b; text-align:center;">No hay consultas creadas.</p>`;
     } else {
-      queriesData.forEach(q => {
+      const created = q => q.createdAt || (Number(q.id) > 1e11 ? new Date(Number(q.id)).toISOString() : "");
+      const activas = queriesData.filter(q => !isQueryClosed(q)).sort((a, b) => created(b).localeCompare(created(a)));
+      const completadas = queriesData.filter(isQueryClosed).sort((a, b) => String(queryClosedAt(b) || "").localeCompare(String(queryClosedAt(a) || "")));
+      const fmt = iso => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleDateString("es-ES") : "-"; };
+
+      const actionBtn = (icon, title, css, fn) => {
+        const b = document.createElement("button");
+        b.className = "query-action-btn";
+        b.style.cssText = "flex:0 0 auto; width:40px; border-radius:8px; font-size:1rem; cursor:pointer;" + css;
+        b.title = title;
+        b.textContent = icon;
+        b.onclick = fn;
+        return b;
+      };
+      const addRow = (q, closed) => {
         const btn = document.createElement("button");
         btn.className = "team-btn";
         btn.style.borderLeft = `4px solid ${safeColor(q.color, "#0284c7")}`;
         btn.style.flex = "1";
         btn.style.minWidth = "0";
-        if (q.hidden) btn.style.opacity = "0.6";
-        btn.innerHTML = `<span>${escapeHtml(q.text)}${q.hidden ? ' <small style="color:#64748b;">(oculta)</small>' : ''}</span> <span style="font-size:0.75rem; color:#64748b;">Generar PDF →</span>`;
+        if (closed) btn.style.opacity = "0.7";
+        btn.innerHTML = `<span>${escapeHtml(q.text)}${closed ? `<br><small style="color:#475569;">✔ Completada el ${fmt(queryClosedAt(q))}</small>` : ''}</span> <span style="font-size:0.75rem; color:#64748b;">Generar PDF →</span>`;
         btn.onclick = () => {
           closeSelectQueryPdfModal();
           generateQueryPDF(q.id);
@@ -661,44 +866,55 @@
         const row = document.createElement("div");
         row.style.cssText = "display:flex; gap:6px; align-items:stretch;";
         row.appendChild(btn);
-        if (!q.hidden) {
-          const del = document.createElement("button");
-          del.className = "query-hide-btn";
-          del.style.cssText = "flex:0 0 auto; width:40px; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:8px; font-size:1rem; cursor:pointer;";
-          del.title = "Dejar de mostrar en los equipos";
-          del.textContent = "🗑";
-          del.onclick = () => hideQuery(q.id);
-          row.appendChild(del);
-        }
+        if (!closed) row.appendChild(actionBtn("✔", "Completar consulta (deja de mostrarse en los equipos)",
+          "border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d;", () => completeQuery(q.id)));
+        row.appendChild(actionBtn("🗑", "Borrar la consulta y sus respuestas",
+          "border:1px solid #fecaca; background:#fef2f2; color:#b91c1c;", () => deleteQuery(q.id)));
         container.appendChild(row);
-      });
+      };
+      const title = txt => {
+        const t = document.createElement("div");
+        t.className = "section-subtitle";
+        t.style.cssText = "margin:8px 0 2px;";
+        t.textContent = txt;
+        container.appendChild(t);
+      };
+
+      title(`Activas (${activas.length})`);
+      if (activas.length === 0) container.insertAdjacentHTML("beforeend", `<p style="font-size:0.8rem; color:#64748b; text-align:center; margin:4px 0;">No hay consultas activas.</p>`);
+      activas.forEach(q => addRow(q, false));
+      if (completadas.length) {
+        title(`Completadas (${completadas.length})`);
+        completadas.forEach(q => addRow(q, true));
+      }
     }
 
     document.getElementById("modalSelectQueryPdf").classList.add("active");
   }
 
-  // Oculta una consulta en los equipos (no borra las respuestas ya tomadas;
-  // sigue disponible para generar su PDF).
-  async function hideQuery(queryId) {
+  // Completa una consulta: deja de mostrarse en los equipos, conserva las
+  // respuestas y sigue disponible para generar su PDF.
+  async function completeQuery(queryId) {
     const q = queriesData.find(x => x.id === queryId);
     if (!q) return;
-    if (!confirm(`¿Dejar de mostrar la consulta "${q.text}" en los equipos?\n\nLas respuestas ya registradas se conservan.`)) return;
-    q.hidden = true;
-    q.hiddenAt = new Date().toISOString();
-    const colorTag = q.color === '#0284c7' ? '🔵' : (q.color === '#7e22ce' ? '🟣' : '🟠');
-    const queryNotice = `${colorTag} CONSULTA: ${q.text}`;
-    const lines = (tablonData.tablonText || "").split('\n');
-    const kept = lines.filter(l => l.trim() !== queryNotice.trim());
-    if (kept.length !== lines.length) {
-      tablonData.tablonText = kept.join('\n');
-      const tablonEl = document.getElementById("tablonTextarea");
-      if (tablonEl) { tablonEl.value = tablonData.tablonText; autoResizeTablon(tablonEl); }
-      saveTablonToGitHub();
-    }
-    saveQueriesToLocalStorage();
+    if (!confirm(`¿Completar la consulta "${q.text}"?\n\nDejará de mostrarse en los equipos. Las respuestas se conservan y podrás seguir sacando su PDF.`)) return;
+    removeQueryNoticeFromTablon(q);
+    const pending = saveQueryOp({ type: "complete", id: queryId, at: new Date().toISOString() });
     openSelectQueryPdfModal();
     if (typeof renderPlayersMain === "function") try { renderPlayersMain(); } catch (e) {}
-    await saveQueriesToGitHub();
+    await pending;
+  }
+
+  // Borrado completo: la consulta y todas sus respuestas desaparecen para todos.
+  async function deleteQuery(queryId) {
+    const q = queriesData.find(x => x.id === queryId);
+    if (!q) return;
+    if (!confirm(`¿Borrar por completo la consulta "${q.text}"?\n\nSe eliminarán también todas sus respuestas, para todos los dispositivos. No se puede deshacer.`)) return;
+    removeQueryNoticeFromTablon(q);
+    const pending = saveQueryOp({ type: "delete", id: queryId });
+    openSelectQueryPdfModal();
+    if (typeof renderPlayersMain === "function") try { renderPlayersMain(); } catch (e) {}
+    await pending;
   }
 
   function closeSelectQueryPdfModal() {
@@ -710,16 +926,14 @@
     if (!q) return;
 
     const color = safeColor(q.color, "#1B3A8C");
-    document.getElementById("pdfQueryTextHeader").innerText = q.text;
     const fechaQ = q.createdAt ? new Date(q.createdAt) : (q.id && !isNaN(Number(q.id)) && Number(q.id) > 1e11 ? new Date(Number(q.id)) : new Date());
-    document.getElementById("pdfQueryDate").innerText = fechaQ.toLocaleDateString("es-ES") + " " + fechaQ.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    const fechaTxt = fechaQ.toLocaleDateString("es-ES") + " " + fechaQ.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
     const fmtResp = (iso) => {
       if (!iso) return "-";
       const d = new Date(iso);
       return isNaN(d) ? "-" : d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
     };
-    const container = document.getElementById("pdfQueryTeamsContent");
-    container.innerHTML = "";
+    const teamBlocks = [];
 
     let tSi = 0, tNo = 0, tPend = 0, tOtro = 0;
     // Consulta personalizada: el conteo es por cada opción disponible, no Sí/No.
@@ -756,64 +970,161 @@
       });
       tSi += si; tNo += no; tPend += pend; tOtro += otro;
 
-      const teamBox = document.createElement("div");
-      teamBox.className = "nva-team-block";
-      teamBox.innerHTML = `
-        <div class="nva-team-head">
-          <h4 style="--q:${color}"><i></i>${escapeHtml(teamKey)}</h4>
-          <div class="nva-team-sum">
-            ${isCustom
-              ? Object.keys(optCounts).map(o => `<span class="nva-chip blue">${escapeHtml(o)} ${optCounts[o]}</span>`).join("")
-              : `<span class="nva-chip green">✔ ${si}</span>
-            <span class="nva-chip red">✖ ${no}</span>
-            ${otro ? `<span class="nva-chip blue">Otras ${otro}</span>` : ""}`}
-            <span class="nva-chip grey">Pend. ${pend}</span>
+      teamBlocks.push(`
+        <div class="nva-team-block">
+          <div class="nva-team-head">
+            <h4 style="--q:${color}"><i></i>${escapeHtml(teamKey)}</h4>
+            <div class="nva-team-sum">
+              ${isCustom
+                ? Object.keys(optCounts).map(o => `<span class="nva-chip blue">${escapeHtml(o)} ${optCounts[o]}</span>`).join("")
+                : `<span class="nva-chip green">✔ ${si}</span>
+              <span class="nva-chip red">✖ ${no}</span>
+              ${otro ? `<span class="nva-chip blue">Otras ${otro}</span>` : ""}`}
+              <span class="nva-chip grey">Pend. ${pend}</span>
+            </div>
           </div>
+          <table class="pdf-table">
+            <thead>
+              <tr>
+                <th>Jugadora</th>
+                <th style="width:130px;">Día y hora</th>
+                <th style="text-align:right; width:180px;">Respuesta</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || `<tr><td colspan="3" class="nva-na" style="text-align:center;">Sin jugadoras</td></tr>`}
+            </tbody>
+          </table>
         </div>
-        <table class="pdf-table">
-          <thead>
-            <tr>
-              <th>Jugadora</th>
-              <th style="width:130px;">Día y hora</th>
-              <th style="text-align:right; width:180px;">Respuesta</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || `<tr><td colspan="3" class="nva-na" style="text-align:center;">Sin jugadoras</td></tr>`}
-          </tbody>
-        </table>
-      `;
-      container.appendChild(teamBox);
+      `);
     });
 
     const total = tSi + tNo + tPend + tOtro;
     const pct = (n) => total ? Math.round(n * 100 / total) + "%" : "-";
     const optCols = [NVA_PDF_COL.verde, NVA_PDF_COL.alzira, NVA_PDF_COL.pista, NVA_PDF_COL.balon];
+    let kpis;
     if (isCustom) {
-      document.getElementById("pdfQueryKpis").innerHTML =
+      kpis =
         nvaKpi("Convocadas", total, `${q.teams.length} equipo${q.teams.length === 1 ? "" : "s"}`, NVA_PDF_COL.pista) +
         Object.keys(optTotals).map((o, i) => nvaKpi(escapeHtml(o), optTotals[o], pct(optTotals[o]) + " del total", optCols[i % optCols.length])).join("") +
         nvaKpi("Pendientes", tPend, pct(tPend) + " sin responder", NVA_PDF_COL.balon);
-    } else
-    document.getElementById("pdfQueryKpis").innerHTML =
-      nvaKpi("Convocadas", total, `${q.teams.length} equipo${q.teams.length === 1 ? "" : "s"}`, NVA_PDF_COL.pista) +
-      nvaKpi("Sí", tSi, pct(tSi) + " del total", NVA_PDF_COL.verde) +
-      nvaKpi("No", tNo, pct(tNo) + " del total", NVA_PDF_COL.alzira) +
-      nvaKpi(tOtro ? "Pendientes / otras" : "Pendientes", tOtro ? `${tPend}<small>/ ${tOtro}</small>` : tPend, pct(tPend) + " sin responder", NVA_PDF_COL.balon);
+    } else {
+      kpis =
+        nvaKpi("Convocadas", total, `${q.teams.length} equipo${q.teams.length === 1 ? "" : "s"}`, NVA_PDF_COL.pista) +
+        nvaKpi("Sí", tSi, pct(tSi) + " del total", NVA_PDF_COL.verde) +
+        nvaKpi("No", tNo, pct(tNo) + " del total", NVA_PDF_COL.alzira) +
+        nvaKpi(tOtro ? "Pendientes / otras" : "Pendientes", tOtro ? `${tPend}<small>/ ${tOtro}</small>` : tPend, pct(tPend) + " sin responder", NVA_PDF_COL.balon);
+    }
+    const intro = `
+      <div class="nva-query-box">
+        <span>Consulta</span>
+        <h2>${escapeHtml(q.text)}</h2>
+      </div>
+      <div class="nva-kpis">${kpis}</div>`;
 
     const exportArea = document.getElementById("pdfQueryExportArea");
 
     try {
       await ensureExportLibs();
-      await nvaPdfReady(exportArea);
+      const pages = await buildPagedPdfArea(exportArea, {
+        kicker: "Consulta · Petición de dirección", title: "Respuestas",
+        periodLabel: "Fecha", period: fechaTxt, intro, blocks: teamBlocks
+      });
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
-      await addAreaAsPdfPages(pdf, exportArea);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = await html2canvas(pages[i], { scale: 1.5, useCORS: true, backgroundColor: "#ffffff" });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
+      }
       pdf.save(`Consulta_${q.id}.pdf`);
     } catch (e) {
       console.error("Error al generar PDF de consulta:", e);
       alert("Ocurrió un error al generar el PDF de la consulta.");
+    } finally {
+      exportArea.innerHTML = "";
     }
+  }
+
+  // Reparte bloques (tablas) en hojas A4 de 800 px de ancho, el ancho
+  // completo de la página, con tantas hojas como hagan falta. Un bloque que
+  // no cabe en lo que queda de hoja pasa entero a la siguiente; solo se parte
+  // una tabla si por sí sola es más alta que una hoja, y entonces sigue en la
+  // siguiente con su cabecera y «(cont.)». Devuelve las hojas para capturarlas.
+  async function buildPagedPdfArea(area, o) {
+    const head = (compact) => `
+      <div class="nva-pdf-head${compact ? " compact" : ""}">
+        <div class="nva-pdf-bigtxt"${compact ? ' style="font-size:150px; top:-30px;"' : ""}>NVA</div>
+        <div class="nva-pdf-logo"><img src="LOGO-NVA.png" alt="Logo"></div>
+        <div class="nva-pdf-head-txt">
+          ${compact ? "" : `<div class="nva-pdf-club">Club Nou Vòlei Alzira</div>`}
+          <div class="nva-pdf-kicker">${compact ? "Club Nou Vòlei Alzira" : o.kicker}</div>
+          <h1 class="nva-pdf-title">${o.title}</h1>
+        </div>
+        <div class="nva-pdf-period"><span>${o.periodLabel}</span><b>${escapeHtml(o.period)}</b></div>
+      </div>
+      <div class="nva-pdf-attack"></div>`;
+    area.innerHTML = "";
+    const pages = [];
+    const newPage = (first) => {
+      const page = document.createElement("div");
+      page.className = "pdf-results-page nva-pdf-paginada";
+      page.innerHTML = `
+        <img src="LOGO-NVA.png" alt="" class="pdf-watermark">
+        ${head(!first)}
+        <div class="pdf-content-wrapper nva-pdf-body"></div>
+        <div class="nva-pdf-foot"><span class="nva-pdf-gen"></span><span class="nva-pdf-pag"></span><span class="nva-pdf-brand"><i></i>Nou Vòlei Alzira</span></div>`;
+      area.appendChild(page);
+      pages.push(page);
+      return page.querySelector(".nva-pdf-body");
+    };
+    const cabe = body => body.scrollHeight <= body.clientHeight + 1;
+    const toEl = html => { const t = document.createElement("div"); t.innerHTML = html.trim(); return t.firstElementChild; };
+
+    let body = newPage(true);
+    body.innerHTML = o.intro || "";
+    await nvaPdfReady(area);   // el tamaño final depende de logos y tipografías
+
+    for (const html of o.blocks) {
+      const block = toEl(html);
+      body.appendChild(block);
+      if (cabe(body)) continue;
+      body.removeChild(block);
+      if (body.children.length) {
+        body = newPage(false);
+        body.appendChild(block);
+        if (cabe(body)) continue;
+        body.removeChild(block);
+      }
+      // La tabla no cabe ni en una hoja vacía: se reparte por filas
+      let rows = Array.from(block.querySelectorAll("tbody tr"));
+      let cont = false;
+      while (rows.length) {
+        const part = block.cloneNode(true);
+        const tb = part.querySelector("tbody");
+        tb.innerHTML = "";
+        if (cont) { const h4 = part.querySelector("h4"); if (h4) h4.appendChild(document.createTextNode(" (cont.)")); }
+        body.appendChild(part);
+        let n = 0;
+        while (n < rows.length) {
+          tb.appendChild(rows[n]);
+          if (!cabe(body)) { tb.removeChild(rows[n]); break; }
+          n++;
+        }
+        if (n === 0) {
+          if (body.children.length > 1) { body.removeChild(part); body = newPage(false); continue; }
+          tb.appendChild(rows[0]); n = 1;   // nunca debería pasar: una fila siempre cabe
+        }
+        rows = rows.slice(n);
+        if (rows.length) { body = newPage(false); cont = true; }
+      }
+    }
+
+    pages.forEach((p, i) => { p.querySelector(".nva-pdf-pag").textContent = `Página ${i + 1} de ${pages.length}`; });
+    await nvaPdfReady(area);
+    return pages;
   }
 
   function togglePdfMode() {
@@ -2276,21 +2587,7 @@
         ? `<div class="warning-capsule" style="background:${warningColor};" title="${escapeHtml(player.name)} (${escapeHtml(warningText)})">${escapeHtml(player.name)} (${escapeHtml(warningText)})</div>`
         : `<div class="player-name" title="${escapeHtml(player.name)}">${escapeHtml(player.name)}</div>`;
 
-      let queryHtml = "";
-      const pendingQuery = queriesData.find(q => !q.hidden && q.teams && q.teams.includes(currentTeam) && (!q.responses || !q.responses[player.name]));
-      if (pendingQuery) {
-        const opts = (pendingQuery.options && pendingQuery.options.length > 0) ? pendingQuery.options : ['V', 'X'];
-        const btnsHtml = opts.map(opt => {
-          return `<button class="query-btn" onclick="answerQuery(${Number(pendingQuery.id)}, ${jsArg(player.name)}, ${jsArg(opt)})">${escapeHtml(opt)}</button>`;
-        }).join('');
-
-        queryHtml = `
-          <div class="query-capsule" style="background:${safeColor(pendingQuery.color, "#0284c7")};">
-            <span>❓</span>
-            ${btnsHtml}
-          </div>
-        `;
-      }
+      const queryHtml = queryCapsulesHtml(player.name, "answerQuery");
 
       const stateColor = getAttendanceStateColor(player);
       card.style.backgroundColor = getAttendanceStateSoftColor(player);
@@ -2327,7 +2624,7 @@
         </div>
 
         <div class="card-row-1">
-          <div style="display:flex; align-items:center; gap:4px; flex:1; min-width:0; overflow:hidden;">
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; flex:1; min-width:0; overflow:hidden;">
             ${nameHtml}
             ${queryHtml}
           </div>
@@ -3072,8 +3369,12 @@
     if (!navigator.onLine || offlineQueue.length === 0) return;
     if (!ghSettings.user || !ghSettings.repo || !ghSettings.token) return;
 
+    const lote = offlineQueue.slice();
     const remaining = [];
-    for (const op of offlineQueue) {
+    const queryOps = [];
+    for (const op of lote) {
+      // Las consultas se envían juntas como operaciones (ver pushQueryOps)
+      if (op.fileName === QUERIES_FILE) { queryOps.push(op); continue; }
       if (op.deleteLog) {
         try {
           if (!(await githubDeleteTrainingLogFiles(op.equipo, op.fecha, op.kind))) remaining.push(op);
@@ -3104,7 +3405,13 @@
       }
     }
 
-    offlineQueue = remaining;
+    if (queryOps.length) {
+      const ok = await pushQueryOps(queryOps.map(op => op.queryOp || { type: "merge", data: op.dataObject }));
+      if (!ok) remaining.push(...queryOps);
+    }
+
+    // Lo que se haya añadido a la cola mientras se enviaba se conserva
+    offlineQueue = remaining.concat(offlineQueue.filter(op => !lote.includes(op)));
     localStorage.setItem("NVA_OFFLINE_QUEUE", JSON.stringify(offlineQueue));
   }
 
@@ -3214,11 +3521,6 @@
     }
   }
 
-  async function saveQueriesToGitHub() {
-    saveQueriesToLocalStorage();
-    return await writeGitHubFile("Consultas.json", queriesData, "Actualizar consultas del club");
-  }
-
   async function fetchQueriesFromGitHub() {
     if (!ghSettings.user || !ghSettings.repo) return;
     const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/Consultas.json`;
@@ -3230,6 +3532,8 @@
       if (res.ok) {
         const json = await res.json();
         queriesData = JSON.parse(b64_to_utf8(json.content));
+        // Lo que este dispositivo aún no ha podido enviar sigue viéndose
+        pendingQueryOps().forEach(op => applyQueryOp(queriesData, op));
         saveQueriesToLocalStorage();
         if (document.getElementById("screenAttendance").classList.contains("active")) {
           renderPlayersMain();
@@ -4513,21 +4817,7 @@
         ? `<div class="warning-capsule" style="background:${warningColor};" title="${escapeHtml(player.name)} (${escapeHtml(warningText)})">${escapeHtml(player.name)} (${escapeHtml(warningText)})</div>`
         : `<div class="player-name" title="${escapeHtml(player.name)}">${escapeHtml(player.name)}</div>`;
 
-      let queryHtml = "";
-      const pendingQuery = queriesData.find(q => !q.hidden && q.teams && q.teams.includes(currentTeam) && (!q.responses || !q.responses[player.name]));
-      if (pendingQuery) {
-        const opts = (pendingQuery.options && pendingQuery.options.length > 0) ? pendingQuery.options : ['V', 'X'];
-        const btnsHtml = opts.map(opt => {
-          return `<button class="query-btn" onclick="answerMatchQuery(${Number(pendingQuery.id)}, ${jsArg(player.name)}, ${jsArg(opt)})">${escapeHtml(opt)}</button>`;
-        }).join('');
-
-        queryHtml = `
-          <div class="query-capsule" style="background:${safeColor(pendingQuery.color, "#0284c7")};">
-            <span>❓</span>
-            ${btnsHtml}
-          </div>
-        `;
-      }
+      const queryHtml = queryCapsulesHtml(player.name, "answerMatchQuery");
 
       const stateColor = getMatchStateColor(player);
       card.style.backgroundColor = getMatchStateSoftColor(player);
@@ -4562,7 +4852,7 @@
         </div>
 
         <div class="card-row-1">
-          <div style="display:flex; align-items:center; gap:4px; flex:1; min-width:0; overflow:hidden;">
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; flex:1; min-width:0; overflow:hidden;">
             ${nameHtml}
             ${queryHtml}
           </div>

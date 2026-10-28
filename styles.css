@@ -2302,3 +2302,14 @@
 .nva-pdf-paginada .pdf-table td { padding: 4px 12px; }
 .nva-pdf-paginada .pdf-table .nva-chip { padding-top: 1px; padding-bottom: 1px; }
 .nva-pdf-paginada .nva-team-block { margin-top: 14px; }
+/* PDF de consulta compactado para ocupar menos hojas */
+.nva-pdf-apretado-1 .nva-query-box, .nva-pdf-apretado-2 .nva-query-box { padding: 8px 14px 9px 18px; margin-bottom: 10px; }
+.nva-pdf-apretado-1 .nva-query-box h2, .nva-pdf-apretado-2 .nva-query-box h2 { font-size: 16px; margin-top: 2px; }
+.nva-pdf-apretado-1 .nva-kpi, .nva-pdf-apretado-2 .nva-kpi { padding: 6px 10px 6px 14px; }
+.nva-pdf-apretado-1 .nva-kpi-v, .nva-pdf-apretado-2 .nva-kpi-v { font-size: 24px; }
+.nva-pdf-apretado-1 .nva-kpi-s, .nva-pdf-apretado-2 .nva-kpi-s { font-size: 10px; margin-top: 0; }
+.nva-pdf-apretado-1 .nva-pdf-body, .nva-pdf-apretado-2 .nva-pdf-body { padding-top: 16px; }
+.nva-pdf-apretado-2 .pdf-table td { padding: 2px 12px; font-size: 12px; }
+.nva-pdf-apretado-2 .pdf-table th { padding-top: 6px; padding-bottom: 6px; }
+.nva-pdf-apretado-2 .nva-team-block { margin-top: 10px; }
+.nva-pdf-apretado-2 .nva-team-head { margin-bottom: 4px; }

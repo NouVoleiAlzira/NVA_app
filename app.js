@@ -1052,7 +1052,11 @@
   // completo de la página, con tantas hojas como hagan falta. Un bloque que
   // no cabe en lo que queda de hoja pasa entero a la siguiente; solo se parte
   // una tabla si por sí sola es más alta que una hoja, y entonces sigue en la
-  // siguiente con su cabecera y «(cont.)». Devuelve las hojas para capturarlas.
+  // siguiente con su cabecera y «(cont.)». Para gastar las menos hojas posibles
+  // se prueba también con el título, el cuadro de la consulta y los recuadros
+  // de totales más compactos (y, si aún hace falta, con filas más bajas), y se
+  // usa el tamaño más grande que consiga el mínimo de hojas.
+  // Devuelve las hojas para capturarlas.
   async function buildPagedPdfArea(area, o) {
     const head = (compact) => `
       <div class="nva-pdf-head${compact ? " compact" : ""}">
@@ -1066,62 +1070,74 @@
         <div class="nva-pdf-period"><span>${o.periodLabel}</span><b>${escapeHtml(o.period)}</b></div>
       </div>
       <div class="nva-pdf-attack"></div>`;
-    area.innerHTML = "";
-    const pages = [];
-    const newPage = (first) => {
-      const page = document.createElement("div");
-      page.className = "pdf-results-page nva-pdf-paginada";
-      page.innerHTML = `
-        <img src="LOGO-NVA.png" alt="" class="pdf-watermark">
-        ${head(!first)}
-        <div class="pdf-content-wrapper nva-pdf-body"></div>
-        <div class="nva-pdf-foot"><span class="nva-pdf-gen"></span><span class="nva-pdf-pag"></span><span class="nva-pdf-brand"><i></i>Nou Vòlei Alzira</span></div>`;
-      area.appendChild(page);
-      pages.push(page);
-      return page.querySelector(".nva-pdf-body");
-    };
     const cabe = body => body.scrollHeight <= body.clientHeight + 1;
     const toEl = html => { const t = document.createElement("div"); t.innerHTML = html.trim(); return t.firstElementChild; };
 
-    let body = newPage(true);
-    body.innerHTML = o.intro || "";
-    await nvaPdfReady(area);   // el tamaño final depende de logos y tipografías
+    // nivel 0: tamaño normal · 1: cabecera, consulta y totales compactos · 2: además filas más bajas
+    const layout = (nivel) => {
+      area.innerHTML = "";
+      area.className = nivel ? `nva-pdf-apretado-${nivel}` : "";
+      const pages = [];
+      const newPage = (first) => {
+        const page = document.createElement("div");
+        page.className = "pdf-results-page nva-pdf-paginada";
+        page.innerHTML = `
+          <img src="LOGO-NVA.png" alt="" class="pdf-watermark">
+          ${head(!first || nivel > 0)}
+          <div class="pdf-content-wrapper nva-pdf-body"></div>
+          <div class="nva-pdf-foot"><span class="nva-pdf-gen"></span><span class="nva-pdf-pag"></span><span class="nva-pdf-brand"><i></i>Nou Vòlei Alzira</span></div>`;
+        area.appendChild(page);
+        pages.push(page);
+        return page.querySelector(".nva-pdf-body");
+      };
 
-    for (const html of o.blocks) {
-      const block = toEl(html);
-      body.appendChild(block);
-      if (cabe(body)) continue;
-      body.removeChild(block);
-      if (body.children.length) {
-        body = newPage(false);
+      let body = newPage(true);
+      body.innerHTML = o.intro || "";
+
+      for (const html of o.blocks) {
+        const block = toEl(html);
         body.appendChild(block);
         if (cabe(body)) continue;
         body.removeChild(block);
-      }
-      // La tabla no cabe ni en una hoja vacía: se reparte por filas
-      let rows = Array.from(block.querySelectorAll("tbody tr"));
-      let cont = false;
-      while (rows.length) {
-        const part = block.cloneNode(true);
-        const tb = part.querySelector("tbody");
-        tb.innerHTML = "";
-        if (cont) { const h4 = part.querySelector("h4"); if (h4) h4.appendChild(document.createTextNode(" (cont.)")); }
-        body.appendChild(part);
-        let n = 0;
-        while (n < rows.length) {
-          tb.appendChild(rows[n]);
-          if (!cabe(body)) { tb.removeChild(rows[n]); break; }
-          n++;
+        if (body.children.length) {
+          body = newPage(false);
+          body.appendChild(block);
+          if (cabe(body)) continue;
+          body.removeChild(block);
         }
-        if (n === 0) {
-          if (body.children.length > 1) { body.removeChild(part); body = newPage(false); continue; }
-          tb.appendChild(rows[0]); n = 1;   // nunca debería pasar: una fila siempre cabe
+        // La tabla no cabe ni en una hoja vacía: se reparte por filas
+        let rows = Array.from(block.querySelectorAll("tbody tr"));
+        let cont = false;
+        while (rows.length) {
+          const part = block.cloneNode(true);
+          const tb = part.querySelector("tbody");
+          tb.innerHTML = "";
+          if (cont) { const h4 = part.querySelector("h4"); if (h4) h4.appendChild(document.createTextNode(" (cont.)")); }
+          body.appendChild(part);
+          let n = 0;
+          while (n < rows.length) {
+            tb.appendChild(rows[n]);
+            if (!cabe(body)) { tb.removeChild(rows[n]); break; }
+            n++;
+          }
+          if (n === 0) {
+            if (body.children.length > 1) { body.removeChild(part); body = newPage(false); continue; }
+            tb.appendChild(rows[0]); n = 1;   // nunca debería pasar: una fila siempre cabe
+          }
+          rows = rows.slice(n);
+          if (rows.length) { body = newPage(false); cont = true; }
         }
-        rows = rows.slice(n);
-        if (rows.length) { body = newPage(false); cont = true; }
       }
-    }
+      return pages.length;
+    };
 
+    layout(0);
+    await nvaPdfReady(area);   // el tamaño final depende de logos y tipografías
+    const hojas = [0, 1, 2].map(layout);
+    const nivel = hojas.indexOf(Math.min(...hojas));
+    layout(nivel);
+
+    const pages = Array.from(area.querySelectorAll(".nva-pdf-paginada"));
     pages.forEach((p, i) => { p.querySelector(".nva-pdf-pag").textContent = `Página ${i + 1} de ${pages.length}`; });
     await nvaPdfReady(area);
     return pages;

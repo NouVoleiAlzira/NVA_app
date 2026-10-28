@@ -196,7 +196,7 @@
     <div class="section-subtitle">CONSULTAS</div>
     <div style="display:flex; gap:8px;">
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="openCreateQueryModal()">📨 Nueva CONSULTA</button>
-      <button class="btn-pdf-mode" style="flex:1; min-width:0; margin-bottom:0;" onclick="openSelectQueryPdfModal()">📝 PDF CONSULTA</button>
+      <button class="btn-pdf-mode" style="flex:1; min-width:0; margin-bottom:0;" onclick="openSelectQueryPdfModal()">📝 Ver CONSULTAS</button>
     </div>
 
     </div>
@@ -438,6 +438,7 @@
         <div class="color-circle selected" data-color="#0284c7" style="background:#0284c7;" title="Azul"></div>
         <div class="color-circle" data-color="#7e22ce" style="background:#7e22ce;" title="Morado"></div>
         <div class="color-circle" data-color="#f97316" style="background:#f97316;" title="Naranja"></div>
+        <label class="color-circle color-custom" id="queryCustomColorCircle" title="Color personalizado"><input type="color" id="queryCustomColor" value="#16a34a" aria-label="Color personalizado"></label>
       </div>
 
       <button class="btn-save-session" onclick="openQueryTeamsSelection()">Siguiente: Seleccionar Equipos</button>
@@ -455,13 +456,27 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="modalQueryQuestion" onclick="if (event.target === this) closeQueryQuestionModal()">
+    <div class="modal-box" style="max-width: 360px;">
+      <div class="modal-header">
+        <div class="modal-title">❓ Consulta</div>
+        <button class="btn-close-modal" onclick="closeQueryQuestionModal()">✕</button>
+      </div>
+      <div id="queryQuestionBar" style="height:4px; border-radius:2px; margin-bottom:10px;"></div>
+      <p id="queryQuestionText" style="font-size:1rem; font-weight:600; line-height:1.4; margin:0 0 8px; white-space:pre-wrap; overflow-wrap:anywhere;"></p>
+      <p id="queryQuestionOptions" style="font-size:0.78rem; color:#94a3b8; margin:0 0 12px;"></p>
+      <button class="btn-save-session" onclick="closeQueryQuestionModal()">Entendido</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="modalSelectQueryPdf">
     <div class="modal-box" style="max-width: 380px;">
       <div class="modal-header">
-        <div class="modal-title">📄 Seleccionar Consulta PDF</div>
+        <div class="modal-title">📄 Consultas</div>
         <button class="btn-close-modal" onclick="closeSelectQueryPdfModal()">✕</button>
       </div>
-      <div id="queryListPdfContainer" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 240px; overflow-y: auto;"></div>
+      <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px;">Pulsa una consulta para sacar su PDF. ✔ la completa (deja de mostrarse en los equipos) y 🗑 la borra con todas sus respuestas.</div>
+      <div id="queryListPdfContainer" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 60vh; overflow-y: auto;"></div>
     </div>
   </div>
 
@@ -901,30 +916,7 @@
 <div id="pdfResultsExportArea"></div>
 
 <!-- CONTENEDOR OCULTO PARA EXPORTACIÓN A PDF CONSULTAS -->
-<div id="pdfQueryExportArea" class="nva-pdf">
-  <img src="LOGO-NVA.png" alt="" class="pdf-watermark">
-  <div class="nva-pdf-head">
-    <div class="nva-pdf-bigtxt">NVA</div>
-    <div class="nva-pdf-logo"><img src="LOGO-NVA.png" alt="Logo"></div>
-    <div class="nva-pdf-head-txt">
-      <div class="nva-pdf-club">Club Nou Vòlei Alzira</div>
-      <div class="nva-pdf-kicker">Consulta · Petición de dirección</div>
-      <h1 class="nva-pdf-title">Respuestas</h1>
-    </div>
-    <div class="nva-pdf-period"><span>Fecha</span><b id="pdfQueryDate">-</b></div>
-  </div>
-  <div class="nva-pdf-attack"></div>
-
-  <div class="pdf-content-wrapper nva-pdf-body">
-    <div class="nva-query-box">
-      <span>Consulta</span>
-      <h2 id="pdfQueryTextHeader">-</h2>
-    </div>
-    <div class="nva-kpis" id="pdfQueryKpis"></div>
-    <div id="pdfQueryTeamsContent"></div>
-  </div>
-  <div class="nva-pdf-foot"><span class="nva-pdf-gen"></span><span class="nva-pdf-brand"><i></i>Nou Vòlei Alzira</span></div>
-</div>
+<div id="pdfQueryExportArea"></div>
 
 
 <!-- JS en fichero aparte con "defer": se descarga en paralelo mientras el

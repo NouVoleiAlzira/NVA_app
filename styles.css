@@ -2280,3 +2280,25 @@
 .hist-deshacer { margin-top: 4px; background: #fff; border: 1px solid #cbd5e1; color: #1e293b; border-radius: 999px; padding: 3px 10px; font-size: .8em; cursor: pointer; }
 .hist-deshecho { margin-top: 4px; font-size: .78em; color: #64748b; font-style: italic; }
 .hist-anulacion .hist-txt { font-weight: 600; }
+
+/* Consultas: botón ❓ de la cápsula (muestra la pregunta) */
+.query-info-btn {
+  border: none; background: transparent; color: inherit;
+  padding: 0 2px; font-size: 0.8rem; line-height: 1; cursor: pointer;
+}
+/* Color personalizado de la consulta: arcoíris hasta que se elige uno */
+.color-circle.color-custom {
+  position: relative; overflow: hidden;
+  background: conic-gradient(#ef4444, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444);
+}
+.color-circle.color-custom input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: 0; padding: 0; cursor: pointer;
+}
+/* PDF por hojas: el cuerpo ocupa el hueco entre cabecera y pie (para medir lo que cabe) */
+.nva-pdf-paginada .nva-pdf-body { min-height: 0; overflow: hidden; }
+.nva-pdf-paginada .nva-team-block:first-child { margin-top: 0; }
+/* Filas algo más bajas para que quepan dos equipos por hoja */
+.nva-pdf-paginada .pdf-table td { padding: 4px 12px; }
+.nva-pdf-paginada .pdf-table .nva-chip { padding-top: 1px; padding-bottom: 1px; }
+.nva-pdf-paginada .nva-team-block { margin-top: 14px; }

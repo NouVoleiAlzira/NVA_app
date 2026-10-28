@@ -425,7 +425,7 @@
   const ESTILO_KEY = "NVA_REEL_ESTILO";
   const PLANTILLAS = [["auto", "🎲 Al azar"], ["pancarta", "Pancarta"], ["rasgado", "Rasgado"], ["impacto", "Impacto"], ["diagonal", "Diagonal"],
                       ["franjas", "Franjas"], ["pista", "Pista"], ["corte", "Corte"], ["foco", "Foco"], ["editorial", "Crónica"], ["marcador", "Marcador"]];
-  const ANIM_TXT = { portada: "Animación de inicio", partido: "Transición entre partidos", cierre: "Animación final" };
+  const ANIM_TXT = { portada: "Inicio", partido: "Transición", cierre: "Final" };
   const ANIM_DEF = { portada: "fade", partido: "slideleft", cierre: "fade" };
   const PARTES = [["portada", "Portada", [2, 2.5, 3, 4, 5], 3], ["partido", "Partidos y fotos", [2, 2.5, 3, 3.2, 4, 5, 6], 3.2],
                   ["cierre", "Despedida", [2, 2.5, 3, 4, 5], 3]];
@@ -470,7 +470,7 @@
         ${PLANTILLAS.map(([g, n]) => `<button type="button" class="ig-plantilla" data-g="${g}"
           style="flex:0 0 auto; width:70px; padding:3px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; cursor:pointer; color:#1e293b;">
           ${g === "auto" ? `<div style="height:124px; display:flex; align-items:center; justify-content:center; font-size:28px; background:#f1f5f9; border-radius:5px;">🎲</div>`
-            : `<img src="reels-estilos/partido-${g}.jpg" alt="" loading="lazy" style="width:100%; height:124px; object-fit:cover; border-radius:5px; display:block;">`}
+            : `<img src="reels-estilos/partido-${g}.jpg" alt="" width="60" height="124" decoding="async" style="width:100%; height:124px; object-fit:cover; border-radius:5px; display:block;">`}
           <small style="display:block; font-size:11px; margin-top:2px;">${g === "auto" ? "Al azar" : n}</small></button>`).join("")}
       </div>
       <label class="ig-label">Colores del estilo</label>
@@ -484,11 +484,11 @@
       ${PARTES.map(([k, nombre, durs]) => `
       <div class="ig-est-parte" data-parte="${k}" style="margin-top:10px;">
         <label class="ig-label">${nombre}</label>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div style="display:grid; grid-template-columns:auto 4.2rem 3.9rem minmax(0,1fr); gap:6px; align-items:center;">
           <small>Duración</small>
-          <select class="app-input ig-est-dur" style="width:auto; padding:4px 8px;">${durs.map(d => `<option value="${d}">${String(d).replace(".", ",")} s</option>`).join("")}</select>
+          <select class="app-input ig-est-dur" style="width:100%; min-width:0; padding:4px 6px; font-size:.9rem;">${durs.map(d => `<option value="${d}">${String(d).replace(".", ",")} s</option>`).join("")}</select>
           <small>${ANIM_TXT[k]}</small>
-          <select class="app-input ig-est-anim" style="width:auto; padding:4px 8px;">${ANIMACIONES.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select>
+          <select class="app-input ig-est-anim" style="width:100%; min-width:0; padding:4px 6px; font-size:.9rem;">${ANIMACIONES.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select>
         </div>
       </div>`).join("")}
       <div style="display:flex; gap:8px; margin-top:12px;">

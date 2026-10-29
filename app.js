@@ -604,8 +604,18 @@
       if (!q) return;
       if (!q.responses) q.responses = {};
       if (!q.responseTimes) q.responseTimes = {};
-      q.responses[op.player] = op.option;
-      q.responseTimes[op.player] = op.at;
+      if (op.option == null) {   // corrección desde dirección: vuelve a «Pendiente»
+        delete q.responses[op.player];
+        delete q.responseTimes[op.player];
+      } else {
+        q.responses[op.player] = op.option;
+        q.responseTimes[op.player] = op.at;
+      }
+      if (op.corrected) {
+        if (!q.corrected) q.corrected = {};
+        if (op.option == null) delete q.corrected[op.player];
+        else q.corrected[op.player] = op.at;
+      }
     } else if (op.type === "complete") {
       if (!q) return;
       // hidden se mantiene para que las versiones anteriores de la app también la oculten
@@ -866,6 +876,8 @@
         const row = document.createElement("div");
         row.style.cssText = "display:flex; gap:6px; align-items:stretch;";
         row.appendChild(btn);
+        row.appendChild(actionBtn("✏️", "Corregir respuestas",
+          "border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8;", () => openEditQueryAnswers(q.id)));
         if (!closed) row.appendChild(actionBtn("✔", "Completar consulta (deja de mostrarse en los equipos)",
           "border:1px solid #bbf7d0; background:#f0fdf4; color:#15803d;", () => completeQuery(q.id)));
         row.appendChild(actionBtn("🗑", "Borrar la consulta y sus respuestas",
@@ -890,6 +902,56 @@
     }
 
     document.getElementById("modalSelectQueryPdf").classList.add("active");
+  }
+
+  // Corrección de respuestas desde dirección (por si el entrenador se
+  // equivocó al marcar a alguna jugadora). Cada cambio se guarda al momento.
+  let editQueryId = null;
+  function openEditQueryAnswers(queryId) {
+    const q = queriesData.find(x => x.id === queryId);
+    if (!q) return;
+    editQueryId = queryId;
+    closeSelectQueryPdfModal();
+    document.getElementById("editQueryTitle").textContent = q.text;
+    renderEditQueryAnswers();
+    document.getElementById("modalEditQueryAnswers").classList.add("active");
+  }
+
+  function renderEditQueryAnswers() {
+    const q = queriesData.find(x => x.id === editQueryId);
+    const container = document.getElementById("editQueryAnswers");
+    if (!q) { container.innerHTML = ""; return; }
+    const opts = (q.options && q.options.length > 0) ? q.options : ['V', 'X'];
+    container.innerHTML = (q.teams || []).map(teamKey => {
+      const players = getPlayersForTeamKey(teamKey);
+      const rows = players.map(p => {
+        const resp = q.responses ? q.responses[p] : null;
+        const select = `<select class="app-select" style="width:auto; min-width:110px; padding:4px 8px; font-size:0.8rem;"
+            onchange="setQueryAnswerCorrection(${jsArg(p)}, this.value)">
+            <option value=""${resp ? "" : " selected"}>Pendiente</option>
+            ${opts.map(o => `<option value="${escapeHtml(o)}"${resp === o ? " selected" : ""}>${escapeHtml(queryOptionLabel(o))}</option>`).join("")}
+            ${resp && !opts.includes(resp) ? `<option value="${escapeHtml(resp)}" selected>${escapeHtml(resp)}</option>` : ""}
+          </select>`;
+        const mark = q.corrected && q.corrected[p] ? ` <small style="color:#94a3b8;">(corregida)</small>` : "";
+        return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px solid rgba(148,163,184,0.15);">
+            <span style="font-size:0.85rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p)}${mark}</span>${select}
+          </div>`;
+      }).join("");
+      return `<div class="section-subtitle" style="margin:10px 0 4px;">${escapeHtml(teamKey)}</div>${rows || `<p style="font-size:0.8rem; color:#94a3b8;">Sin jugadoras</p>`}`;
+    }).join("");
+  }
+
+  function setQueryAnswerCorrection(playerName, value) {
+    if (editQueryId == null) return;
+    saveQueryOp({ type: "answer", id: editQueryId, player: playerName, option: value || null, at: new Date().toISOString(), corrected: true });
+    renderEditQueryAnswers();
+    const att = document.getElementById("screenAttendance");
+    if (att && att.classList.contains("active")) try { renderPlayersMain(); } catch (e) {}
+  }
+
+  function closeEditQueryAnswers() {
+    document.getElementById("modalEditQueryAnswers").classList.remove("active");
+    editQueryId = null;
   }
 
   // Completa una consulta: deja de mostrarse en los equipos, conserva las
@@ -963,7 +1025,7 @@
         rowsHtml += `
           <tr>
             <td class="nva-name">${escapeHtml(p)}</td>
-            <td style="white-space:nowrap; color:#64748b; font-size:0.85em;">${resp ? fmtResp(q.responseTimes && q.responseTimes[p]) : "-"}</td>
+            <td style="white-space:nowrap; color:#64748b; font-size:0.85em;">${resp ? fmtResp(q.responseTimes && q.responseTimes[p]) : "-"}${resp && q.corrected && q.corrected[p] ? " · corregida" : ""}</td>
             <td style="text-align:right;">${badge}</td>
           </tr>
         `;

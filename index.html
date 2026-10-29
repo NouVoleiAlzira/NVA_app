@@ -125,12 +125,17 @@
       </div>
 
       <div data-nva-menu="informes.pdf">
-      <div class="section-subtitle" style="margin-top:14px;">Informes PDF</div>
+      <div class="section-subtitle" style="margin-top:14px;">Informes Entrenadores</div>
       <div style="display:flex; gap:6px;">
-        <button class="btn-pdf-mode" id="btnPdfMode" onclick="togglePdfMode()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">📊 POR EQUIPO</button>
-        <button class="btn-pdf-mode" id="btnPdfJugadora" onclick="openPlayerPdfModal()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🧑 POR DEPORTISTA</button>
-        <button class="btn-pdf-mode" id="btnPdfCuadrante" onclick="togglePdfCuadranteMode()" style="flex:1.6; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🏆 PARTIDOS Y RESULTADOS</button>
+        <button class="btn-pdf-mode" id="btnPdfMode" onclick="togglePdfMode()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">📊 por Equipo</button>
+        <button class="btn-pdf-mode" id="btnPdfJugadora" onclick="openPlayerPdfModal()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🧑 por Deportista</button>
+        <button class="btn-pdf-mode" id="btnPdfCuadrante" onclick="togglePdfCuadranteMode()" style="flex:1.6; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🏆 Partidos y Resultados</button>
       </div>
+      </div>
+      <!-- Reporte Kilometraje: va dentro de «Informes Entrenadores», pero conserva
+           su propio permiso (informes.kilometraje) -->
+      <div data-nva-menu="informes.kilometraje">
+      <button class="btn-pdf-mode" id="btnKilometraje" onclick="openKilometrajeModal()" style="width:100%; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🚗 Reporte Kilometraje</button>
       </div>
       <div data-nva-menu="informes.fichas">
       <div class="section-subtitle" style="margin-top:14px;">Fichas de Federación</div>
@@ -144,10 +149,6 @@
         <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
       </div>
       <div id="drvProg" class="drv-prog"></div>
-      </div>
-      <div data-nva-menu="informes.kilometraje">
-      <div class="section-subtitle" style="margin-top:14px;">Informes de Entrenadores</div>
-      <button class="btn-pdf-mode" id="btnKilometraje" onclick="openKilometrajeModal()" style="width:100%; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🚗 REPORTE KILOMETRAJE</button>
       </div>
     </div>
 

@@ -86,7 +86,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
   position: relative;
   overflow: hidden;
   min-height: 34px !important;
-  padding: 6px 10px !important;
+  padding: 6px 8px !important;
   border: 1px solid var(--tiza-borde) !important;
   border-radius: 12px !important;
   background: var(--tiza-fondo) !important;
@@ -96,7 +96,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
   font-size: 0.72rem !important;
   letter-spacing: 0.01em;
   line-height: 1.2;
-  white-space: nowrap;
   box-shadow: var(--tiza-brillo) !important;
   transition: transform 200ms var(--ease-sis), box-shadow 220ms ease, border-color 200ms ease, filter 150ms ease;
   display: flex;

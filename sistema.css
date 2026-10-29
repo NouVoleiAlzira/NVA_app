@@ -67,19 +67,37 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
 /* ---------------------------------------------------------------------
    Botones de acción (mismo aspecto en todas las pantallas y ventanas)
    --------------------------------------------------------------------- */
+/* Todos los botones siguen el estilo «tiza» de POR EQUIPO (cristal claro,
+   borde fino, 34px de alto). Los de color no se rellenan: llevan el cristal
+   teñido de su color, el borde y una línea inferior del mismo color.
+   Los !important ganan a los tamaños y fondos escritos a mano en el HTML/JS. */
+:root {
+  --c-rojo: 240, 74, 93;
+  --c-azul: 92, 132, 255;
+  --c-verde: 52, 199, 132;
+  --c-amarillo: 245, 197, 24;
+  --c-peligro: 229, 72, 77;
+  --c-violeta: 157, 120, 255;
+  --tiza-fondo: rgba(233, 238, 250, 0.07);
+  --tiza-borde: rgba(233, 238, 250, 0.16);
+  --tiza-brillo: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action) {
   position: relative;
   overflow: hidden;
-  min-height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
-  color: #fff;
+  min-height: 34px !important;
+  padding: 6px 10px !important;
+  border: 1px solid var(--tiza-borde) !important;
+  border-radius: 12px !important;
+  background: var(--tiza-fondo) !important;
+  color: var(--txt-1) !important;
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.72rem !important;
   letter-spacing: 0.01em;
   line-height: 1.2;
-  box-shadow: var(--sombra-btn);
+  white-space: nowrap;
+  box-shadow: var(--tiza-brillo) !important;
   transition: transform 200ms var(--ease-sis), box-shadow 220ms ease, border-color 200ms ease, filter 150ms ease;
   display: flex;
   align-items: center;
@@ -87,31 +105,31 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
   gap: 6px;
   text-align: center;
 }
-.btn-save-session { background: var(--g-rojo); }
-.btn-pdf-mode2 { background: var(--g-azul); }
-.btn-danger-action { background: var(--g-peligro); }
-.btn-pdf-mode {
-  background: rgba(233, 238, 250, 0.07);
-  border-color: rgba(233, 238, 250, 0.16);
-  color: var(--txt-1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
 
-/* Variantes de color puestas a mano en el HTML/JS (style="background:…") */
+/* Toque de color: cada botón de color define --c (r, g, b) */
+.btn-save-session { --c: var(--c-rojo); }
+.btn-pdf-mode2 { --c: var(--c-azul); }
+.btn-danger-action { --c: var(--c-peligro); }
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondoVerde"],
-:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#16a34a"] { background-image: var(--g-verde) !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#16a34a"] { --c: var(--c-verde); }
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="azul-primary"],
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondorAzul"],
-:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#2563eb"] { background-image: var(--g-azul) !important; color: #fff !important; }
-:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondoAmarillo"] { background-image: var(--g-amarillo) !important; color: var(--noche) !important; }
-:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#64748b"] {
-  background: rgba(233, 238, 250, 0.08) !important;
-  border-color: var(--borde-fuerte) !important;
-  color: var(--txt-1) !important;
-  box-shadow: none;
-}
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#2563eb"] { --c: var(--c-azul); }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="fondoAmarillo"] { --c: var(--c-amarillo); color: #FFE9A0 !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#7c3aed"] { --c: var(--c-violeta); }
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#ef4444"],
-:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#b91c1c"] { background-image: var(--g-peligro) !important; }
+:is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2)[style*="#b91c1c"] { --c: var(--c-peligro); }
+
+:is(.btn-save-session, .btn-pdf-mode2, .btn-danger-action):not([style*="#64748b"]),
+.btn-pdf-mode[style*="background"]:not([style*="#64748b"]),
+:is(.btn-add, .btn-edit-history, .btn-delete-history, .reason-add-btn, .btn-history-more, .cp-upload, .cp-modal-main, .cp-modal-stop) {
+  background: linear-gradient(135deg, rgba(var(--c), 0.24), rgba(var(--c), 0.07)) !important;
+  border-color: rgba(var(--c), 0.55) !important;
+  box-shadow: inset 0 -2px 0 rgba(var(--c), 0.9), var(--tiza-brillo) !important;
+  color: #fff;
+}
+:is(.btn-save-session, .btn-pdf-mode2, .btn-danger-action):not([style*="fondoAmarillo"]) { color: #fff !important; }
+/* Gris (#64748b) = cancelar: tiza sin color */
 
 /* Brillo diagonal al pasar el ratón */
 :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action)::before {
@@ -119,17 +137,17 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
   position: absolute;
   top: 0; bottom: 0; left: 0;
   width: 60%;
-  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.14), transparent);
   transform: translateX(-120%) skewX(-12deg);
   pointer-events: none;
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action):not(:disabled):hover {
-    transform: translateY(-2px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 16px 26px -12px rgba(0, 0, 0, 0.8);
-    filter: brightness(1.08);
+    transform: translateY(-1px);
+    filter: brightness(1.12);
   }
-  .btn-pdf-mode:not(:disabled):hover { border-color: rgba(245, 197, 24, 0.55); background: rgba(233, 238, 250, 0.12); }
+  .btn-pdf-mode:not([style*="background"]):not(:disabled):hover,
+  :is(.btn-save-session, .btn-pdf-mode)[style*="#64748b"]:not(:disabled):hover { border-color: rgba(245, 197, 24, 0.55) !important; }
   :is(.btn-save-session, .btn-pdf-mode, .btn-pdf-mode2, .btn-danger-action):not(:disabled):hover::before {
     transform: translateX(230%) skewX(-12deg);
     transition: transform 700ms var(--ease-sis);
@@ -141,34 +159,28 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
   filter: saturate(0.6);
 }
 
-/* Botones secundarios pequeños: misma familia, versión compacta */
+/* Botones pequeños: misma familia, versión compacta */
 :is(.btn-history, .btn-add, .btn-edit-history, .btn-delete-history, .reason-add-btn,
     .btn-history-more, .cp-upload, .cp-tl-btn, .calendar-nav-btn, .anul-barra button) {
-  min-height: 36px;
-  padding: 7px 12px;
-  border: 1px solid transparent;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--tiza-borde);
   border-radius: var(--r-sm);
+  background: var(--tiza-fondo);
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   line-height: 1.15;
-  color: #fff;
+  color: var(--txt-1);
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 6px 14px -8px rgba(0, 0, 0, 0.7);
+  box-shadow: var(--tiza-brillo);
   transition: transform 160ms var(--ease-sis), filter 150ms ease, border-color 150ms ease;
 }
-:is(.btn-add, .btn-edit-history, .reason-add-btn, .btn-history-more, .cp-upload) { background: var(--g-azul); }
-.btn-add { min-width: 44px; font-size: 1rem; }
-.btn-add-pdf { font-size: 0.78rem; }
-.btn-delete-history { background: var(--g-peligro); }
-:is(.btn-history, .cp-tl-btn, .calendar-nav-btn) {
-  background: rgba(233, 238, 250, 0.08);
-  border-color: var(--borde-fuerte);
-  color: var(--txt-1);
-  box-shadow: none;
-}
-.cp-tl-btn-red { border-color: var(--alzira); color: var(--txt-mal); }
-.anul-barra button { background: var(--g-amarillo); color: var(--noche); }
+:is(.btn-add, .btn-edit-history, .reason-add-btn, .btn-history-more, .cp-upload) { --c: var(--c-azul); }
+.btn-add { min-width: 40px; font-size: 0.95rem; }
+.btn-delete-history { --c: var(--c-peligro); }
+.cp-tl-btn-red { border-color: rgba(var(--c-peligro), 0.55); color: var(--txt-mal); }
+.anul-barra button { --c: var(--c-amarillo); background: linear-gradient(135deg, rgba(var(--c), 0.24), rgba(var(--c), 0.07)); border-color: rgba(var(--c), 0.55); box-shadow: inset 0 -2px 0 rgba(var(--c), 0.9); color: #FFE9A0; }
 @media (hover: hover) and (pointer: fine) {
   :is(.btn-history, .btn-add, .btn-edit-history, .btn-delete-history, .reason-add-btn,
       .btn-history-more, .cp-upload, .cp-tl-btn, .calendar-nav-btn, .anul-barra button):hover { filter: brightness(1.12); }
@@ -294,20 +306,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--balon); }
 .cp-modal-btn {
   position: relative;
   overflow: hidden;
-  min-height: 44px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--borde-fuerte);
-  background: rgba(233, 238, 250, 0.08);
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--tiza-borde);
+  background: var(--tiza-fondo);
+  color: var(--txt-1);
+  font-weight: 700;
+  font-size: 0.72rem;
+  box-shadow: var(--tiza-brillo);
   display: flex; align-items: center; justify-content: center;
   transition: transform 200ms var(--ease-sis), filter 150ms ease, border-color 150ms ease;
 }
-.cp-modal-main { background: var(--g-verde); border-color: transparent; box-shadow: var(--sombra-btn); }
-.cp-modal-stop { border-color: var(--alzira); color: var(--txt-mal); }
+.cp-modal-main { --c: var(--c-verde); color: #fff; }
+.cp-modal-stop { --c: var(--c-peligro); color: #fff; }
 @media (hover: hover) and (pointer: fine) {
   .cp-modal-btn:hover { filter: brightness(1.1); border-color: rgba(245, 197, 24, 0.55); }
-  .cp-modal-main:hover { border-color: transparent; }
+  .cp-modal-main:hover, .cp-modal-stop:hover { border-color: rgba(var(--c), 0.8) !important; }
 }
 
 /* ---------------------------------------------------------------------
@@ -618,12 +633,12 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .ig-reel a { color: var(--txt-link); }
 /* Descargar = secundario (tiza); Cambiar estilo = abrir otra cosa (azul) */
 .btn-save-session.ig-descargar {
-  background: rgba(233, 238, 250, 0.07) !important;
-  border-color: rgba(233, 238, 250, 0.16);
-  color: var(--txt-1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--tiza-fondo) !important;
+  border-color: var(--tiza-borde) !important;
+  color: var(--txt-1) !important;
+  box-shadow: var(--tiza-brillo) !important;
 }
-.btn-save-session.ig-estilo { background: var(--g-azul) !important; }
+.btn-save-session.ig-estilo { --c: var(--c-azul); }
 .ig-mu-btn {
   min-height: 34px;
   background: rgba(233, 238, 250, 0.08) !important;

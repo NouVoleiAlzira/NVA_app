@@ -648,6 +648,55 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 }
 
 /* ---------------------------------------------------------------------
+   Subsecciones de la pantalla principal: título blanco con un punto y una
+   línea vertical que baja hasta el final de la subsección (acaba en «L»).
+   Una subsección sin título (Reporte Kilometraje, con permiso propio)
+   continúa la línea de la anterior.
+   --------------------------------------------------------------------- */
+#screenCoachTeam [data-nva-menu] {
+  position: relative;
+  padding-left: 14px;
+  padding-bottom: 4px;
+}
+#screenCoachTeam [data-nva-menu]:has(> .section-subtitle) { margin-top: 16px; }
+#screenCoachTeam [data-nva-menu] > .section-subtitle {
+  margin: 0 0 10px -14px !important;
+  color: #fff;
+}
+#screenCoachTeam [data-nva-menu] > .section-subtitle::before {
+  content: "";
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 8px; height: 8px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+}
+#screenCoachTeam [data-nva-menu]::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 6px; bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(233, 238, 250, 0.22) 40px, rgba(233, 238, 250, 0.22));
+  pointer-events: none;
+}
+#screenCoachTeam [data-nva-menu]::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: 0;
+  width: 10px; height: 2px;
+  border-radius: 2px;
+  background: rgba(233, 238, 250, 0.22);
+}
+/* Continuación sin título: la línea sigue desde arriba y la anterior no cierra */
+#screenCoachTeam [data-nva-menu]:not(:has(> .section-subtitle)) { padding-top: 8px; }
+#screenCoachTeam [data-nva-menu]:not(:has(> .section-subtitle))::before { top: 0; background: rgba(233, 238, 250, 0.22); }
+#screenCoachTeam [data-nva-menu]:has(+ [data-nva-menu="informes.kilometraje"]:not([data-nva-oculto]))::after { display: none; }
+
+/* ---------------------------------------------------------------------
    Puente de tema: colores claros escritos a mano dentro de lo oscuro
    --------------------------------------------------------------------- */
 :is(.modal-box, .cp-modal-box, .otros-panel, .hz-panel, .ig-reel) :is(

@@ -470,13 +470,26 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="modalEditQueryAnswers">
+    <div class="modal-box" style="max-width: 400px;">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Corregir respuestas</div>
+        <button class="btn-close-modal" onclick="closeEditQueryAnswers()">✕</button>
+      </div>
+      <p id="editQueryTitle" style="font-size:0.9rem; font-weight:600; margin:0 0 4px; overflow-wrap:anywhere;"></p>
+      <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:6px;">Cada cambio se guarda al momento. «Pendiente» borra la respuesta de esa jugadora.</div>
+      <div id="editQueryAnswers" style="max-height:60vh; overflow-y:auto; margin-bottom:12px;"></div>
+      <button class="btn-save-session" onclick="closeEditQueryAnswers(); openSelectQueryPdfModal();">Hecho</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="modalSelectQueryPdf">
     <div class="modal-box" style="max-width: 380px;">
       <div class="modal-header">
         <div class="modal-title">📄 Consultas</div>
         <button class="btn-close-modal" onclick="closeSelectQueryPdfModal()">✕</button>
       </div>
-      <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px;">Pulsa una consulta para sacar su PDF. ✔ la completa (deja de mostrarse en los equipos) y 🗑 la borra con todas sus respuestas.</div>
+      <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px;">Pulsa una consulta para sacar su PDF. ✏️ corrige respuestas, ✔ la completa (deja de mostrarse en los equipos) y 🗑 la borra con todas sus respuestas.</div>
       <div id="queryListPdfContainer" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; max-height: 60vh; overflow-y: auto;"></div>
     </div>
   </div>

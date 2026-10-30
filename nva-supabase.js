@@ -424,7 +424,7 @@
     // Es un <form> de verdad para que el móvil ofrezca guardar la contraseña
     // en su gestor (llavero de iOS, Google) y rellenarla después.
     const bio = bioGuardada();
-    el.innerHTML = `<div class="caja">${logo}<h1>Nou Volei Alzira</h1><p>Inicia sesión para entrar en la app.</p>
+    el.innerHTML = `<div class="caja">${logo}<h1>Nou Vòlei Alzira</h1><p>Inicia sesión para entrar en la app.</p>
       <div class="error" id="nvaError">${esc(mensaje || "")}</div>
       ${bio ? `<button type="button" class="bio" id="nvaEntrarBio">${HUELLA_SVG}Entrar con ${nombreBio().texto}</button>` : ""}
       <form id="nvaFormLogin">
@@ -617,7 +617,7 @@
       let cred;
       try {
         cred = await navigator.credentials.create({ publicKey: {
-          rp: { name: "Nou Volei Alzira", id: location.hostname },
+          rp: { name: "Nou Vòlei Alzira", id: location.hostname },
           // Mismo id para el mismo usuario: si la vuelve a activar, el móvil reemplaza la llave anterior
           user: { id: new TextEncoder().encode(perfil.id), name: email, displayName: perfil.nombre || email },
           challenge: crypto.getRandomValues(new Uint8Array(32)),

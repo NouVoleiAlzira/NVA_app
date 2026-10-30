@@ -155,7 +155,7 @@
     <!-- ===== Sección plegable: Tablón de Consultas ===== -->
     <div class="section-title section-toggle" id="secHead_tablon" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_tablon" style="margin-top:20px;" onclick="toggleSection('tablon')" onkeydown="sectionKey(event,'tablon')">Tablón de Consultas <span class="sec-arrow">▾</span></div>
     <div class="section-body" id="secBody_tablon">
-      <textarea id="tablonTextarea" class="comment-input-long" placeholder="Escribe aquí las noticias del club..." oninput="autoResizeTablon(this)" onchange="updateTablon(this.value)"></textarea>
+      <textarea id="tablonTextarea" class="comment-input-long" placeholder="Escribe aquí las noticias del club..." lang="es" spellcheck="true" autocorrect="on" autocapitalize="sentences" autocomplete="on" inputmode="text" enterkeyhint="enter" oninput="onTablonInput(this, event)" oncompositionend="autoResizeTablon(this)" onchange="updateTablon(this.value)"></textarea>
       <div style="display:flex; gap:8px;">
         <button class="btn-save-session" style="flex:1;" onclick="withLoading(saveTablon, 'Guardando Tablón...')">💾 Guardar Tablón</button>
         <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; background: var(--btn-fondoVerde);" onclick="withLoading(refreshTablon, 'Refrescando Tablón...')">🔄 Refrescar</button>
@@ -420,7 +420,7 @@
         <div class="modal-title">❓ Crear Consulta</div>
         <button class="btn-close-modal" onclick="closeCreateQueryModal()">✕</button>
       </div>
-      <textarea id="createQueryText" class="comment-input-long" style="min-height:70px; margin-bottom:10px;" placeholder="Escribe aquí la consulta o pregunta..."></textarea>
+      <textarea id="createQueryText" class="comment-input-long" lang="es" spellcheck="true" autocorrect="on" autocapitalize="sentences" autocomplete="on" inputmode="text" enterkeyhint="enter" style="min-height:70px; margin-bottom:10px;" placeholder="Escribe aquí la consulta o pregunta..."></textarea>
       
       <div style="margin-bottom: 10px;">
         <label style="font-size:0.75rem; color:#64748b; font-weight:600; display:block; margin-bottom:4px;">Tipo de Consulta:</label>

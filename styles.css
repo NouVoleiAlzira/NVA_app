@@ -1801,6 +1801,7 @@
     .imp-item input { margin-top: 2px; flex: 0 0 auto; }
     .imp-item select { font: inherit; font-size: 0.78rem; border-radius: 6px; padding: 1px 4px; color: #0f172a; background: #fff; }
     .imp-sub { margin-top: 3px; }
+    .imp-sub select { margin: 2px 4px 0 0; }
     .imp-add { color: #86efac; }
     .imp-del { color: #fca5a5; }
     .imp-ren { color: #fde68a; }

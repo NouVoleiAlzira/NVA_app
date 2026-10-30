@@ -4560,10 +4560,12 @@
     ctx.restore();
   }
   function wkAnulado(key, dateStr) { return !!(window.nvaEntrenoAnulado && window.nvaEntrenoAnulado(key, dateStr)); }
+  // V = registrado, X = sin registrar, D = equipo deseleccionado (no tiene que registrar)
   function wkMarkFor(x, mon, logSet, now) {
     const d = new Date(mon); d.setDate(mon.getDate() + x.day - 1);
     if (wkAnulado(x.key, wkFmt(d))) return null;
     if (logSet.has(`${x.key}|${wkFmt(d)}`)) return "V";
+    if (window.nvaEquipoDeselec && window.nvaEquipoDeselec(x.key)) return "D";
     const end = new Date(d); end.setHours(Math.floor(x.e / 60), x.e % 60, 0, 0);
     return end <= now ? "X" : null;
   }
@@ -6220,7 +6222,7 @@
           const anul = opts.anulado ? opts.anulado(x) : false;
           if (anul) wkStripes(ctx, [[x0, yTL], [x1, yTR], [x1, yBR], [x0, yBL]]);
 
-          // Marca V / X (solo en el calendario semanal de la página principal)
+          // Marca V / X / D (solo en el calendario semanal de la página principal)
           const markCh = opts.mark && !anul ? opts.mark(x) : null;
           const mr = markCh ? Math.max(12, Math.min(28, (yBR - yTL) * 0.22)) : 0;
           const reserve = markCh && (bBot - bTop) > 2 * mr + 70 ? 2 * mr + 6 : 0;
@@ -6230,11 +6232,15 @@
             const bx = reserve ? (x0 + x1) / 2 : x0 + mr + 6;
             const by = reserve ? bTop + 3 + mr : yTL + mr + 4;
             ctx.beginPath(); ctx.arc(bx, by, mr, 0, Math.PI * 2);
-            ctx.fillStyle = markCh === "V" ? "#16a34a" : "#dc2626"; ctx.fill();
+            ctx.fillStyle = markCh === "V" ? "#16a34a" : markCh === "D" ? "#f5ee00" : "#dc2626"; ctx.fill();
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke();
-            ctx.fillStyle = "#fff"; ctx.font = `800 ${Math.round(mr * 1.3)}px ${HZ_FONT}`;
-            ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText(markCh, bx, by + mr * 0.06);
+            ctx.fillStyle = "#fff";
+            if (markCh === "D") ctx.fillRect(bx - mr * 0.55, by - mr * 0.17, mr * 1.1, mr * 0.34);   // prohibido el paso
+            else {
+              ctx.font = `800 ${Math.round(mr * 1.3)}px ${HZ_FONT}`;
+              ctx.textAlign = "center"; ctx.textBaseline = "middle";
+              ctx.fillText(markCh, bx, by + mr * 0.06);
+            }
           }
         });
       });

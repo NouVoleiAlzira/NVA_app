@@ -3,6 +3,8 @@
 // entrenamiento o la cabecera de un día lo marca como anulado (rayas
 // diagonales) y deja de contar en los avisos de registros.
 // «Deselección partidos»: ventana para anular partidos sin registro.
+// «Deselección equipos»: ventana para marcar equipos que no tienen que
+// registrar sus entrenamientos (salen con un icono amarillo y no generan aviso).
 // Se guarda en GitHub (Historial/anulaciones.json) para todos; cada cambio
 // sale en el Historial de cambios con la opción de deshacerlo.
 (function () {
@@ -17,8 +19,8 @@
   const esc = escapeHtml, b64dec = b64_to_utf8, b64enc = utf8_to_b64;   // de app.js
   function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function fmt(f) { const d = new Date(f + "T12:00:00"); return DIAS[(d.getDay() + 6) % 7] + " " + d.getDate() + "/" + (d.getMonth() + 1); }
-  function vacio() { return { entrenos: {}, dias: {}, partidos: {}, deshechos: [] }; }
-  function norm(d) { d = Object.assign(vacio(), d || {}); ["entrenos", "dias", "partidos"].forEach(k => { if (typeof d[k] !== "object" || !d[k]) d[k] = {}; }); if (!Array.isArray(d.deshechos)) d.deshechos = []; return d; }
+  function vacio() { return { entrenos: {}, dias: {}, partidos: {}, equipos: {}, deshechos: [] }; }
+  function norm(d) { d = Object.assign(vacio(), d || {}); ["entrenos", "dias", "partidos", "equipos"].forEach(k => { if (typeof d[k] !== "object" || !d[k]) d[k] = {}; }); if (!Array.isArray(d.deshechos)) d.deshechos = []; return d; }
 
   let datos = norm(lsGet(LS, null));
   const pkey = (team, date, rival) => team + "|" + date + "|" + (rival || "");
@@ -26,6 +28,7 @@
   window.nvaEntrenoAnulado = (team, date) => !!(datos.entrenos[team + "|" + date] || datos.dias[date]);
   window.nvaDiaAnulado = date => !!datos.dias[date];
   window.nvaPartidoAnulado = (team, date, rival) => !!datos.partidos[pkey(team, date, rival)];
+  window.nvaEquipoDeselec = team => !!datos.equipos[team];
   window.nvaAccionDeshecha = id => datos.deshechos.indexOf(id) !== -1;
 
   function redibujar() { try { if (typeof renderWeekCalendar === "function") renderWeekCalendar(); } catch (e) {} }
@@ -91,6 +94,7 @@
     const fn = d => {
       if (op.tipo === "entreno") { const k = op.team + "|" + op.date; if (op.anular) d.entrenos[k] = q; else delete d.entrenos[k]; }
       else if (op.tipo === "dia") { if (op.anular) d.dias[op.date] = q; else delete d.dias[op.date]; }
+      else if (op.tipo === "equipo") { if (op.anular) d.equipos[op.team] = q; else delete d.equipos[op.team]; }
       else if (op.tipo === "partido") { const k = pkey(op.team, op.date, op.rival); if (op.anular) d.partidos[k] = Object.assign({ equipo: op.equipo || op.team }, q); else delete d.partidos[k]; }
     };
     return cambiar(fn, "Anulaciones de registros");
@@ -156,6 +160,29 @@
   window.openDeselPartidos = function () { semana = 0; document.getElementById("modalDeselPartidos").classList.add("active"); pintarPartidos(); };
   window.closeDeselPartidos = function () { document.getElementById("modalDeselPartidos").classList.remove("active"); };
   window.anulSemana = function (s) { semana = s; pintarPartidos(); };
+
+  // ---------- Equipos ----------
+  function equipos() {
+    try { return (appData.teams || []).map(t => getTeamKey(t)).filter(Boolean).sort((a, b) => a.localeCompare(b, "es")); } catch (e) { return []; }
+  }
+  function pintarEquipos() {
+    const lista = equipos();
+    const box = document.getElementById("deselEquipos");
+    if (!lista.length) { box.innerHTML = '<p class="hist-vacio">No hay equipos.</p>'; return; }
+    box.innerHTML = lista.map((t, i) => {
+      const des = window.nvaEquipoDeselec(t);
+      return `<label class="anul-part${des ? " anul-si" : ""}"><input type="checkbox" data-i="${i}"${des ? " checked" : ""}>
+        <span><b>${esc(t)}</b>${des ? ' <em class="anul-tag">DESELECCIONADO</em>' : ""}</span></label>`;
+    }).join("");
+    box.querySelectorAll("input").forEach(inp => inp.addEventListener("change", () => {
+      const team = lista[Number(inp.dataset.i)], anular = inp.checked;
+      aplicar({ tipo: "equipo", team, anular });
+      anotar((anular ? "🚫 Equipo deseleccionado: " : "↩ Equipo seleccionado de nuevo: ") + team, { tipo: "equipo", team, anular: !anular });
+      pintarEquipos();
+    }));
+  }
+  window.openDeselEquipos = function () { document.getElementById("modalDeselEquipos").classList.add("active"); pintarEquipos(); };
+  window.closeDeselEquipos = function () { document.getElementById("modalDeselEquipos").classList.remove("active"); };
 
   window.addEventListener("load", () => setTimeout(cargar, 800));
 })();

@@ -41,8 +41,8 @@
     } catch (e) {}
   }
 
-  // Entrenamientos y partidos anulados (anulaciones.js) no cuentan
-  function anulE(team, date) { return !!(window.nvaEntrenoAnulado && window.nvaEntrenoAnulado(team, date)); }
+  // Entrenamientos y partidos anulados y equipos deseleccionados (anulaciones.js) no cuentan
+  function anulE(team, date) { return !!((window.nvaEntrenoAnulado && window.nvaEntrenoAnulado(team, date)) || (window.nvaEquipoDeselec && window.nvaEquipoDeselec(team))); }
   function anulP(team, date, rival) { return !!(window.nvaPartidoAnulado && window.nvaPartidoAnulado(team, date, rival)); }
   function url(g, path) { return `https://api.github.com/repos/${g.user}/${g.repo}/contents/${path}`; }
 

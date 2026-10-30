@@ -210,10 +210,11 @@
     <div class="section-subtitle">Control de registros</div>
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openHistorial()">📜 Historial de cambios</button>
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openAvisos()">⚠️ Mensaje de aviso</button>
-    <div style="display:flex; gap:8px; margin-bottom:20px;">
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
       <button class="btn-pdf-mode2" id="btnDeselEntrenos" style="flex:1; min-width:0; margin-bottom:0;" onclick="nvaDeselEntrenos()">🚫 Deselección entrenamientos</button>
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="openDeselPartidos()">🚫 Deselección partidos</button>
     </div>
+    <button class="btn-pdf-mode2" style="margin-bottom:20px;" onclick="openDeselEquipos()">🚫 Deselección equipos</button>
     </div>
     </div>
 
@@ -614,6 +615,18 @@
       <div class="hist-estado" id="anulSemTxt"></div>
       <p class="hist-estado">Marca los partidos que se han anulado: no se pedirá su registro.</p>
       <div class="hist-list" id="anulPartidos"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: DESELECCIÓN DE EQUIPOS (anulaciones.js) -->
+  <div class="modal-backdrop" id="modalDeselEquipos" onclick="if(event.target===this)closeDeselEquipos()">
+    <div class="modal-box hist-box">
+      <div class="modal-header">
+        <div class="modal-title">🚫 Deselección equipos</div>
+        <button class="hist-cerrar" onclick="closeDeselEquipos()" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="hist-estado">Marca los equipos que no tienen que registrar sus entrenamientos: salen con el icono amarillo y no generan aviso.</p>
+      <div class="hist-list" id="deselEquipos"></div>
     </div>
   </div>
 

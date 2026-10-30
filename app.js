@@ -252,8 +252,21 @@
     document.getElementById("sessionDatePicker").value = today;
   }
 
+  // Mientras el teclado del móvil está componiendo una palabra (corrector,
+  // predicción, emojis) no se toca el tamaño: cambiar la altura en mitad de
+  // la composición hace saltar la página y el teclado pierde la palabra.
+  // Se recalcula al terminar (compositionend).
+  function onTablonInput(element, ev) {
+    tablonData.tablonText = element.value;
+    if (ev && ev.isComposing) return;
+    autoResizeTablon(element);
+  }
+
   function autoResizeTablon(element) {
     if (!element) return;
+    // Al poner la altura en 'auto' la página se acorta un instante; se guarda
+    // el scroll para que no salte mientras se escribe.
+    const scrollY = window.scrollY;
     element.style.height = 'auto';
     const style = window.getComputedStyle(element);
     let lineHeight = parseFloat(style.lineHeight);
@@ -262,6 +275,7 @@
       lineHeight = fontSize * 1.3;
     }
     element.style.height = (element.scrollHeight + lineHeight) + 'px';
+    if (window.scrollY !== scrollY) window.scrollTo(window.scrollX, scrollY);
   }
 
   function setupColorPickers() {
@@ -390,7 +404,8 @@
         tablonData = JSON.parse(b64_to_utf8(json.content));
         localStorage.setItem("NVA_TABLON_DATA", JSON.stringify(tablonData));
         const tablonEl = document.getElementById("tablonTextarea");
-        if (tablonEl) {
+        // No se pisa lo que se está escribiendo en ese momento.
+        if (tablonEl && document.activeElement !== tablonEl) {
           tablonEl.value = tablonData.tablonText || "";
           autoResizeTablon(tablonEl);
         }

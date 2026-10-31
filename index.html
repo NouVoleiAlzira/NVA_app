@@ -137,15 +137,20 @@
       <div data-nva-menu="informes.kilometraje">
       <button class="btn-pdf-mode" id="btnKilometraje" onclick="openKilometrajeModal()" style="width:100%; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🚗 Reporte Kilometraje</button>
       </div>
-      <div data-nva-menu="informes.fichas">
-      <div class="section-subtitle" style="margin-top:14px;">Fichas de Federación</div>
-      <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openFichasFederacion()">📇 Fichas de Federación</button>
-      <input type="file" id="fichaFileInput" accept="application/pdf,.pdf" style="display:none;">
+      <!-- Federación: dos botones con permisos propios (informes.fichas e
+           informes.autorizaciones). El título se oculta si no se ve ninguno. -->
+      <div data-nva-menu="informes.federacion" id="grpFederacion">
+      <div class="section-subtitle" style="margin-top:14px;">Federación</div>
+      <div style="display:flex; gap:8px;">
+        <div id="fedFichas" style="flex:1; min-width:0;">
+        <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openFichasFederacion()">📇 Fichas</button>
+        <input type="file" id="fichaFileInput" accept="application/pdf,.pdf" style="display:none;">
+        </div>
+        <div id="fedAutorizaciones" style="flex:1; min-width:0;">
+        <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openAutorizacionesFederacion()">📝 Autorizaciones</button>
+        <input type="file" id="autorizacionFileInput" accept="application/pdf,.pdf" style="display:none;">
+        </div>
       </div>
-      <div data-nva-menu="informes.autorizaciones">
-      <div class="section-subtitle" style="margin-top:14px;">Autorizaciones de Federación</div>
-      <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openAutorizacionesFederacion()">📝 Autorizaciones de Federación</button>
-      <input type="file" id="autorizacionFileInput" accept="application/pdf,.pdf" style="display:none;">
       </div>
       <div data-nva-menu="informes.drive">
       <div class="section-subtitle" style="margin-top:14px;">PDFs Resultados en Drive</div>

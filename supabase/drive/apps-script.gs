@@ -8,6 +8,8 @@
 //  · Fichas de Federación: la función «fichas-drive» las guarda en la
 //    carpeta CARPETA_FICHAS (privada: solo la cuenta del club) y las lee
 //    para que la app las muestre o descargue.
+//  · Autorizaciones de Federación: igual que las fichas, en la carpeta
+//    CARPETA_AUTORIZACIONES (privada: solo la cuenta del club).
 //
 //  1. Cambia CLAVE por una clave larga inventada (la misma que el secreto
 //     DRIVE_SCRIPT_CLAVE de Supabase).
@@ -22,15 +24,21 @@
 const CLAVE = "CAMBIA_ESTA_CLAVE";
 const CARPETA = "NVA · Partidos y Resultados";
 const CARPETA_FICHAS = "NVA · Fichas de Federación";
-const VERSION = 2; // «fichas-drive» exige la 2 para no dejar fichas en la carpeta pública
+const CARPETA_AUTORIZACIONES = "NVA · Autorizaciones de Federación";
+// «fichas-drive» exige la 2 para las fichas y la 3 para las autorizaciones,
+// para no dejarlas nunca en la carpeta pública
+const VERSION = 3;
 
 function doPost(e) {
   try {
     const p = JSON.parse(e.postData.contents);
     if (CLAVE === "CAMBIA_ESTA_CLAVE" || p.clave !== CLAVE) return salida({ error: "Clave del Apps Script incorrecta" });
     if (p.accion === "version") return salida({ version: VERSION });
-    const fichas = p.carpeta === "fichas";
-    const carpeta = fichas ? carpetaClub("CARPETA_FICHAS_ID", CARPETA_FICHAS) : carpetaClub("CARPETA_ID", CARPETA);
+    // Fichas y autorizaciones: carpetas privadas. Lo demás: PDFs de resultados (públicos).
+    const privada = p.carpeta === "fichas" || p.carpeta === "autorizaciones";
+    const carpeta = p.carpeta === "fichas" ? carpetaClub("CARPETA_FICHAS_ID", CARPETA_FICHAS)
+      : p.carpeta === "autorizaciones" ? carpetaClub("CARPETA_AUTORIZACIONES_ID", CARPETA_AUTORIZACIONES)
+      : carpetaClub("CARPETA_ID", CARPETA);
     if (p.accion === "leer") return leer(p, carpeta);
     const blob = Utilities.newBlob(Utilities.base64Decode(p.pdf), "application/pdf", p.nombre);
 
@@ -58,8 +66,8 @@ function doPost(e) {
     } else {
       archivo = carpeta.createFile(blob);
     }
-    // Las fichas llevan datos de menores: no se comparten con nadie.
-    if (!fichas) archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    // Las fichas y autorizaciones llevan datos de menores: no se comparten con nadie.
+    if (!privada) archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     return salida({ id: archivo.getId(), url: archivo.getUrl() });
   } catch (err) {
     return salida({ error: String((err && err.message) || err) });
@@ -102,6 +110,7 @@ function carpetaClub(propiedad, nombre) {
 function autorizar() {
   carpetaClub("CARPETA_ID", CARPETA);
   carpetaClub("CARPETA_FICHAS_ID", CARPETA_FICHAS);
+  carpetaClub("CARPETA_AUTORIZACIONES_ID", CARPETA_AUTORIZACIONES);
   UrlFetchApp.fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
     headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
   });

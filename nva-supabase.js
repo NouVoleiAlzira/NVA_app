@@ -43,6 +43,7 @@
     "informes.entrenadores": ["[data-nva-menu=\"informes.entrenadores\"]"],
     "informes.pdf": ["[data-nva-menu=\"informes.pdf\"]"],
     "informes.fichas": ["[data-nva-menu=\"informes.fichas\"]"],
+    "informes.autorizaciones": ["[data-nva-menu=\"informes.autorizaciones\"]"],
     "informes.drive": ["[data-nva-menu=\"informes.drive\"]"],
     "informes.kilometraje": ["[data-nva-menu=\"informes.kilometraje\"]"],
     "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],

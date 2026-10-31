@@ -42,8 +42,8 @@
     // Subsecciones («menú.subsección»): solo se muestran u ocultan
     "informes.entrenadores": ["[data-nva-menu=\"informes.entrenadores\"]"],
     "informes.pdf": ["[data-nva-menu=\"informes.pdf\"]"],
-    "informes.fichas": ["[data-nva-menu=\"informes.fichas\"]"],
-    "informes.autorizaciones": ["[data-nva-menu=\"informes.autorizaciones\"]"],
+    "informes.fichas": ["#fedFichas"],
+    "informes.autorizaciones": ["#fedAutorizaciones"],
     "informes.drive": ["[data-nva-menu=\"informes.drive\"]"],
     "informes.kilometraje": ["[data-nva-menu=\"informes.kilometraje\"]"],
     "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],
@@ -701,6 +701,12 @@
         if (ver) n.removeAttribute("data-nva-oculto"); else n.setAttribute("data-nva-oculto", "");
       }));
     });
+    // Subsección «Federación»: su título solo si se ve alguno de sus dos botones
+    const fed = document.getElementById("grpFederacion");
+    if (fed) {
+      const algun = acceso("informes.fichas") !== "ninguno" || acceso("informes.autorizaciones") !== "ninguno";
+      if (algun) fed.removeAttribute("data-nva-oculto"); else fed.setAttribute("data-nva-oculto", "");
+    }
     const igVisible = acceso("instagram") !== "ninguno";
     ["#secHead_instagram", "#secBody_instagram"].forEach(sel => {
       const n = document.querySelector(sel);

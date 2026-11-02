@@ -98,7 +98,17 @@
       const porMes = {};
       pend.forEach(e => { (porMes[e.t.slice(0, 7)] = porMes[e.t.slice(0, 7)] || []).push(e); });
       const enviados = new Set();
+      // Cualquier usuario puede anotar sus acciones (función anotar_historial),
+      // aunque no tenga permiso para ver ni editar Dirección NVA. Antes los
+      // entrenadores no podían y sus registros nunca llegaban al historial.
+      const cli = window.nva && window.nva.cliente;
       for (const mes of Object.keys(porMes)) {
+        if (cli) {
+          const { error } = await cli.rpc("anotar_historial", { p_mes: mes, p_items: porMes[mes] });
+          if (!error) { porMes[mes].forEach(e => enviados.add(e.id)); guardarCache(porMes[mes]); continue; }
+          // Sin la función en la base de datos todavía: se intenta como antes
+          if (!/anotar_historial|PGRST202|42883/.test((error.code || "") + " " + (error.message || ""))) continue;
+        }
         for (let intento = 0; intento < 3; intento++) {
           const { sha, items } = await leerMes(g, mes);
           const ids = new Set(items.map(x => x.id));

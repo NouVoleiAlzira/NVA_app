@@ -89,11 +89,26 @@
       return data;
     }
 
+    // Una versión antigua de fichas-drive no conoce «tipo» y guardaría (o
+    // leería) las autorizaciones como si fueran las fichas, pisándolas. Antes
+    // de tocar algo que no sean fichas se comprueba que la función lo conoce.
+    let tipoAdmitido = cfg.tipo === "fichas";
+    async function comprobarTipo() {
+      if (tipoAdmitido) return;
+      let d = null;
+      try { d = await llamar({ accion: "tipos" }); } catch (e) {}
+      if (!d || !Array.isArray(d.tipos) || !d.tipos.includes(cfg.tipo)) {
+        throw new Error(`La función «fichas-drive» de Supabase está sin actualizar: guardaría las ${cfg.plural} encima de las fichas. Hay que desplegarla de nuevo (supabase functions deploy fichas-drive).`);
+      }
+      tipoAdmitido = true;
+    }
+
     async function blobDe(key) {
       const enDrive = indice[key];
       if (!enDrive) throw new Error(`${key} todavía no tiene ${cfg.una}.`);
       const c = cacheBlobs[key];
       if (c && c.actualizado === enDrive.actualizado) return c.blob;
+      await comprobarTipo();
       const d = await llamar({ accion: "leer", equipo: key });
       const blob = deBase64(d.pdf);
       cacheBlobs[key] = { actualizado: enDrive.actualizado, blob };
@@ -131,6 +146,7 @@
     }
 
     async function subir(key, blob) {
+      await comprobarTipo();
       const r = await llamar({ accion: "subir", equipo: key, pdf: await aBase64(blob) });
       indice[key] = r;
       cacheBlobs[key] = { actualizado: r.actualizado, blob };

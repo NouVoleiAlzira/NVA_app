@@ -13,6 +13,9 @@
 //     → { id, actualizado }   (quien pueda editar la subsección; un entrenador, solo sus equipos)
 //   supabase.functions.invoke("fichas-drive", { body: { accion: "leer", equipo: "NVA A (Cadete)" } })
 //     → { pdf: "<base64>", nombre }   (quien pueda ver la subsección)
+//   supabase.functions.invoke("fichas-drive", { body: { accion: "tipos" } })
+//     → { tipos: ["fichas", "autorizaciones"] }   (la app lo comprueba antes de
+//       usar las autorizaciones: una versión antigua las guardaría como fichas)
 // Qué equipo tiene PDF y cuándo se subió: Fichas/drive.json y
 // Autorizaciones/drive.json
 //   { "<equipo>": { id, actualizado, por } }
@@ -63,6 +66,9 @@ Deno.serve(async (req) => {
   const t = TIPOS[tipo as keyof typeof TIPOS];
   const INDICE = t.indice;
   const nombreFicha = t.nombre;
+  // La app pregunta antes de tocar las autorizaciones: una versión antigua de
+  // esta función no conoce «tipo» y las guardaría encima de las fichas.
+  if (accion === "tipos") return respuesta(200, { tipos: Object.keys(TIPOS) });
   if (accion !== "subir" && accion !== "leer") return respuesta(400, { error: "Acción no válida" });
   if (typeof equipo !== "string" || !/^[^/\\]{1,100}$/.test(equipo)) return respuesta(400, { error: "Equipo no válido" });
 

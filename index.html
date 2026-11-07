@@ -270,6 +270,11 @@
         </div>
         </div>
         </div>
+        <div class="cp-sub-head" id="igSubHead_eventos" role="button" tabindex="0" aria-expanded="true" onclick="igToggleSub('eventos')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();igToggleSub('eventos');}">🎨 Eventos <span class="sec-arrow">▾</span></div>
+        <div class="cp-sub-body" id="igSub_eventos">
+        <p class="ig-info">Crea el cartel de un evento paso a paso: te iré preguntando como un diseñador y la IA pinta la imagen. El escudo, los patrocinadores y los textos se colocan solos.</p>
+        <button class="btn-save-session" style="width:100%; margin:0 0 10px; --c: var(--c-violeta);" onclick="evAbrirCartel()">✨ Crear cartel de evento</button>
+        </div>
       </div>
     </div>
   </div>
@@ -978,6 +983,7 @@
 <script src="historia-editor.js" defer></script>
 <script src="historia-semana.js" defer></script>
 <script src="instagram.js" defer></script>
+<script src="eventos-cartel.js" defer></script>
 
 
 <!-- Botón ATRÁS: vuelve a la pantalla principal y, ya en ella, pregunta antes de salir -->

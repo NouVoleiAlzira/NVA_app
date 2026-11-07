@@ -57,6 +57,7 @@
     "direccion.registros": ["[data-nva-menu=\"direccion.registros\"]"],
     "instagram.reels": ["#igSubHead_reels", "#igSub_reels"],
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
+    "instagram.eventos": ["#igSubHead_eventos", "#igSub_eventos"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
     "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"],
     "opciones.ligas": [".tab-btn[onclick=\"switchTab(3)\"]", "#tabContent3"]

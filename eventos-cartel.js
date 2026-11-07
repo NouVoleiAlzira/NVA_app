@@ -69,6 +69,9 @@
   const conImagen = r => usaIA(r) || r.principal === "foto";
 
   const PREGUNTAS = [
+    { id: "inicio", bloque: "Para empezar", q: "¿Cómo quieres empezar?", nota: "Si ya tienes la imagen, me salto las preguntas sobre ella y vamos directos a los textos.",
+      op: [{ v: "entrevista", e: "✨", t: "Crear la imagen paso a paso" }, { v: "subir", e: "📥", t: "Ya tengo la imagen, la subo" }] },
+    { id: "foto0", bloque: "Para empezar", tipo: "foto", q: "Sube tu imagen.", nota: "Elijo el formato que mejor le encaja; luego lo puedes cambiar y mover o ampliar la imagen.", cuando: r => r.inicio === "subir" },
     { id: "evento", bloque: "El encargo", q: "Antes de nada, ¿qué evento vamos a anunciar?", nota: "Me ayuda a proponerte el tono y los textos.",
       op: [
         { v: "partido", e: "🏐", t: "Partido especial" }, { v: "torneo", e: "🏆", t: "Torneo" },
@@ -83,13 +86,13 @@
         { v: "cuadrado", e: "⬛", t: "Post cuadrado · 1080×1080" }, { v: "a4", e: "🖨️", t: "Para imprimir · A4/A3" },
         { v: "horizontal", e: "🖥️", t: "Horizontal · web / pantalla" }
       ] },
-    { id: "principal", bloque: "La imagen central", q: "¿Qué protagonista quieres en el centro del cartel?", nota: "Es lo primero que mira la gente: tiene que contar el evento de un vistazo.",
+    { id: "principal", bloque: "La imagen central", cuando: r => r.inicio !== "subir", q: "¿Qué protagonista quieres en el centro del cartel?", nota: "Es lo primero que mira la gente: tiene que contar el evento de un vistazo.",
       op: [
         { v: "jugadora", e: "🙋‍♀️", t: "Una jugadora (IA)" }, { v: "equipo", e: "👯", t: "Varias jugadoras (IA)" },
         { v: "balon", e: "🏐", t: "El balón como protagonista (IA)" }, { v: "foto", e: "📷", t: "Una foto mía" },
         { v: "tipografia", e: "🔤", t: "Solo texto, sin imagen" }
       ] },
-    { id: "foto", bloque: "La imagen central", tipo: "foto", q: "Sube la foto que quieres usar.", nota: "Mejor en vertical y con buena luz. Luego podrás moverla y ampliarla.", cuando: r => r.principal === "foto" },
+    { id: "foto", bloque: "La imagen central", tipo: "foto", q: "Sube la foto que quieres usar.", nota: "Mejor en vertical y con buena luz. Luego podrás moverla y ampliarla.", cuando: r => r.principal === "foto" && r.inicio !== "subir" },
 
     { id: "equip", bloque: "La jugadora", q: "Vestirá la equipación del club. ¿Cuál?", cuando: esPersona, nota: "Uso las fotos de la equipación como referencia para la IA.", dinamica: "equipaciones" },
     { id: "dorsal", bloque: "La jugadora", tipo: "dorsal", q: "¿Qué dorsal lleva en la camiseta?", cuando: r => r.principal === "jugadora", nota: "Si es una jugadora concreta, pon su número." },
@@ -435,10 +438,24 @@
     return partes.join("\n\n");
   }
 
+  // Formato con la proporción más parecida a la de la imagen subida
+  function formatoParecido(prop) {
+    let mejor = "story", dif = Infinity;
+    Object.keys(FORMATOS).forEach(k => {
+      const d = Math.abs(Math.log((FORMATOS[k].w / FORMATOS[k].h) / prop));
+      if (d < dif) { dif = d; mejor = k; }
+    });
+    return mejor;
+  }
+
   function responder(id, v) {
     const nueva = r[id] === undefined;
     r[id] = v;
     if (id === "formato") ajuste = { z: 1, ox: 0, oy: 0 };
+    if (id === "inicio") {
+      if (v === "subir") r.principal = "foto";
+      else if (r.principal === "foto") { delete r.principal; imgPrincipal = null; }
+    }
     if (id === "principal" && v !== "foto" && imgPrincipal && imgPrincipal._foto) imgPrincipal = null;
     if (id === "principal" && v === "foto" && imgPrincipal && !imgPrincipal._foto) imgPrincipal = null;
     render.saltar = nueva;
@@ -464,7 +481,11 @@
       const f = foto.files && foto.files[0];
       if (!f) return;
       const i = new Image();
-      i.onload = () => { i._foto = true; imgPrincipal = i; ajuste = { z: 1, ox: 0, oy: 0 }; render.saltar = true; render(); };
+      i.onload = () => {
+        i._foto = true; imgPrincipal = i; ajuste = { z: 1, ox: 0, oy: 0 };
+        if (r.inicio === "subir" && !r.formato) r.formato = formatoParecido(i.width / i.height);
+        render.saltar = true; render();
+      };
       i.src = URL.createObjectURL(f);
     };
     const zoom = c.querySelector("[data-zoom]");

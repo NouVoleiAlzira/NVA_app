@@ -182,25 +182,36 @@
   }
   const info = T => [T.hora, T.lugar].filter(Boolean).join(" · ");
 
+  /* ---------- Colores del boceto (principal y acento elegidos) ---------- */
+  let PR, PR2, PR3, AC, AC2, AC3;
+  const hx = h => { const n = parseInt(String(h).replace("#", ""), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const mezclar = (a, b, t) => "#" + hx(a).map((v, i) => Math.round(v + (hx(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+  const rgb = (h, a) => { const [r, g, b] = hx(h); return `rgba(${r},${g},${b},${a})`; };
+  function tonos(c1, c2) {
+    PR = c1; PR2 = mezclar(c1, "#ffffff", 0.3); PR3 = mezclar(c1, "#000000", 0.55);
+    AC = c2; AC2 = mezclar(c2, "#ffffff", 0.25); AC3 = mezclar(c2, "#000000", 0.45);
+  }
+  tonos("#1f3cff", "#ff5b00");
+
   /* ---------- Bocetos ---------- */
   const DIB = {
     estallido(ctx, W, H, T, rnd) {
-      const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#1f3cff"); g.addColorStop(0.6, "#08135a"); g.addColorStop(1, "#050a2a");
+      const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, PR); g.addColorStop(0.6, PR3); g.addColorStop(1, "#050a2a");
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      const o = ctx.createLinearGradient(W * 0.5, 0, W, H); o.addColorStop(0, "#ff9a3d"); o.addColorStop(1, "#ff5b00");
+      const o = ctx.createLinearGradient(W * 0.5, 0, W, H); o.addColorStop(0, AC2); o.addColorStop(1, AC);
       ctx.fillStyle = o; ctx.beginPath(); ctx.moveTo(W * 0.66, 0); ctx.lineTo(W, 0); ctx.lineTo(W, H); ctx.lineTo(W * 0.46, H); ctx.fill();
       ctx.strokeStyle = "rgba(170,200,255,.25)"; ctx.lineWidth = Math.max(1, W * 0.002);
       for (let i = 0; i < 90; i++) { const x = rnd() * W * 0.65, y = rnd() * H; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - W * 0.01, y + H * 0.03); ctx.stroke(); }
-      esquirlas(ctx, 70, W * 0.15, H * 0.12, W * 0.8, H * 0.75, W * 0.025, ["#0b1236", "#0b1236", "#ff7a1a", "#e9eefa"], rnd);
+      esquirlas(ctx, 70, W * 0.15, H * 0.12, W * 0.8, H * 0.75, W * 0.025, ["#0b1236", "#0b1236", AC2, "#e9eefa"], rnd);
       const yT = H * 0.53, lin = lineas(T.titulo.toUpperCase(), 1);
-      jugadora(ctx, W * 0.5, H * 0.46, H * 0.62, "#0b1236", "remate", "#7ea0ff");
+      jugadora(ctx, W * 0.5, H * 0.46, H * 0.62, "#0b1236", "remate", PR2);
       const px = texto(ctx, lin[0], W / 2, yT, W * 0.94, H * 0.2, A, "#f4f6fb");
-      desgaste(ctx, 0, yT - px / 2, W, px, "rgba(8,19,90,.55)", rnd, 260);
+      desgaste(ctx, 0, yT - px / 2, W, px, rgb(PR3, .55), rnd, 260);
       ctx.save(); ctx.beginPath(); ctx.rect(0, yT + px * 0.32, W, H); ctx.clip();
-      jugadora(ctx, W * 0.5, H * 0.46, H * 0.62, "#0b1236", "remate", "#7ea0ff"); ctx.restore();
+      jugadora(ctx, W * 0.5, H * 0.46, H * 0.62, "#0b1236", "remate", PR2); ctx.restore();
       const sub = (T.sub || T.vs || "").toUpperCase(), sl = lineas(sub, 2);
       sl.forEach((l, i) => texto(ctx, l, W * 0.94, H * (0.76 + i * 0.055), W * 0.5, W * 0.085, BC, "#ffffff", "right"));
-      ctx.fillStyle = "rgba(140,50,0,.55)";
+      ctx.fillStyle = rgb(AC3, .55);
       for (let i = 0; i < 12; i++) { const w = W * (0.02 + rnd() * 0.03), h = H * (0.03 + rnd() * 0.08); ctx.fillRect(W * 0.6 + i * W * 0.033, H - h, w, h); }
       texto(ctx, [T.fecha, T.redes].filter(Boolean).join("  ·  "), W * 0.06, H * 0.95, W * 0.5, W * 0.035, B, "#ffffff", "left");
     },
@@ -212,17 +223,17 @@
       const of = document.createElement("canvas"); of.width = W; of.height = H; const o = of.getContext("2d");
       lin.forEach((l, i) => texto(o, l, W / 2, H * (lin.length === 1 ? 0.24 : 0.16 + i * 0.2), W * 0.95, H * (lin.length === 1 ? 0.22 : 0.19), A, "#000"));
       o.globalCompositeOperation = "source-atop";
-      const g = o.createLinearGradient(0, 0, W, H * 0.5); g.addColorStop(0, "#0a1f9e"); g.addColorStop(0.5, "#2f6bff"); g.addColorStop(1, "#0b1a6e");
+      const g = o.createLinearGradient(0, 0, W, H * 0.5); g.addColorStop(0, PR3); g.addColorStop(0.5, PR2); g.addColorStop(1, PR3);
       o.fillStyle = g; o.fillRect(0, 0, W, H);
-      puntos(o, 160, 0, 0, W, H * 0.5, W * 0.003, W * 0.02, "rgba(170,210,255,.35)", rnd);
-      puntos(o, 40, 0, 0, W, H * 0.5, W * 0.002, W * 0.006, "rgba(255,140,60,.8)", rnd);
+      puntos(o, 160, 0, 0, W, H * 0.5, W * 0.003, W * 0.02, rgb(PR2, .35), rnd);
+      puntos(o, 40, 0, 0, W, H * 0.5, W * 0.002, W * 0.006, rgb(AC2, .8), rnd);
       ctx.drawImage(of, 0, 0);
       salpicar(ctx, W * 0.55, H * 0.8, W * 0.42, 260, "rgba(11,18,54,.85)", rnd);
       salpicar(ctx, W * 0.72, H * 0.62, W * 0.18, 90, "rgba(190,150,40,.8)", rnd);
-      jugadora(ctx, W * 0.56, H * 0.6, H * 0.66, "#2a3f8f", "remate", "#ffffff");
-      [T.vs, T.fecha, T.lugar].filter(Boolean).forEach((l, i) => texto(ctx, l.toUpperCase(), W * 0.05, H * (0.58 + i * 0.035), W * 0.36, W * 0.032, BC, "#0b1a6e", "left"));
+      jugadora(ctx, W * 0.56, H * 0.6, H * 0.66, PR3, "remate", "#ffffff");
+      [T.vs, T.fecha, T.lugar].filter(Boolean).forEach((l, i) => texto(ctx, l.toUpperCase(), W * 0.05, H * (0.58 + i * 0.035), W * 0.36, W * 0.032, BC, PR3, "left"));
       ctx.save(); ctx.translate(W * 0.5, H * 0.9); ctx.rotate(-0.12); ctx.globalAlpha = 0.55;
-      texto(ctx, T.sub || "Nou Volei Alzira", 0, 0, W * 0.9, W * 0.15, PM, "#1f3cff"); ctx.restore();
+      texto(ctx, T.sub || "Nou Volei Alzira", 0, 0, W * 0.9, W * 0.15, PM, PR); ctx.restore();
     },
 
     grunge(ctx, W, H, T, rnd) {
@@ -235,17 +246,17 @@
         if (e > 0) { ctx.fillStyle = `rgba(20,20,20,${0.35 * e})`; ctx.beginPath(); ctx.arc(x, y, W * 0.007 * e, 0, 7); ctx.fill(); }
       }
       ctx.save(); ctx.translate(W * 0.2, H * 0.55); ctx.rotate(-Math.PI / 2);
-      const px = texto(ctx, T.titulo.toUpperCase(), 0, 0, H * 0.78, W * 0.3, A, "#ff5b00");
+      const px = texto(ctx, T.titulo.toUpperCase(), 0, 0, H * 0.78, W * 0.3, A, AC);
       desgaste(ctx, -H * 0.4, -px / 2, H * 0.8, px, "rgba(60,60,60,.45)", rnd, 200);
       ctx.restore();
       if (T.sub) texto(ctx, T.sub, W * 0.2, H * 0.1, W * 0.36, W * 0.06, PM, "#ffffff");
-      jugadora(ctx, W * 0.56, H * 0.55, H * 0.8, "#1c1f26", "frente", "#ff7a1a");
+      jugadora(ctx, W * 0.56, H * 0.55, H * 0.8, "#1c1f26", "frente", AC2);
       caja(ctx, W * 0.7, H * 0.05, W * 0.25, H * 0.04, "#0d0d0d");
       texto(ctx, (T.evento || "PARTIDO").toUpperCase(), W * 0.825, H * 0.07, W * 0.22, W * 0.04, BC, "#ffffff");
-      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.825, H * 0.13, W * 0.26, W * 0.08, A, "#ff5b00");
+      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.825, H * 0.13, W * 0.26, W * 0.08, A, AC);
       if (T.vs) { pincel(ctx, W * 0.12, H * 0.8, W * 0.76, H * 0.05, "#0d0d0d", -0.02, rnd); texto(ctx, T.vs.toUpperCase(), W * 0.5, H * 0.825, W * 0.7, W * 0.055, BC, "#ffffff"); }
       [info(T), T.extra].filter(Boolean).forEach((l, i) => texto(ctx, l.toUpperCase(), W / 2, H * (0.885 + i * 0.035), W * 0.9, W * 0.036, BC, "#ffffff"));
-      texto(ctx, T.redes, W / 2, H * 0.965, W * 0.8, W * 0.032, B, "#ff7a1a");
+      texto(ctx, T.redes, W / 2, H * 0.965, W * 0.8, W * 0.032, B, AC2);
     },
 
     duelo(ctx, W, H, T, rnd) {
@@ -256,7 +267,7 @@
       ctx.save(); ctx.translate(W / 2, H * 0.47); ctx.rotate(-0.35);
       const lg = ctx.createLinearGradient(-W, 0, W, 0); lg.addColorStop(0, "rgba(255,180,60,0)"); lg.addColorStop(0.5, "rgba(255,200,90,.9)"); lg.addColorStop(1, "rgba(255,180,60,0)");
       ctx.fillStyle = lg; ctx.fillRect(-W, -H * 0.004, W * 2, H * 0.008); ctx.restore();
-      jugadora(ctx, W * 0.3, H * 0.27, H * 0.42, "#1f3cff", "perfil", "#c9d6ff");
+      jugadora(ctx, W * 0.3, H * 0.27, H * 0.42, PR, "perfil", "#c9d6ff");
       jugadora(ctx, W * 0.7, H * 0.6, H * 0.42, T.rivalColor || "#c1121f", "perfil", "#ffd2b0", true);
       const ch = ctx.createLinearGradient(0, H * 0.4, 0, H * 0.5); ch.addColorStop(0, "#ffffff"); ch.addColorStop(0.5, "#8d97ab"); ch.addColorStop(1, "#f2f4f8");
       texto(ctx, "VS", W / 2, H * 0.455, W * 0.3, W * 0.17, A, ch, "center", ["#0b1236", 0.08]);
@@ -274,12 +285,12 @@
     fuegohielo(ctx, W, H, T, rnd) {
       const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, "#04122e"); g.addColorStop(0.5, "#1a0b1e"); g.addColorStop(1, "#2a0500");
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      for (let i = 0; i < 14; i++) brillo(ctx, rnd() * W * 0.5, H * (0.25 + rnd() * 0.5), W * 0.25, "rgba(40,140,255,A)", 0.22);
-      for (let i = 0; i < 14; i++) brillo(ctx, W * 0.5 + rnd() * W * 0.5, H * (0.25 + rnd() * 0.5), W * 0.25, "rgba(255,90,0,A)", 0.25);
+      for (let i = 0; i < 14; i++) brillo(ctx, rnd() * W * 0.5, H * (0.25 + rnd() * 0.5), W * 0.25, rgb(PR2, "A"), 0.22);
+      for (let i = 0; i < 14; i++) brillo(ctx, W * 0.5 + rnd() * W * 0.5, H * (0.25 + rnd() * 0.5), W * 0.25, rgb(AC, "A"), 0.25);
       puntos(ctx, 120, 0, H * 0.15, W * 0.5, H * 0.65, W * 0.002, W * 0.006, "rgba(190,230,255,.8)", rnd);
       puntos(ctx, 140, W * 0.5, H * 0.15, W * 0.5, H * 0.65, W * 0.002, W * 0.007, "rgba(255,180,60,.85)", rnd);
-      jugadora(ctx, W * 0.27, H * 0.47, H * 0.42, "#06142f", "perfil", "#58b8ff");
-      jugadora(ctx, W * 0.73, H * 0.47, H * 0.42, "#1f0700", "perfil", "#ff7a1a", true);
+      jugadora(ctx, W * 0.27, H * 0.47, H * 0.42, "#06142f", "perfil", PR2);
+      jugadora(ctx, W * 0.73, H * 0.47, H * 0.42, "#1f0700", "perfil", AC2, true);
       const tg = ctx.createLinearGradient(0, H * 0.06, 0, H * 0.16); tg.addColorStop(0, "#ffffff"); tg.addColorStop(1, "#a9a3ff");
       lineas(T.titulo.toUpperCase(), 2).forEach((t, i, a) => texto(ctx, t, W / 2, H * (a.length === 1 ? 0.1 : 0.08 + i * 0.06), W * 0.8, Math.min(W * 0.1, H * 0.063), A, tg, "center", ["#2a1a6e", 0.08]));
       texto(ctx, (T.sub || T.vs || "").toUpperCase(), W / 2, H * 0.73, W * 0.7, W * 0.04, BC, "#f5c518");
@@ -297,10 +308,10 @@
         ctx.fillStyle = "rgba(255,255,255,.05)"; ctx.beginPath(); ctx.moveTo(x - W * 0.02, H * 0.05); ctx.lineTo(x + W * 0.02, H * 0.05); ctx.lineTo(x + W * 0.12, H * 0.6); ctx.lineTo(x - W * 0.12, H * 0.6); ctx.fill();
         brillo(ctx, x, H * 0.05, W * 0.1, "rgba(255,255,255,A)", 0.95);
       }
-      const cols = ["#ffffff", "#f5c518", "#ff7a1a", "#9fb0d8"];
+      const cols = ["#ffffff", "#f5c518", AC2, "#9fb0d8"];
       for (let i = 0; i < 70; i++) { ctx.fillStyle = cols[i % 4]; ctx.save(); ctx.translate(rnd() * W, rnd() * H * 0.6); ctx.rotate(rnd() * 3); ctx.fillRect(0, 0, W * 0.012, W * 0.006); ctx.restore(); }
-      ctx.fillStyle = "#1d3fbf"; ctx.fillRect(0, H * 0.62, W, H * 0.38);
-      ctx.fillStyle = "#f07a2a"; ctx.beginPath(); ctx.moveTo(W * 0.22, H * 0.62); ctx.lineTo(W * 0.78, H * 0.62); ctx.lineTo(W * 1.15, H); ctx.lineTo(-W * 0.15, H); ctx.fill();
+      ctx.fillStyle = PR; ctx.fillRect(0, H * 0.62, W, H * 0.38);
+      ctx.fillStyle = AC2; ctx.beginPath(); ctx.moveTo(W * 0.22, H * 0.62); ctx.lineTo(W * 0.78, H * 0.62); ctx.lineTo(W * 1.15, H); ctx.lineTo(-W * 0.15, H); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = Math.max(1, W * 0.004);
       ctx.beginPath(); ctx.moveTo(W * 0.22, H * 0.62); ctx.lineTo(-W * 0.15, H); ctx.moveTo(W * 0.78, H * 0.62); ctx.lineTo(W * 1.15, H); ctx.moveTo(W * 0.12, H * 0.75); ctx.lineTo(W * 0.88, H * 0.75); ctx.stroke();
       const ch = ctx.createLinearGradient(0, H * 0.12, 0, H * 0.25); ch.addColorStop(0, "#ffffff"); ch.addColorStop(0.5, "#8a93a6"); ch.addColorStop(1, "#eef1f6");
@@ -331,7 +342,7 @@
       ctx.fillRect(W * 0.3, H * 0.33, W * 0.008, H * 0.05); ctx.fillRect(W * 0.62, H * 0.34, W * 0.006, H * 0.07);
       texto(ctx, (T.sub || "").toUpperCase().split("").join(" "), W / 2, H * 0.08, W * 0.8, W * 0.032, B, "#333");
       lineas(T.titulo.toUpperCase(), 2).forEach((t, i, a) => texto(ctx, t, W / 2, H * (a.length === 1 ? 0.28 : 0.22 + i * 0.11), W * 0.86, Math.min(W * 0.2, H * 0.115), A, "#f4f4f4", "center", ["#000", 0.05]));
-      brillo(ctx, W / 2, H * 0.56, W * 0.38, "rgba(255,130,40,A)", 0.55);
+      brillo(ctx, W / 2, H * 0.56, W * 0.38, rgb(AC2, "A"), 0.55);
       balon(ctx, W / 2, H * 0.54, W * 0.2);
       jugadora(ctx, W * 0.15, H * 0.47, H * 0.13, "#111", "remate");
       jugadora(ctx, W * 0.86, H * 0.5, H * 0.13, "#111", "remate", null, true);
@@ -352,20 +363,20 @@
       ctx.fillStyle = m; ctx.beginPath(); ctx.moveTo(W * 0.1, H * 0.45); ctx.lineTo(W * 0.9, H * 0.45); ctx.lineTo(W * 1.3, H); ctx.lineTo(-W * 0.3, H); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = Math.max(1, W * 0.004);
       ctx.beginPath(); ctx.ellipse(W / 2, H * 0.55, W * 0.2, H * 0.04, 0, 0, 7); ctx.moveTo(0, H * 0.55); ctx.lineTo(W, H * 0.55); ctx.stroke();
-      ctx.fillStyle = "#ff5b00"; ctx.beginPath(); ctx.moveTo(W, H * 0.6); ctx.lineTo(W, H * 0.8); ctx.lineTo(W * 0.8, H * 0.8); ctx.fill();
-      ctx.fillStyle = "#1f3cff"; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.18, 0); ctx.lineTo(0, H * 0.12); ctx.fill();
-      esquirlas(ctx, 50, 0, H * 0.3, W, H * 0.4, W * 0.01, ["#ff7a1a", "#ffb15a"], rnd);
+      ctx.fillStyle = AC; ctx.beginPath(); ctx.moveTo(W, H * 0.6); ctx.lineTo(W, H * 0.8); ctx.lineTo(W * 0.8, H * 0.8); ctx.fill();
+      ctx.fillStyle = PR; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.18, 0); ctx.lineTo(0, H * 0.12); ctx.fill();
+      esquirlas(ctx, 50, 0, H * 0.3, W, H * 0.4, W * 0.01, [AC2, AC2], rnd);
       const lin = lineas(T.titulo.toUpperCase(), 2);
       ctx.save(); ctx.transform(1, 0, -0.12, 1, H * 0.012, 0);
-      lin.forEach((t, i) => texto(ctx, t, W / 2, H * (0.08 + i * 0.085), W * 0.9, Math.min(W * 0.15, H * 0.088), A, i === lin.length - 1 && lin.length > 1 ? "#ff5b00" : "#ffffff", "center", ["#000", 0.1]));
+      lin.forEach((t, i) => texto(ctx, t, W / 2, H * (0.08 + i * 0.085), W * 0.9, Math.min(W * 0.15, H * 0.088), A, i === lin.length - 1 && lin.length > 1 ? AC : "#ffffff", "center", ["#000", 0.1]));
       ctx.restore();
       texto(ctx, (T.sub || "").toUpperCase(), W / 2, H * 0.25, W * 0.8, W * 0.05, BC, "#ffffff", "center", ["#000", 0.08]);
       balon(ctx, W / 2, H * 0.5, W * 0.13);
       texto(ctx, (T.vs || "").toUpperCase(), W / 2, H * 0.66, W * 0.9, W * 0.08, A, "#ffffff", "center", ["#000", 0.08]);
       [[W * 0.04, "CUÁNDO", [T.fecha, T.hora]], [W * 0.52, "DÓNDE", [T.lugar, T.extra]]].forEach(([x, cab, ls]) => {
-        caja(ctx, x, H * 0.72, W * 0.44, H * 0.11, "rgba(8,12,30,.88)", W * 0.02); caja(ctx, x, H * 0.72, W * 0.44, H * 0.028, "#ff5b00", W * 0.02);
+        caja(ctx, x, H * 0.72, W * 0.44, H * 0.11, "rgba(8,12,30,.88)", W * 0.02); caja(ctx, x, H * 0.72, W * 0.44, H * 0.028, AC, W * 0.02);
         texto(ctx, cab, x + W * 0.22, H * 0.734, W * 0.4, W * 0.032, BC, "#ffffff");
-        ls.filter(Boolean).forEach((l, i) => texto(ctx, l, x + W * 0.22, H * (0.77 + i * 0.03), W * 0.4, W * 0.032, B, i ? "#ffb15a" : "#ffffff"));
+        ls.filter(Boolean).forEach((l, i) => texto(ctx, l, x + W * 0.22, H * (0.77 + i * 0.03), W * 0.4, W * 0.032, B, i ? AC2 : "#ffffff"));
       });
       caja(ctx, 0, H * 0.93, W, H * 0.07, "#05070f");
       texto(ctx, T.redes, W / 2, H * 0.965, W * 0.9, W * 0.032, B, "#ffffff");
@@ -380,10 +391,10 @@
       const p = T.titulo.toUpperCase().split(/\s+/), ult = p.length > 1 ? p.pop() : "", pri = p.join(" ");
       const p1 = texto(ctx, pri, W * 0.06, H * 0.15, W * 0.86, W * 0.17, A, "#f2f2f2", "left");
       desgaste(ctx, 0, H * 0.15 - p1 / 2, W, p1, "rgba(20,20,20,.55)", rnd, 160);
-      if (ult) { const p2 = texto(ctx, ult, W * 0.06, H * 0.29, W * 0.9, W * 0.25, A, "#ff6a00", "left"); desgaste(ctx, 0, H * 0.29 - p2 / 2, W, p2, "rgba(20,20,20,.5)", rnd, 160); }
+      if (ult) { const p2 = texto(ctx, ult, W * 0.06, H * 0.29, W * 0.9, W * 0.25, A, AC, "left"); desgaste(ctx, 0, H * 0.29 - p2 / 2, W, p2, "rgba(20,20,20,.5)", rnd, 160); }
       pincel(ctx, W * 0.02, H * 0.37, W * 0.8, H * 0.06, "#c1121f", -0.05, rnd);
       ctx.save(); ctx.translate(W * 0.42, H * 0.4); ctx.rotate(-0.05); texto(ctx, T.vs || T.extra || "", 0, 0, W * 0.72, W * 0.06, PM, "#ffffff"); ctx.restore();
-      ctx.strokeStyle = "#ff6a00"; ctx.lineWidth = Math.max(1.5, W * 0.005);
+      ctx.strokeStyle = AC; ctx.lineWidth = Math.max(1.5, W * 0.005);
       [0.12, 0.3, 0.48].forEach((x, i) => {
         const cx = W * x, cy = H * 0.5, r = W * 0.045;
         ctx.beginPath();
@@ -392,14 +403,14 @@
         else { ctx.moveTo(cx - r * 0.7, cy - r); ctx.lineTo(cx + r * 0.7, cy - r); ctx.quadraticCurveTo(cx + r * 0.7, cy + r * 0.3, cx, cy + r * 0.3); ctx.quadraticCurveTo(cx - r * 0.7, cy + r * 0.3, cx - r * 0.7, cy - r); ctx.moveTo(cx, cy + r * 0.3); ctx.lineTo(cx, cy + r); ctx.moveTo(cx - r * 0.4, cy + r); ctx.lineTo(cx + r * 0.4, cy + r); }
         ctx.stroke();
       });
-      ctx.strokeStyle = "rgba(255,106,0,.9)"; ctx.lineWidth = Math.max(1, W * 0.003); ctx.strokeRect(W * 0.05, H * 0.57, W * 0.52, H * 0.18);
-      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.08, H * 0.61, W * 0.46, W * 0.055, BC, "#ff8a3d", "left");
+      ctx.strokeStyle = rgb(AC, .9); ctx.lineWidth = Math.max(1, W * 0.003); ctx.strokeRect(W * 0.05, H * 0.57, W * 0.52, H * 0.18);
+      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.08, H * 0.61, W * 0.46, W * 0.055, BC, AC2, "left");
       texto(ctx, (T.hora || "").toUpperCase(), W * 0.08, H * 0.66, W * 0.46, W * 0.045, BC, "#ffffff", "left");
       texto(ctx, (T.lugar || "").toUpperCase(), W * 0.08, H * 0.71, W * 0.46, W * 0.04, BC, "#ffffff", "left");
-      pincel(ctx, W * 0.55, H * 0.63, W * 0.44, H * 0.13, "#ff7a1a", -0.08, rnd);
+      pincel(ctx, W * 0.55, H * 0.63, W * 0.44, H * 0.13, AC2, -0.08, rnd);
       ctx.save(); ctx.translate(W * 0.77, H * 0.695); ctx.rotate(-0.08);
       lineas((T.extra || T.sub || "").toUpperCase(), 2).forEach((l, i, a) => texto(ctx, l, 0, (i - (a.length - 1) / 2) * W * 0.06, W * 0.38, W * 0.05, BC, "#111")); ctx.restore();
-      caja(ctx, 0, H * 0.85, W, H * 0.15, "#000"); ctx.fillStyle = "#ff6a00"; ctx.fillRect(0, H * 0.85, W, H * 0.006);
+      caja(ctx, 0, H * 0.85, W, H * 0.15, "#000"); ctx.fillStyle = AC; ctx.fillRect(0, H * 0.85, W, H * 0.006);
       texto(ctx, (T.redes || "").toUpperCase(), W / 2, H * 0.925, W * 0.9, W * 0.1, A, "#f2f2f2");
     },
 
@@ -415,24 +426,24 @@
       for (let x = 0; x <= W * 0.62; x += W * 0.03) { ctx.beginPath(); ctx.moveTo(x, H * 0.05); ctx.lineTo(x, H * 0.17); ctx.stroke(); }
       for (let y = H * 0.05; y <= H * 0.17; y += W * 0.03) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W * 0.62, y); ctx.stroke(); }
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, H * 0.045, W * 0.63, H * 0.012);
-      ctx.strokeStyle = "rgba(255,170,90,.6)"; ctx.lineWidth = W * 0.008;
+      ctx.strokeStyle = rgb(AC2, .6); ctx.lineWidth = W * 0.008;
       for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(cx - W * 0.25 - i * W * 0.03, cy + H * 0.06 + i * H * 0.02); ctx.lineTo(cx - W * 0.13, cy + H * 0.02 + i * H * 0.01); ctx.stroke(); }
       ctx.strokeStyle = "#20140c"; ctx.lineCap = "round"; ctx.lineWidth = W * 0.08;
       ctx.beginPath(); ctx.moveTo(cx + W * 0.25, cy + H * 0.28); ctx.lineTo(cx + W * 0.1, cy + H * 0.06); ctx.stroke();
       balon(ctx, cx, cy, W * 0.12);
       ctx.save(); ctx.translate(W * 0.86, H * 0.46); ctx.rotate(Math.PI / 2);
-      const vg = ctx.createLinearGradient(-H * 0.4, 0, H * 0.4, 0); vg.addColorStop(0, "#ff5b00"); vg.addColorStop(1, "#ffffff");
+      const vg = ctx.createLinearGradient(-H * 0.4, 0, H * 0.4, 0); vg.addColorStop(0, AC); vg.addColorStop(1, "#ffffff");
       const px = texto(ctx, T.titulo.toUpperCase(), 0, 0, H * 0.84, W * 0.3, A, vg);
       desgaste(ctx, -H * 0.42, -px / 2, H * 0.84, px, "rgba(0,0,0,.45)", rnd, 200); ctx.restore();
       texto(ctx, (T.sub || "").toUpperCase(), W * 0.05, H * 0.5, W * 0.62, W * 0.045, BC, "#ffffff", "left");
-      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.05, H * 0.57, W * 0.62, W * 0.09, BC, "#ff6a00", "left");
+      texto(ctx, (T.fecha || "").toUpperCase(), W * 0.05, H * 0.57, W * 0.62, W * 0.09, BC, AC, "left");
       texto(ctx, (T.hora || "").toUpperCase(), W * 0.05, H * 0.625, W * 0.62, W * 0.05, BC, "#ffffff", "left");
       if (T.vs) {
-        ctx.fillStyle = "#ff5b00"; ctx.beginPath(); ctx.moveTo(0, H * 0.66); ctx.lineTo(W * 0.66, H * 0.66); ctx.lineTo(W * 0.71, H * 0.69); ctx.lineTo(W * 0.66, H * 0.72); ctx.lineTo(0, H * 0.72); ctx.fill();
+        ctx.fillStyle = AC; ctx.beginPath(); ctx.moveTo(0, H * 0.66); ctx.lineTo(W * 0.66, H * 0.66); ctx.lineTo(W * 0.71, H * 0.69); ctx.lineTo(W * 0.66, H * 0.72); ctx.lineTo(0, H * 0.72); ctx.fill();
         texto(ctx, T.vs.toUpperCase(), W * 0.05, H * 0.69, W * 0.6, W * 0.055, BC, "#ffffff", "left");
       }
       [T.lugar, T.extra].filter(Boolean).forEach((l, i) => texto(ctx, l.toUpperCase(), W * 0.05, H * (0.77 + i * 0.035), W * 0.62, W * 0.035, BC, "#ffffff", "left"));
-      texto(ctx, (T.redes || "").toUpperCase(), W * 0.05, H * 0.9, W * 0.62, W * 0.035, BC, "#ff8a3d", "left");
+      texto(ctx, (T.redes || "").toUpperCase(), W * 0.05, H * 0.9, W * 0.62, W * 0.035, BC, AC2, "left");
       if (T.evento) { caja(ctx, W * 0.66, H * 0.9, W * 0.3, H * 0.05, "#ffffff"); texto(ctx, T.evento.toUpperCase(), W * 0.81, H * 0.925, W * 0.26, W * 0.04, BC, "#000"); }
     }
   };
@@ -440,9 +451,10 @@
   // Boceto de un estilo. T: textos de la entrevista
   function dibujar(ctx, W, H, id, T) {
     const f = DIB[id];
+    tonos(/^#[0-9a-f]{6}$/i.test(T.c1 || "") ? T.c1 : "#1f3cff", /^#[0-9a-f]{6}$/i.test(T.c2 || "") ? T.c2 : "#ff5b00");
     ctx.save();
     if (!f) {   // «Otro»: un boceto neutro con el título
-      const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#0a1f9e"); g.addColorStop(1, "#ff5b00");
+      const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, PR3); g.addColorStop(1, AC);
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       texto(ctx, T.titulo.toUpperCase(), W / 2, H * 0.5, W * 0.9, W * 0.15, A, "#ffffff");
     } else f(ctx, W, H, T, azar(id.length * 977 + 13));

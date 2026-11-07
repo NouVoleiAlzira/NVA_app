@@ -1,0 +1,17 @@
+{
+  "nota": "Fotos de referencia de la equipación para el apartado EVENTOS (Redes Sociales). Cada imagen como máximo 512×512 px. La IA las usa para copiar la camiseta; el dorsal lo cambia según la respuesta.",
+  "equipaciones": [
+    {
+      "id": "azul",
+      "nombre": "Camiseta azul",
+      "descripcion": "navy blue V-neck volleyball jersey with orange collar, white and orange diagonal brush-stroke stripes across the lower half, white halftone dots, fox mascot on the sleeves, white shirt number with orange outline, navy shorts",
+      "imagenes": ["azul-delante.jpg", "azul-detras.jpg"]
+    },
+    {
+      "id": "blanca",
+      "nombre": "Camiseta blanca",
+      "descripcion": "white V-neck volleyball jersey with navy blue collar and navy sleeves, navy and orange diagonal brush-stroke stripes across the lower half, navy halftone dots, fox mascot on the sleeves, navy shirt number with orange outline, navy shorts",
+      "imagenes": ["blanca-delante.jpg", "blanca-detras.jpg"]
+    }
+  ]
+}

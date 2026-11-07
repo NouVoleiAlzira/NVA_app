@@ -129,7 +129,7 @@
     applySub(id, open);
   }
   const st0 = subsState();
-  ["reels", "stories"].forEach(id => applySub(id, st0[id] !== false));
+  ["reels", "stories", "eventos"].forEach(id => applySub(id, st0[id] !== false));
   ["reelsPub", "storiesPub"].forEach(id => applySub(id, st0[id] === true));   // «Publicados» empieza plegado
   window.igToggleSub = igToggleSub;
 

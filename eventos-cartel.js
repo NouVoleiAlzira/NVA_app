@@ -14,6 +14,14 @@
       tamaño (⤡) y la opacidad (◐).
    La imagen también se puede generar desde la app con la función de
    Supabase «generar-cartel» si está configurada.
+
+   Modo «Cartel con estilo» (evAbrirCartel("ia")): la entrevista pregunta por
+   el escenario, la protagonista y los textos, enseña bocetos de diez estilos
+   (eventos-estilos.js) y monta un único encargo para que la IA haga el cartel
+   entero. El cartel subido pasa al mismo montaje por capas para ponerle el
+   escudo, los patrocinadores y los escudos de los equipos.
+   Si el evento es un partido, se elige entre los próximos del calendario y se
+   usan sus escudos, fecha, hora y campo.
    ===================================================================== */
 (function () {
   "use strict";
@@ -196,7 +204,51 @@
       { id: "patros", tipo: "patros", q: "El escudo del club va siempre. ¿Qué patrocinadores salen? Tócalos por orden de importancia: el primero sale más grande.", nota: "Después los podrás mover y cambiar de tamaño." }
     ] }
   ];
-  const TODAS = SECCIONES.reduce((a, s) => a.concat(s.preguntas), []);
+  // Si el evento es un partido: los próximos del calendario
+  const PREG_PARTIDO = { id: "partido", tipo: "partido", cuando: () => r.evento === "partido", q: "¿Qué partido es? Estos son los próximos del calendario.", nota: "Uso los escudos de los dos equipos, la fecha, la hora y el campo." };
+  SECCIONES[0].preguntas.splice(1, 0, PREG_PARTIDO);
+
+  /* ---------- «Cartel con estilo»: la IA hace el cartel entero ---------- */
+  const P = id => SECCIONES.reduce((a, s) => a.concat(s.preguntas), []).find(p => p.id === id);
+  const TEXTOS_IA = [
+    { id: "titulo", tipo: "texto", q: "Vamos con los textos: los escribes tú y saldrán tal cual. ¿Cuál es el título grande?", ph: "Por ejemplo: GRAN FINAL", nota: "Mejor corto: una o dos palabras lucen más." },
+    { id: "subtitulo", tipo: "texto", opcional: true, q: "¿Una frase o categoría que acompañe al título?", ph: "Por ejemplo: Liga autonómica cadete" },
+    { id: "vs", tipo: "texto", opcional: true, q: "¿Quién juega? Escríbelo como «local vs visitante».", ph: "Por ejemplo: NVA vs CV Xàtiva" },
+    { id: "fecha", tipo: "texto", opcional: true, q: "¿Qué día?", ph: "Por ejemplo: Sábado 24 de mayo" },
+    { id: "hora", tipo: "texto", opcional: true, q: "¿A qué hora?", ph: "Por ejemplo: 18:00 h" },
+    { id: "lugar", tipo: "texto", opcional: true, q: "¿Dónde es?", ph: "Por ejemplo: Pabellón Municipal de Alzira" },
+    { id: "extra", tipo: "texto", largo: true, opcional: true, q: "¿Algo más? Precio, inscripciones, un lema…", ph: "Por ejemplo: Entrada libre. ¡Te esperamos!" },
+    { id: "redes", tipo: "texto", opcional: true, q: "¿Web, Instagram o contacto?", ph: "Por ejemplo: @nouvoleialzira" }
+  ];
+  const COLORES_RIVAL = [
+    { v: "rojo", t: "Rojo", c: "#c1121f", p: "a red kit" }, { v: "verde", t: "Verde", c: "#1b8a3a", p: "a green kit" },
+    { v: "amarillo", t: "Amarillo", c: "#e0b000", p: "a yellow kit" }, { v: "negro", t: "Negro", c: "#1a1a1a", p: "a black kit" },
+    { v: "blanco", t: "Blanco", c: "#d9dde6", p: "a white kit" }, { v: "morado", t: "Morado", c: "#6a1b9a", p: "a purple kit" },
+    { v: "celeste", t: "Celeste", c: "#4fa8e0", p: "a sky-blue kit" }
+  ];
+  const estiloElegido = () => window.evEstilos && window.evEstilos.LISTA.find(e => e.v === r.estiloCartel);
+  const SECCIONES_IA = [
+    { id: "cartel", t: "🗂️ El cartel", preguntas: [P("evento"), PREG_PARTIDO, P("formato")] },
+    { id: "fondo", t: "🌄 El escenario", preguntas: [
+      { id: "fTipo", q: "Empecemos por el escenario. ¿Qué se ve detrás?", nota: "El estilo del cartel lo eliges al final; esto es lo que habrá detrás.",
+        op: P("fTipo").op.filter(o => o.v !== "sin").concat([{ v: "liso", e: "🎨", t: "Fondo liso con textura", p: "a plain textured backdrop" }]) },
+      P("fPaleta"), P("fLuz"), P("fAmb")
+    ] },
+    { id: "pers", t: "🙋‍♀️ Protagonista", preguntas: [
+      Object.assign({}, P("pTipo"), { q: "¿Quién protagoniza el cartel?", op: P("pTipo").op.map(o => o.v === "ninguno" ? { v: "ninguno", e: "🚫", t: "Nadie, solo ambiente" } : o) })
+    ].concat(["equip", "dorsal", "nJug", "edad", "rasgos", "complexion", "peloColor", "peinado", "pose", "poseEq", "balon", "plano", "expresion"].map(P)) },
+    { id: "textos", t: "🔤 Títulos y textos", preguntas: TEXTOS_IA },
+    { id: "logos", t: "🛡️ Escudo y patrocinadores", preguntas: [Object.assign({}, P("patros"), {
+      q: "El escudo del club y los patrocinadores los pongo yo encima del cartel. ¿Qué patrocinadores salen? Tócalos por orden de importancia.", nota: "El encargo le pide a la IA que les deje sitio." })] },
+    { id: "estilo", t: "✨ Estilo del cartel", preguntas: [
+      { id: "estiloCartel", tipo: "estilo", q: "Con todo esto, ¿qué estilo de cartel te gusta más?", nota: "Son bocetos con tus textos. La imagen de verdad la hará la IA." },
+      { id: "rivalColor", q: "Este estilo enfrenta a dos jugadoras. ¿De qué color viste el rival?", cuando: () => !!(estiloElegido() || {}).duo, op: COLORES_RIVAL },
+      { id: "acabado", q: "¿Y el acabado de la imagen?", op: [{ v: "auto", e: "✨", t: "El que pida el estilo", p: "" }].concat(ESTILOS) }
+    ] },
+    { id: "encargo", t: "📋 El encargo", preguntas: [{ id: "cartelImg", tipo: "imagen", capa: "fondo", ia: true }] }
+  ];
+  let modo = "capas";
+  const SECC = () => modo === "ia" ? SECCIONES_IA : SECCIONES;
 
   /* ---------- Estado ---------- */
   let r = {};                       // respuestas (id → valor; «otro» guarda el texto en id_o)
@@ -210,6 +262,7 @@
   let patrocinadores = [];
   const imgs = {}, imgsListas = {};
   let capa = null;
+  let partidos = null, partidoSel = null, cargandoPartidos = false;
 
   // Capas del montaje. El fondo es siempre la capa 1; el resto se ordena en E.orden
   // (de atrás hacia delante) y cada texto tiene su propio id.
@@ -219,9 +272,11 @@
       fondo: { z: 1, ox: 0, oy: 0, op: 1 },
       pers: { x: 0.5, y: 0.6, s: 0.72, rot: 0, op: 1, flip: false },
       logo: { x: 0.5, y: 0.09, s: 0.2, rot: 0, op: 1 },
+      escL: { x: 0.28, y: 0.8, s: 0.17, rot: 0, op: 1 },
+      escV: { x: 0.72, y: 0.8, s: 0.17, rot: 0, op: 1 },
       patros: { x: 0.74, y: 0.93, s: 1, rot: 0, op: 1, placa: true },
       textos: [],
-      orden: ["pers", "logo", "patros"],
+      orden: ["pers", "escL", "escV", "logo", "patros"],
       ocultas: {}
     };
   }
@@ -486,15 +541,34 @@
       .ev-tog { display: flex; gap: 6px; flex-wrap: wrap; }
       .ev-tog button { border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); border-radius: 999px; padding: 7px 12px; font: 600 .82rem Barlow, sans-serif; cursor: pointer; }
       .ev-tog button[aria-pressed="true"] { background: var(--ev-tiza); color: var(--ev-noche); border-color: var(--ev-tiza); }
+      .ev-fila textarea { flex: 1; min-width: 0; min-height: 60px; resize: vertical; font: 500 .95rem Barlow, sans-serif; border-radius: 10px; padding: 8px 10px; }
+      .ev-q > .ev-estilos, .ev-q > .ev-partidos { margin-left: 34px; }
+      .ev-estilos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+      .ev-estilo { display: flex; flex-direction: column; gap: 4px; padding: 6px 6px 10px; border-radius: 14px; border: 2px solid var(--ev-linea); background: rgba(233,238,250,.04); color: var(--ev-tiza); text-align: left; cursor: pointer; font: inherit; }
+      .ev-estilo canvas { width: 100%; height: auto; border-radius: 8px; display: block; background: #000; }
+      .ev-estilo b { font-family: "Barlow Condensed", var(--font-display); font-style: italic; font-weight: 800; font-size: 1.02rem; color: #fff; padding: 2px 2px 0; }
+      .ev-estilo small { font-size: .74rem; line-height: 1.3; color: var(--ev-gris); padding: 0 2px; }
+      .ev-estilo.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.12); }
+      .ev-partidos { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+      .ev-partido { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px 8px; padding: 10px; border-radius: 14px; border: 2px solid var(--ev-linea); background: rgba(233,238,250,.04); color: var(--ev-tiza); cursor: pointer; font: inherit; }
+      .ev-partido .eq { display: flex; align-items: center; gap: 6px; min-width: 0; font: 800 italic .9rem "Barlow Condensed", sans-serif; }
+      .ev-partido .eq:last-of-type { flex-direction: row-reverse; text-align: right; }
+      .ev-partido .eq span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ev-partido img { flex: none; width: 30px; height: 30px; object-fit: contain; }
+      .ev-partido > b { color: var(--ev-naranja2); font: 800 italic .85rem "Barlow Condensed", sans-serif; }
+      .ev-partido small { grid-column: 1 / -1; text-align: center; color: var(--ev-gris); font-size: .74rem; }
+      .ev-partido.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.12); }
       .ev-box :focus-visible { outline: 2px solid var(--ev-naranja2); outline-offset: 2px; }
     `;
     document.head.appendChild(s);
   }
 
   /* ---------- Abrir / cerrar ---------- */
-  async function abrir() {
+  async function abrir(m) {
+    modo = m === "ia" ? "ia" : "capas";
+    partidos = null; partidoSel = null;
     ponerCss();
-    cargarFuentes().then(() => pintar());
+    cargarFuentes().then(() => { pintar(); if (capa) dibujarMinis(); });
     r = {}; abiertas = {}; img.fondo = img.pers = img.persOrig = null; E = capasIniciales(); sel = "fondo"; panel = "capas";
     quitarFondo = { activo: true, tol: 70, color: null };
     capa = document.createElement("div");
@@ -502,7 +576,7 @@
     capa.setAttribute("role", "dialog"); capa.setAttribute("aria-modal", "true"); capa.setAttribute("aria-label", "Crear cartel de evento");
     capa.innerHTML = `
       <div class="cp-modal-box ev-box">
-        <div class="ev-cab"><h3>Cartel de evento</h3>
+        <div class="ev-cab"><h3>${modo === "ia" ? "Cartel con estilo" : "Cartel de evento"}</h3>
           <button type="button" class="btn-close-modal" data-cerrar aria-label="Cerrar">✕</button></div>
         <div class="ev-pasos" id="evPasos" aria-hidden="true"></div>
         <div class="ev-escena" id="evEscena">
@@ -539,6 +613,7 @@
   function contestada(p) {
     if (p.tipo === "imagen") return !!img[p.capa] || r[p.id] === "omitir";
     if (p.tipo === "patros") return r.patros_ok === true;
+    if (p.tipo === "texto") return !!r[p.id + "_no"] || !!(r[p.id] || "").trim();
     if (r[p.id] === undefined || r[p.id] === "") return false;
     if (r[p.id] === "otro") return !!(r[p.id + "_o"] || "").trim();
     return true;
@@ -551,6 +626,9 @@
     if (p.tipo === "patros") return (r.patros || []).length ? `${r.patros.length} patrocinador${r.patros.length > 1 ? "es" : ""}` : "sin patrocinadores";
     if (p.tipo === "equip") { if (r.equip === "otro") return r.equip_o; const e = equipaciones.find(x => x.id === r.equip); return e ? e.nombre : ""; }
     if (p.tipo === "dorsal") return "dorsal " + (r.dorsal === "otro" ? r.dorsal_o : r.dorsal);
+    if (p.tipo === "texto") return r[p.id + "_no"] ? "" : (r[p.id] || "").trim().split("\n")[0];
+    if (p.tipo === "partido" && r.partido !== "otro") return partidoSel ? `${partidoSel.local.nombre} vs ${partidoSel.visit.nombre}` : "";
+    if (p.tipo === "estilo" && r.estiloCartel !== "otro") return (estiloElegido() || {}).t || "";
     if (r[p.id] === "otro") return r[p.id + "_o"];
     const o = (p.op || []).find(x => x.v === r[p.id]);
     return o ? o.t : "";
@@ -558,12 +636,12 @@
   // Parte del encargo de una respuesta («Otro» → lo escrito)
   function pr(id) {
     if (r[id] === "otro") return (r[id + "_o"] || "").trim();
-    const p = TODAS.find(x => x.id === id), o = p && (p.op || []).find(x => x.v === r[id]);
+    const p = SECC().reduce((a, s) => a.concat(s.preguntas), []).find(x => x.id === id), o = p && (p.op || []).find(x => x.v === r[id]);
     return (o && o.p) || "";
   }
 
   /* ---------- Pintar la entrevista ---------- */
-  const ICONOS = { cartel: "🗂️", fondo: "🌄", pers: "🙋‍♀️", logos: "🛡️" };
+  const ICONOS = { cartel: "🗂️", fondo: "🌄", pers: "🙋‍♀️", logos: "🛡️", textos: "🔤", estilo: "✨", encargo: "📋" };
   function dice(q, nota) {
     return `<div class="ev-dice"><img src="LOGO-NVA.png" alt=""><p>${esc(q)}${nota ? `<small>${esc(nota)}</small>` : ""}</p></div>`;
   }
@@ -573,7 +651,7 @@
     if (!cuerpo) return;
     const scrollAntes = cuerpo.scrollTop;
     let html = "", actual = null;
-    for (const s of SECCIONES) {
+    for (const s of SECC()) {
       const hecha = completa(s);
       if (!hecha && !actual) actual = s;
       if (!hecha && actual !== s) break;
@@ -610,8 +688,8 @@
   }
   function pintarPasos(actual) {
     const el = capa.querySelector("#evPasos");
-    const i = actual ? SECCIONES.indexOf(actual) : SECCIONES.length;
-    el.innerHTML = SECCIONES.concat([{ id: "montaje" }]).map((s, n) => `<span class="${n < i ? "hecho" : n === i ? "ahora" : ""}"></span>`).join("");
+    const i = actual ? SECC().indexOf(actual) : SECC().length;
+    el.innerHTML = SECC().concat([{ id: "montaje" }]).map((s, n) => `<span class="${n < i ? "hecho" : n === i ? "ahora" : ""}"></span>`).join("");
   }
   function pintarBarra(montaje) {
     const b = capa.querySelector("#evBarra");
@@ -632,7 +710,7 @@
   }
 
   function preguntaHtml(p) {
-    if (p.tipo === "imagen") return imagenHtml(p);
+    if (p.tipo === "imagen") return p.ia ? encargoHtml(p) : imagenHtml(p);
     let h = dice(p.q, p.nota);
     const tipo = p.tipo || "chips";
     if (tipo === "chips" || tipo === "color") {
@@ -659,6 +737,30 @@
         <div class="ev-fila"><button type="button" class="ev-op" data-eqacc="nueva">➕ Añadir equipación</button>
           <button type="button" class="ev-op otro${r.equip === "otro" ? " sel" : ""}" data-op="equip" data-v="otro">✏️ Otra (descríbela)</button>
           <span class="ev-estado" id="evEqEstado"></span></div>` + otroHtml("equip", "Describe la equipación");
+    } else if (tipo === "texto") {
+      const v = r[p.id] || "";
+      h += `<div class="ev-fila">${p.largo
+        ? `<textarea data-txt="${p.id}" rows="2" maxlength="300" placeholder="${esc(p.ph || "")}">${esc(v)}</textarea>`
+        : `<input type="text" maxlength="120" data-txt="${p.id}" placeholder="${esc(p.ph || "")}" value="${esc(v)}">`}
+        <button type="button" class="ev-mini" data-txtok="${p.id}" aria-label="Vale">✓</button></div>`;
+      if (p.opcional) h += `<div class="ev-ops"><button type="button" class="ev-op${r[p.id + "_no"] ? " sel" : ""}" data-txtno="${p.id}">No lleva</button></div>`;
+    } else if (tipo === "partido") {
+      if (!partidos) { cargarPartidos(); h += `<div class="ev-estado" style="margin-left:34px">Buscando los próximos partidos…</div>`; }
+      else {
+        h += partidos.length
+          ? `<div class="ev-partidos">` + partidos.map(pa => `<button type="button" class="ev-partido${r.partido === pa.id ? " sel" : ""}" data-partido="${esc(pa.id)}">
+              <span class="eq">${pa.local.src ? `<img src="${esc(pa.local.src)}" alt="">` : ""}<span>${esc(pa.local.nombre)}</span></span><b>vs</b>
+              <span class="eq">${pa.visit.src ? `<img src="${esc(pa.visit.src)}" alt="">` : ""}<span>${esc(pa.visit.nombre)}</span></span>
+              <small>${esc([pa.cat, fechaLarga(pa.fecha) + (pa.hora ? " · " + pa.hora : ""), pa.campo].filter(Boolean).join(" · "))}</small></button>`).join("") + `</div>`
+          : `<div class="ev-estado" style="margin-left:34px">No hay partidos en el calendario de las próximas semanas.</div>`;
+        h += `<div class="ev-ops"><button type="button" class="ev-op otro${r.partido === "otro" ? " sel" : ""}" data-op="partido" data-v="otro">✏️ Otro partido</button></div>` + otroHtml("partido", "Por ejemplo: NVA Cadete vs CV Xàtiva");
+      }
+    } else if (tipo === "estilo") {
+      const F = formato(), k = 300 / Math.max(F.w, F.h);
+      h += `<div class="ev-estilos">` + (window.evEstilos ? window.evEstilos.LISTA : []).map(e => `<button type="button" class="ev-estilo${r.estiloCartel === e.v ? " sel" : ""}" data-op="estiloCartel" data-v="${e.v}">
+          <canvas data-mini="${e.v}" width="${Math.round(F.w * k)}" height="${Math.round(F.h * k)}"></canvas><b>${esc(e.t)}</b><small>${esc(e.d)}</small></button>`).join("") + `</div>
+        <div class="ev-ops"><button type="button" class="ev-op otro${r.estiloCartel === "otro" ? " sel" : ""}" data-op="estiloCartel" data-v="otro">✏️ Otro estilo</button></div>` +
+        otroHtml("estiloCartel", "Describe el estilo, por ejemplo: cómic con colores neón");
     } else if (tipo === "patros") {
       const selP = r.patros || (r.patros = []);
       h += `<div class="ev-patro">` + patrocinadores.map(pt => {
@@ -692,7 +794,7 @@
       `<div class="ev-prompt" data-prompt="${p.capa}">${esc(txt)}</div>
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="${p.capa}">📋 Copiar el encargo</button>
-        ${fotosEq ? `<button type="button" class="ev-boton" data-fotoseq>👕 Fotos de la camiseta</button>` : ""}
+        ${fotosEq ? `<button type="button" class="ev-boton" data-copiareq>📋 Copiar la camiseta</button><button type="button" class="ev-boton" data-fotoseq>👕 Guardar sus fotos</button>` : ""}
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
@@ -708,6 +810,143 @@
     }
     return h;
   }
+
+  // Paso final del «Cartel con estilo»: el encargo completo y subir el cartel
+  function encargoHtml(p) {
+    const est = estiloElegido(), tiene = !!img.fondo;
+    const eq = equipaciones.find(e => e.id === r.equip) || {};
+    const fotosEq = esPersona() && r.equip !== "otro" && (eq.imagenes || []).length;
+    return dice(`Este es el encargo completo del cartel${est ? ` con el estilo «${est.t}»` : ""}. Cópialo y pégalo en Gemini o ChatGPT${fotosEq ? " junto con las fotos de la camiseta" : ""}, y sube aquí el cartel que te dé.`,
+        `Encima pondré el escudo del club${(r.patros || []).length ? ", los patrocinadores" : ""}${partidoActivo() ? " y los escudos de los dos equipos" : ""}, y podrás añadir más textos.`) +
+      `<div class="ev-prompt" data-prompt="fondo">${esc(promptCartel())}</div>
+      <div class="ev-acc">
+        <button type="button" class="ev-boton" data-copiar="fondo">📋 Copiar el encargo</button>
+        ${fotosEq ? `<button type="button" class="ev-boton" data-copiareq>📋 Copiar la camiseta</button><button type="button" class="ev-boton" data-fotoseq>👕 Guardar sus fotos</button>` : ""}
+      </div>
+      <div class="ev-acc">
+        <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar el cartel" : "Subir el cartel creado"}<input type="file" accept="image/*" data-subir="fondo" hidden></label>
+      </div>
+      <div class="ev-acc">
+        <button type="button" class="ev-op" data-generar="fondo">✨ Generarlo desde la app</button>
+        ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">Lo subo luego</button>` : ""}
+      </div>
+      <div class="ev-estado" data-estado="fondo" style="margin-left:34px"></div>`;
+  }
+
+  /* ---------- Partidos previstos (calendario) ---------- */
+  const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  function fechaLarga(iso) {
+    if (!iso) return "";
+    const d = new Date(iso + "T12:00:00"), t = `${DIAS_L[d.getDay()]} ${d.getDate()} de ${MESES_L[d.getMonth()]}`;
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  const partidoActivo = () => r.evento === "partido" && r.partido && r.partido !== "otro" && partidoSel;
+  async function cargarPartidos() {
+    if (cargandoPartidos) return;
+    cargandoPartidos = true;
+    const lista = [];
+    try {
+      const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const hoy = new Date(), fin = new Date(); fin.setDate(fin.getDate() + 60);
+      const crudos = window.partidosSemana ? window.partidosSemana(iso(hoy), iso(fin), false) : [];
+      let fichas = null;
+      try { if (window.nvaSemana) fichas = await window.nvaSemana.cargarFichas(); } catch (e) { fichas = null; }
+      for (const c of crudos.slice(0, 40)) {
+        let pa = null;
+        if (fichas) { try { pa = await window.nvaSemana.prepararPartido(c, fichas); } catch (e) { pa = null; } }
+        if (!pa) {   // sin DATOS.xls: solo nombres
+          const club = { nombre: c.team.name.toUpperCase(), logo: await cargarImg("LOGO-NVA.png") }, otro = { nombre: String(c.rival || "").toUpperCase(), logo: null };
+          pa = { id: `${c.key}|${c.fecha}|${c.rival}`, cat: (c.team.category || "").toUpperCase(), local: c.home ? club : otro, visit: c.home ? otro : club, fecha: c.fecha, hora: c.hora || "", campo: String(c.campo || "").toUpperCase() };
+        }
+        [pa.local, pa.visit].forEach(e => { e.src = e.logo && e.logo.src ? e.logo.src : ""; });
+        lista.push(pa);
+      }
+    } catch (e) { /* sin calendario */ }
+    partidos = lista;
+    cargandoPartidos = false;
+    if (capa) render();
+  }
+  const MENUDAS = new Set(["de", "del", "la", "las", "el", "los", "i", "y", "d", "l", "en"]);
+  const enFrase = t => String(t || "").toLowerCase().replace(/\p{L}+/gu, (w, i) => i > 0 && MENUDAS.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1));
+  function elegirPartido(id) {
+    const pa = (partidos || []).find(x => x.id === id);
+    if (!pa) return;
+    partidoSel = pa;
+    const vs = `${pa.local.nombre} vs ${pa.visit.nombre}`, fecha = fechaLarga(pa.fecha), lugar = enFrase(pa.campo);
+    if (modo === "ia") {
+      Object.assign(r, { vs, fecha, hora: pa.hora ? pa.hora + " h" : "", lugar });
+      ["vs", "fecha", "hora", "lugar"].forEach(k => { delete r[k + "_no"]; if (!r[k]) r[k + "_no"] = true; });
+      if (!r.subtitulo && pa.cat) r.subtitulo = enFrase(pa.cat);
+    } else {
+      // Textos del partido como capas (se pueden mover, cambiar o borrar)
+      const viejos = E.textos.filter(t => t.auto).map(t => t.id);
+      E.textos = E.textos.filter(t => !t.auto); E.orden = E.orden.filter(x => !viejos.includes(x));
+      const base = { f: "deportiva", color: "#ffffff", x: 0.5, rot: 0, op: 1, sombra: true, contorno: false, mayus: true, auto: true };
+      const nuevos = [
+        Object.assign({}, base, { t: vs, y: 0.7, s: 0.06 }),
+        Object.assign({}, base, { t: [fecha, pa.hora ? pa.hora + " h" : ""].filter(Boolean).join(" · "), y: 0.89, s: 0.05, f: "texto" }),
+        Object.assign({}, base, { t: lugar, y: 0.935, s: 0.04, f: "texto", mayus: false })
+      ].filter(t => t.t).map(t => Object.assign(t, { id: "t" + (++idTexto) }));
+      E.textos.push(...nuevos);
+      const i = E.orden.indexOf("escL");
+      E.orden.splice(i < 0 ? E.orden.length : i, 0, ...nuevos.map(t => t.id));
+    }
+    responder("partido", id);
+  }
+
+  /* ---------- El encargo del cartel entero ---------- */
+  function textosIA() {
+    const v = id => r[id + "_no"] ? "" : (r[id] || "").trim();
+    const ev = r.evento === "otro" ? (r.evento_o || "") : ((P("evento").op.find(o => o.v === r.evento) || {}).t || "");
+    const rc = COLORES_RIVAL.find(c => c.v === r.rivalColor);
+    return { titulo: v("titulo") || "Tu título", sub: v("subtitulo"), vs: v("vs"), fecha: v("fecha"), hora: v("hora"), lugar: v("lugar"),
+      extra: v("extra"), redes: v("redes"), evento: ev, rivalColor: rc ? rc.c : (r.rivalColor === "otro" ? "#7a7a7a" : "") };
+  }
+  function kitTexto() {
+    if (!esPersona()) return "";
+    const n = r.pTipo === "jugadora" ? `the shirt number ${r.dorsal === "otro" ? r.dorsal_o : r.dorsal || ""}` : "different shirt numbers";
+    if (r.equip === "otro") return `Kit: ${r.equip_o}, with ${n}, knee pads and indoor volleyball shoes.`;
+    const eq = equipaciones.find(e => e.id === r.equip) || {};
+    return `Use the attached photos of our volleyball jersey (front and back) as reference: ${r.pTipo === "equipo" ? "every player of our club" : "our player"} must wear EXACTLY that kit (same colours, cut, stripes and details), with ${n} and no player name. Knee pads and indoor volleyball shoes.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`;
+  }
+  function sujetoIA() {
+    const s = [];
+    if (r.pTipo === "jugadora") s.push(`A female volleyball player of our club, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")} in ${pr("peinado")}, ${pr("pose")}. ${pr("plano")}, ${pr("expresion")}.`);
+    else if (r.pTipo === "equipo") s.push(`${pr("nJug")} of our club, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")}, ${pr("peinado")}, ${pr("poseEq")}. ${pr("plano")}, ${pr("expresion")}.`);
+    else if (r.pTipo === "balon") s.push(`${pr("balon")}, a volleyball with blue, yellow and white panels.`);
+    else if (r.pTipo === "ninguno") s.push("No people: the poster is built with the scene, volleyball elements and the typography.");
+    else if (r.pTipo === "otro") s.push(`${pr("pTipo")}.`);
+    s.push(kitTexto());
+    const est = estiloElegido();
+    if (est && est.duo && esPersona()) {
+      const rival = (window.evEstilos.partirVs(r.vs_no ? "" : r.vs)[1] || "").trim();
+      s.push(`The pose is adapted to the layout described above. The rival player wears ${pr("rivalColor") || "a kit in different colours"}${rival ? ` (team: ${rival})` : ""}, with no logos or brands.`);
+    } else if (est && esPersona()) s.push("Adapt the pose and framing to the layout described above if needed.");
+    return s.filter(Boolean).join(" ");
+  }
+  function promptCartel() {
+    const F = formato(), est = estiloElegido(), T = textosIA(), ev = pr("evento");
+    const estilo = est ? est.p : r.estiloCartel === "otro" ? (r.estiloCartel_o || "").trim() : "Modern, powerful sports poster with a clear hierarchy: a big title, the main subject and an info block.";
+    const q = t => `"${String(t).replace(/"/g, "”").replace(/\n+/g, " / ")}"`;
+    const roles = [["TITLE", T.titulo], ["SUBTITLE", T.sub], ["MATCHUP", T.vs], ["DATE", T.fecha], ["TIME", T.hora], ["VENUE", T.lugar], ["INFO", T.extra], ["CONTACT", T.redes]].filter(x => x[1]);
+    const huecos = ["a clean, uncluttered space at the top centre for the club crest"];
+    if ((r.patros || []).length) huecos.push(`a clean strip in a bottom corner for ${r.patros.length} small sponsor logo${r.patros.length > 1 ? "s" : ""}`);
+    if (partidoActivo()) huecos.push("a small clean space next to each team name for its crest");
+    const partes = [
+      `Design a complete, finished ${orientacion(F)} volleyball event poster, ${F.ar} aspect ratio (${F.w}x${F.h} px). Professional sports graphic design, print quality.${ev ? ` It announces ${ev} of the volleyball club Nou Volei Alzira (NVA), from Alzira (Spain), whose colours are navy blue and orange.` : ""}`,
+      `STYLE AND LAYOUT: ${estilo}`,
+      r.acabado && r.acabado !== "auto" ? `RENDERING: ${pr("acabado")}.` : "",
+      `MAIN SUBJECT: ${sujetoIA()}`,
+      `SCENE: ${pr("fTipo")}. ${pr("fPaleta")}. ${pr("fLuz")}. ${pr("fAmb")}.`,
+      `TEXTS: write ONLY these texts, exactly as given (Spanish, with correct accents and spelling), following the typographic hierarchy of the layout:\n` +
+        roles.map(([k, v]) => `${k}: ${q(v)}`).join("\n") + `\nIf the layout mentions a text that is not in this list, leave that element out.`,
+      `LOGOS: do not draw any logo, crest, emblem or sponsor brand (they are added afterwards). Leave ${huecos.length > 1 ? huecos.slice(0, -1).join(", ") + " and " + huecos[huecos.length - 1] : huecos[0]}.`,
+      "No watermarks and no extra or invented text."
+    ];
+    return limpiar(partes.filter(Boolean).join("\n\n"));
+  }
+  const promptDe = capaId => modo === "ia" ? promptCartel() : capaId === "fondo" ? promptFondo() : promptPersonaje();
 
   /* ---------- Los encargos ---------- */
   function orientacion(F) { return F.w > F.h ? "horizontal" : F.w < F.h ? "vertical" : "square"; }
@@ -790,24 +1029,28 @@
   /* ---------- Montaje por capas ---------- */
   let panel = "capas";
   const textoDe = id => E.textos.find(t => t.id === id);
-  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "patros" ? E.patros : textoDe(id); }
+  const esEscudo = id => id === "escL" || id === "escV";
+  const imgEscudo = id => partidoActivo() ? partidoSel[id === "escL" ? "local" : "visit"].logo : null;
+  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "patros" ? E.patros : esEscudo(id) ? E[id] : textoDe(id); }
   function existe(id) {
     if (id === "pers") return !!img.pers;
     if (id === "patros") return (r.patros || []).length > 0;
     if (id === "logo") return true;
+    if (esEscudo(id)) return !!imgEscudo(id);
     return !!textoDe(id);
   }
   // De atrás hacia delante, sin el fondo
   function ordenVisible() { return E.orden.filter(existe); }
   function nombreCapa(id) {
-    if (id === "fondo") return "Fondo";
+    if (id === "fondo") return modo === "ia" ? "Cartel de la IA" : "Fondo";
+    if (esEscudo(id)) return `Escudo ${partidoSel ? partidoSel[id === "escL" ? "local" : "visit"].nombre : ""}`;
     if (id === "pers") return "Personaje";
     if (id === "logo") return "Escudo del club";
     if (id === "patros") return "Patrocinadores";
     const t = textoDe(id);
     return (t && t.t.trim().split("\n")[0].slice(0, 28)) || "Texto nuevo";
   }
-  const ICONO_CAPA = { fondo: "🌄", pers: "🙋‍♀️", logo: "🛡️", patros: "🤝" };
+  const ICONO_CAPA = { fondo: "🌄", pers: "🙋‍♀️", logo: "🛡️", patros: "🤝", escL: "🏠", escV: "✈️" };
   function editorHtml() {
     if (sel !== "fondo" && !existe(sel)) sel = "fondo";
     let h = "";
@@ -821,7 +1064,7 @@
       h += `<div class="ev-panel"><h4>☰ Capas <small>Arrastra ⠿ para cambiar el orden</small></h4>
         <ul class="ev-lista" id="evLista">${lista.map(id => filaCapa(id)).join("")}
           <li class="fija${sel === "fondo" ? " sel" : ""}"><span class="asa" aria-hidden="true">🔒</span><span class="num">1</span>
-            <button type="button" class="nom" data-capa="fondo">🌄 Fondo</button></li></ul>
+            <button type="button" class="nom" data-capa="fondo">🌄 ${nombreCapa("fondo")}</button></li></ul>
         ${formato() === FORMATOS.story && typeof window.igGetToken === "function" && window.igGetToken() && window.nvaStory ? `<button type="button" class="ev-boton" data-story>📲 Guardar como borrador de Story</button>` : ""}
         <div class="ev-estado" id="evEstado2"></div></div>`;
     } else h += `<div class="ev-estado" id="evEstado2"></div>`;
@@ -887,6 +1130,40 @@
     render();
   }
 
+  // Fotos de la equipación elegida juntas (delante y detrás) en un PNG
+  async function imagenCamiseta() {
+    const eq = equipaciones.find(e => e.id === r.equip) || {};
+    const fotos = [];
+    for (const ru of (eq.imagenes || []).slice(0, 3)) {
+      const b = await blobEq(ru).catch(() => null);
+      if (!b) continue;
+      const im = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = URL.createObjectURL(b); });
+      if (im) fotos.push(im);
+    }
+    if (!fotos.length) throw new Error("No hay fotos de la camiseta");
+    const alto = 900, pad = 30, anchos = fotos.map(i => i.width * alto / i.height);
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(anchos.reduce((a, b) => a + b, 0) + pad * (fotos.length + 1)); cv.height = alto + pad * 2;
+    const cx = cv.getContext("2d");
+    cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, cv.width, cv.height);
+    let x = pad;
+    fotos.forEach((im, i) => { cx.drawImage(im, x, pad, anchos[i], alto); x += anchos[i] + pad; });
+    return await new Promise((ok, ko) => cv.toBlob(b => b ? ok(b) : ko(new Error("No se pudo crear la imagen")), "image/png"));
+  }
+  function confirmarTexto(id) {
+    const inp = capa.querySelector(`[data-txt="${id}"]`);
+    const v = inp ? inp.value.trim() : "";
+    if (!v) { if (inp) inp.focus(); return; }
+    r[id] = v; delete r[id + "_no"];
+    render.saltar = true; render();
+  }
+  // Bocetos de los estilos con los textos de la entrevista
+  function dibujarMinis(c) {
+    if (!window.evEstilos) return;
+    const T = textosIA();
+    (c || capa).querySelectorAll("canvas[data-mini]").forEach(cv => window.evEstilos.dibujar(cv.getContext("2d"), cv.width, cv.height, cv.dataset.mini, T));
+  }
+
   function cargarArchivo(file) {
     return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("No se puede abrir la imagen")); i.src = URL.createObjectURL(file); });
   }
@@ -898,7 +1175,7 @@
   }
 
   function enlazar(c) {
-    c.querySelectorAll("[data-sec]").forEach(b => b.onclick = () => { const s = SECCIONES.find(x => x.id === b.dataset.sec); if (completa(s)) { abiertas[s.id] = !abiertas[s.id]; render(); } });
+    c.querySelectorAll("[data-sec]").forEach(b => b.onclick = () => { const s = SECC().find(x => x.id === b.dataset.sec); if (completa(s)) { abiertas[s.id] = !abiertas[s.id]; render(); } });
     c.querySelectorAll("[data-op]").forEach(b => b.onclick = () => {
       if (b.dataset.v === "otro") { r[b.dataset.op] = "otro"; render(); const inp = capa.querySelector(`[data-otro="${b.dataset.op}"]`); if (inp) inp.focus(); return; }
       responder(b.dataset.op, b.dataset.v);
@@ -913,6 +1190,14 @@
       r[id + "_o"] = inp.value.trim(); render.saltar = true; render();
     });
     c.querySelectorAll("[data-colotro]").forEach(inp => { inp.oninput = () => { r[inp.dataset.colotro + "_o"] = inp.value; pintar(); }; inp.onchange = () => { r[inp.dataset.colotro + "_o"] = inp.value; render.saltar = true; render(); }; });
+    c.querySelectorAll("[data-txt]").forEach(inp => {
+      inp.oninput = () => { r[inp.dataset.txt] = inp.value; delete r[inp.dataset.txt + "_no"]; pintar(); };
+      if (inp.tagName === "INPUT") inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); confirmarTexto(inp.dataset.txt); } };
+    });
+    c.querySelectorAll("[data-txtok]").forEach(b => b.onclick = () => confirmarTexto(b.dataset.txtok));
+    c.querySelectorAll("[data-txtno]").forEach(b => b.onclick = () => { const id = b.dataset.txtno; r[id] = ""; r[id + "_no"] = true; render.saltar = true; render(); });
+    c.querySelectorAll("[data-partido]").forEach(b => b.onclick = () => elegirPartido(b.dataset.partido));
+    dibujarMinis(c);
     c.querySelectorAll("[data-eqimg]").forEach(im => urlEq(im.dataset.eqimg).then(u => { if (u) im.src = u; }));
     c.querySelectorAll("[data-eqacc]").forEach(b => b.onclick = () => accionEq(b.dataset.eqacc, b.dataset.id));
 
@@ -926,7 +1211,7 @@
 
     // Imágenes
     c.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => {
-      const txt = b.dataset.copiar === "fondo" ? promptFondo() : promptPersonaje();
+      const txt = promptDe(b.dataset.copiar);
       try { await navigator.clipboard.writeText(txt); b.textContent = "✅ Copiado"; }
       catch (e) {
         const caja = c.querySelector(`[data-prompt="${b.dataset.copiar}"]`), rg = document.createRange();
@@ -934,6 +1219,25 @@
         b.textContent = "Mantén pulsado el texto para copiarlo";
       }
       setTimeout(() => { if (b.isConnected) b.textContent = "📋 Copiar el encargo"; }, 2500);
+    });
+    // Copia las fotos de la camiseta en una sola imagen para pegarla en Gemini o ChatGPT junto al encargo
+    c.querySelectorAll("[data-copiareq]").forEach(b => b.onclick = async () => {
+      const promesa = imagenCamiseta();
+      try {
+        if (!navigator.clipboard || !window.ClipboardItem) throw new Error("sin portapapeles");
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": promesa })]);
+        b.textContent = "✅ Copiada: pégala en el chat";
+      } catch (e) {
+        const blob = await promesa.catch(() => null);
+        if (!blob) { b.textContent = "No hay fotos de la camiseta"; }
+        else {
+          const f = new File([blob], "camiseta.png", { type: "image/png" });
+          if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); } catch (er) { /* cancelado */ } }
+          else { const u = URL.createObjectURL(f), el = document.createElement("a"); el.href = u; el.download = f.name; document.body.appendChild(el); el.click(); el.remove(); }
+          b.textContent = "Este navegador no deja copiar imágenes: te la he guardado";
+        }
+      }
+      setTimeout(() => { if (b.isConnected) b.textContent = "📋 Copiar la camiseta"; }, 3500);
     });
     const fotosEq = c.querySelector("[data-fotoseq]");
     if (fotosEq) fotosEq.onclick = async () => {
@@ -1038,7 +1342,9 @@
     const reloj = setInterval(() => { est.textContent = `🎨 Pintando… ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);
     try {
       const F = formato();
-      const body = capaId === "fondo"
+      const body = modo === "ia"
+        ? Object.assign({ prompt: promptCartel(), aspecto: F.ar, dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq())
+        : capaId === "fondo"
         ? { prompt: promptFondo(), aspecto: F.ar }
         : Object.assign({ prompt: promptPersonaje(), aspecto: r.pTipo !== "equipo" || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
       const { data, error } = await sb.functions.invoke("generar-cartel", { body });
@@ -1102,6 +1408,14 @@
       ctx.globalAlpha = f.op;
       ctx.drawImage(o, (W - dw) / 2 + f.ox * W, (H - dh) / 2 + f.oy * H, dw, dh);
       ctx.globalAlpha = 1;
+    } else if (modo === "ia" && window.evEstilos) {
+      window.evEstilos.dibujar(ctx, W, H, r.estiloCartel || "", textosIA());
+      if (previa) {
+        ctx.font = `700 ${M * 0.034}px Barlow, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+        const t = "Boceto", w = ctx.measureText(t).width;
+        ctx.fillStyle = "rgba(5,10,30,.75)"; ctx.fillRect(M * 0.03, H - M * 0.09, w + M * 0.04, M * 0.06);
+        ctx.fillStyle = "#fff"; ctx.fillText(t, M * 0.05, H - M * 0.078);
+      }
     } else {
       fondoColor(ctx, W, H);
       if (previa && hayFondo() && !img.fondo) {
@@ -1116,6 +1430,7 @@
       if (E.ocultas[id]) continue;
       if (id === "pers") dibujarPersonaje(ctx, W, H);
       else if (id === "logo") dibujarLogo(ctx, W, H, M);
+      else if (esEscudo(id)) dibujarEscudo(ctx, W, H, M, id);
       else if (id === "patros") dibujarPatros(ctx, W, H, M);
       else dibujarTexto(ctx, W, H, M, textoDe(id), previa);
     }
@@ -1136,6 +1451,15 @@
     ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = M * 0.02;
     ctx.drawImage(logo, -s / 2, -s / 2, s, s); ctx.restore();
     cajas.push({ id: "logo", cx, cy, w: s, h: s, rot: l.rot });
+  }
+  function dibujarEscudo(ctx, W, H, M, id) {
+    const im = imgEscudo(id);
+    if (!im) return;
+    const l = E[id], s = l.s * M, k = s / Math.max(im.width, im.height), w = im.width * k, h = im.height * k, cx = l.x * W, cy = l.y * H;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(l.rot * Math.PI / 180); ctx.globalAlpha = l.op;
+    ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = M * 0.02;
+    ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore();
+    cajas.push({ id, cx, cy, w, h, rot: l.rot });
   }
   function dibujarPatros(ctx, W, H, M) {
     const lista = (r.patros || []).map(a => imgLista("Patrocinadores/" + a)).filter(Boolean);
@@ -1275,7 +1599,7 @@
         const mover = ev => {
           if (tipo === "esc") {
             const f = Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0;
-            const lim = prop === "z" ? [1, 4] : sel === "pers" ? [0.1, 2] : sel === "patros" ? [0.3, 3] : sel === "logo" ? [0.05, 0.8] : [0.015, 0.5];
+            const lim = prop === "z" ? [1, 4] : sel === "pers" ? [0.1, 2] : sel === "patros" ? [0.3, 3] : sel === "logo" || esEscudo(sel) ? [0.05, 0.8] : [0.015, 0.5];
             el[prop] = Math.min(lim[1], Math.max(lim[0], ini.v * f));
             medida.textContent = `Tamaño ${Math.round(el[prop] / ini.v * 100)}%`;
           } else if (tipo === "rot") {

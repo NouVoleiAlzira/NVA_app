@@ -8,9 +8,10 @@
       · Personaje principal → encargo para crearlo sobre fondo verde y
         subirlo; la app quita ese fondo para usarlo como capa.
       · Escudo y patrocinadores.
-   2. Editor de capas: fondo, textos por detrás del personaje, personaje,
-      textos por delante, escudo y patrocinadores. Todo se mueve con el
-      dedo y cada capa tiene su tamaño, ángulo y opacidad.
+   2. Montaje por capas: el fondo es siempre la capa 1; personaje, escudo,
+      patrocinadores y textos se ordenan en la lista de capas. Cada capa se
+      mueve con el dedo y sus esquinas sirven para girar (⟳), cambiar el
+      tamaño (⤡) y la opacidad (◐).
    La imagen también se puede generar desde la app con la función de
    Supabase «generar-cartel» si está configurada.
    ===================================================================== */
@@ -210,13 +211,18 @@
   const imgs = {}, imgsListas = {};
   let capa = null;
 
+  // Capas del montaje. El fondo es siempre la capa 1; el resto se ordena en E.orden
+  // (de atrás hacia delante) y cada texto tiene su propio id.
+  let idTexto = 0;
   function capasIniciales() {
     return {
       fondo: { z: 1, ox: 0, oy: 0, op: 1 },
       pers: { x: 0.5, y: 0.6, s: 0.72, rot: 0, op: 1, flip: false },
       logo: { x: 0.5, y: 0.09, s: 0.2, rot: 0, op: 1 },
       patros: { x: 0.74, y: 0.93, s: 1, rot: 0, op: 1, placa: true },
-      textos: []
+      textos: [],
+      orden: ["pers", "logo", "patros"],
+      ocultas: {}
     };
   }
 
@@ -362,60 +368,125 @@
     } catch (e) { patrocinadores = []; }
   }
 
-  /* ---------- Estilos de la ventana ---------- */
+  /* ---------- Estilos de la ventana ----------
+     Idea: un «banquillo de diseño» con la pista de vóley como referencia. Fondo azul
+     noche de la app, el naranja del club solo para lo que se toca (selección, tiradores,
+     botón principal) y líneas de pista blancas finas. Títulos en Barlow Condensed
+     cursiva, como un marcador. */
   function ponerCss() {
     if (document.getElementById("evCss")) return;
     const s = document.createElement("style");
     s.id = "evCss";
     s.textContent = `
-      .ev-box { max-width: 560px !important; width: 100%; padding: 0 !important; display: flex; flex-direction: column; overflow: hidden !important; max-height: calc(100dvh - 24px) !important; }
-      .ev-cab { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--borde, rgba(255,255,255,.12)); }
-      .ev-cab b { flex: 1; font-family: var(--font-display); font-size: 1.1rem; color: #fff; }
-      .ev-prev { flex: none; display: flex; justify-content: center; padding: 8px; background: rgba(0,0,0,.25); }
-      .ev-prev canvas { max-height: 36dvh; max-width: 100%; border-radius: 8px; box-shadow: 0 6px 22px rgba(0,0,0,.45); touch-action: none; }
-      .ev-cuerpo { flex: 1; overflow-y: auto; padding: 10px 14px 18px; display: flex; flex-direction: column; gap: 10px; }
-      .ev-sec { flex: none; border: 1px solid var(--borde, rgba(255,255,255,.12)); border-radius: 14px; overflow: hidden; }
-      .ev-sec-cab { width: 100%; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(255,255,255,.04); border: 0; color: #fff; font: inherit; font-weight: 800; cursor: pointer; text-align: left; }
-      .ev-sec-cab small { display: block; font-weight: 400; color: var(--txt-2, #9fb0d8); font-size: .74rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .ev-sec-cab span.t { flex: 1; min-width: 0; }
-      .ev-sec-cuerpo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
-      .ev-q { display: flex; flex-direction: column; gap: 8px; animation: evEntra .28s ease; }
-      @keyframes evEntra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-      .ev-burbuja { align-self: flex-start; max-width: 94%; background: rgba(92,132,255,.14); border: 1px solid rgba(92,132,255,.3); border-radius: 4px 14px 14px 14px; padding: 8px 11px; color: var(--txt-1, #e9eefa); font-size: .9rem; line-height: 1.35; }
-      .ev-burbuja small { display: block; color: var(--txt-2, #9fb0d8); font-size: .76rem; margin-top: 3px; }
-      .ev-ops { display: flex; flex-wrap: wrap; gap: 6px; }
-      .ev-op { border: 1px solid var(--tiza-borde, rgba(233,238,250,.16)); background: var(--tiza-fondo, rgba(233,238,250,.07)); color: var(--txt-1, #e9eefa); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: .82rem; cursor: pointer; }
-      .ev-op.sel { background: rgba(255,91,0,.22); border-color: #ff7a2e; color: #fff; font-weight: 700; }
+      .ev-modal { padding: 0 !important; align-items: stretch !important; }
+      .ev-box { --ev-noche: #0b1430; --ev-pista: #111d45; --ev-pista2: #172656; --ev-linea: rgba(233,238,250,.14); --ev-tiza: #e9eefa; --ev-gris: #9fb0d8; --ev-naranja: #ff5b00; --ev-naranja2: #ff8a3d; --ev-azul: #2f4dff;
+        max-width: 620px !important; width: 100%; margin: 0 auto; padding: 0 !important; display: flex; flex-direction: column; overflow: hidden !important;
+        height: 100dvh; max-height: 100dvh !important; border-radius: 0 !important; background: var(--ev-noche) !important; border: 0 !important; color: var(--ev-tiza); }
+      @media (min-width: 640px) { .ev-modal { padding: 16px !important; } .ev-box { height: calc(100dvh - 32px); border-radius: 20px !important; border: 1px solid var(--ev-linea) !important; } }
+      .ev-cab { display: flex; align-items: center; gap: 12px; padding: 10px 12px 8px 16px; }
+      .ev-cab h3 { margin: 0; flex: 1; font-family: "Barlow Condensed", var(--font-display); font-style: italic; font-weight: 800; font-size: 1.35rem; letter-spacing: .01em; color: #fff; }
+      .ev-pasos { display: flex; gap: 4px; padding: 0 16px 10px; }
+      .ev-pasos span { flex: 1; height: 4px; border-radius: 4px; background: var(--ev-linea); position: relative; }
+      .ev-pasos span.hecho { background: var(--ev-tiza); }
+      .ev-pasos span.ahora { background: var(--ev-naranja); }
+      .ev-escena { flex: none; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; padding: 12px;
+        background: radial-gradient(ellipse at 50% 120%, rgba(47,77,255,.22), transparent 60%), repeating-linear-gradient(90deg, transparent 0 47px, rgba(233,238,250,.035) 47px 48px), var(--ev-pista); border-block: 1px solid var(--ev-linea); }
+      .ev-escena canvas { display: block; max-height: 42dvh; max-width: 100%; border-radius: 6px; box-shadow: 0 18px 40px rgba(0,0,0,.55); touch-action: none; }
+      .ev-sel { position: absolute; pointer-events: none; outline: 2px solid var(--ev-naranja); outline-offset: 0; transform-origin: center; }
+      .ev-sel::before, .ev-sel::after { content: ""; position: absolute; inset: -7px; border: 2px solid transparent; border-radius: 2px; pointer-events: none;
+        background: linear-gradient(var(--ev-naranja), var(--ev-naranja)) top left / 14px 2px no-repeat, linear-gradient(var(--ev-naranja), var(--ev-naranja)) top left / 2px 14px no-repeat,
+                    linear-gradient(var(--ev-naranja), var(--ev-naranja)) bottom right / 14px 2px no-repeat, linear-gradient(var(--ev-naranja), var(--ev-naranja)) bottom right / 2px 14px no-repeat; }
+      .ev-h { position: absolute; width: 34px; height: 34px; margin: -17px; border-radius: 50%; border: 2px solid #fff; background: var(--ev-naranja); color: #fff; font-size: 15px; line-height: 1; display: grid; place-items: center; pointer-events: auto; touch-action: none; cursor: grab; box-shadow: 0 3px 10px rgba(0,0,0,.45); padding: 0; }
+      .ev-h:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+      .ev-h[data-h="accion"] { top: 0; left: 0; background: var(--ev-pista2); }
+      .ev-h[data-h="rot"] { top: 0; left: 100%; }
+      .ev-h[data-h="esc"] { top: 100%; left: 100%; }
+      .ev-h[data-h="op"] { top: 100%; left: 0; background: var(--ev-azul); }
+      .ev-medida { position: absolute; left: 50%; top: -38px; transform: translateX(-50%); background: rgba(5,10,30,.85); color: #fff; font: 700 .78rem Barlow, sans-serif; padding: 4px 9px; border-radius: 999px; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+      .ev-medida.ver { opacity: 1; }
+      .ev-ayuda { text-align: center; font-size: .72rem; line-height: 1.3; color: var(--ev-gris); pointer-events: none; max-width: 40ch; }
+      .ev-ayuda:empty { display: none; }
+      .ev-box [hidden] { display: none !important; }
+      .ev-barra { flex: none; display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--ev-linea); overflow-x: auto; }
+      .ev-barra button { flex: 1 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); font: 700 .84rem Barlow, sans-serif; cursor: pointer; }
+      .ev-barra button.prim { background: var(--ev-naranja); border-color: var(--ev-naranja); color: #fff; }
+      .ev-barra button[aria-pressed="true"] { border-color: var(--ev-naranja2); background: rgba(255,91,0,.16); }
+      .ev-cuerpo { flex: 1; overflow-y: auto; padding: 12px 12px 28px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
+      .ev-sec { flex: none; border-radius: 16px; background: var(--ev-pista); border: 1px solid var(--ev-linea); overflow: hidden; }
+      .ev-sec-cab { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: 0; color: #fff; font: inherit; cursor: pointer; text-align: left; }
+      .ev-sec-ico { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; background: var(--ev-pista2); border: 1px solid var(--ev-linea); }
+      .ev-sec.hecha .ev-sec-ico { background: var(--ev-tiza); color: var(--ev-noche); }
+      .ev-sec-cab .t { flex: 1; min-width: 0; font-family: "Barlow Condensed", var(--font-display); font-style: italic; font-weight: 800; font-size: 1.08rem; }
+      .ev-sec-cab small { display: block; font-family: Barlow, sans-serif; font-style: normal; font-weight: 400; color: var(--ev-gris); font-size: .76rem; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ev-sec-cab .fl { color: var(--ev-gris); transition: transform .2s; }
+      .ev-sec-cab[aria-expanded="true"] .fl { transform: rotate(90deg); }
+      .ev-sec-cuerpo { padding: 2px 14px 14px; display: flex; flex-direction: column; gap: 14px; }
+      .ev-q { display: flex; flex-direction: column; gap: 9px; }
+      .ev-q.nueva { animation: evEntra .3s ease; }
+      @keyframes evEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      @media (prefers-reduced-motion: reduce) { .ev-q.nueva { animation: none; } .ev-sec-cab .fl { transition: none; } }
+      .ev-dice { display: flex; gap: 8px; align-items: flex-start; }
+      .ev-dice img { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #fff; }
+      .ev-dice p { margin: 0; font-size: .92rem; line-height: 1.38; color: var(--ev-tiza); }
+      .ev-dice p small { display: block; color: var(--ev-gris); font-size: .78rem; margin-top: 2px; }
+      .ev-ops { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 34px; }
+      .ev-op { border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); border-radius: 999px; padding: 8px 13px; font: 500 .84rem Barlow, sans-serif; cursor: pointer; min-height: 36px; }
+      .ev-op:hover { border-color: rgba(233,238,250,.3); }
+      .ev-op.sel { background: var(--ev-naranja); border-color: var(--ev-naranja); color: #fff; font-weight: 700; }
+      .ev-op.otro { border-style: dashed; }
       .ev-fila { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-      .ev-fila input[type=text], .ev-fila input[type=number], .ev-fila select, .ev-fila textarea { flex: 1; min-width: 0; }
-      .ev-mini { border: 1px solid var(--tiza-borde, rgba(233,238,250,.16)); background: var(--tiza-fondo, rgba(233,238,250,.07)); color: var(--txt-1, #e9eefa); border-radius: 8px; min-width: 30px; height: 30px; cursor: pointer; font: inherit; padding: 0 8px; }
-      .ev-mini.sel { border-color: #ff7a2e; background: rgba(255,91,0,.22); }
-      .ev-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-      .ev-eq { border: 2px solid var(--tiza-borde, rgba(233,238,250,.16)); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 4px; background: var(--tiza-fondo, rgba(233,238,250,.07)); }
-      .ev-eq.sel { border-color: #ff7a2e; background: rgba(255,91,0,.14); }
-      .ev-eq-img { display: flex; gap: 2px; background: #fff; border: 0; border-radius: 8px; height: 92px; padding: 4px; cursor: pointer; align-items: center; justify-content: center; }
+      .ev-q > .ev-fila, .ev-q > .ev-eqs, .ev-q > .ev-patro, .ev-q > .ev-orden, .ev-q > .ev-prompt { margin-left: 34px; }
+      .ev-fila input[type=text], .ev-fila input[type=number] { flex: 1; min-width: 0; min-height: 38px; }
+      .ev-mini { border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); border-radius: 10px; min-width: 36px; height: 36px; cursor: pointer; font: 600 .82rem Barlow, sans-serif; padding: 0 10px; }
+      .ev-mini.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.18); }
+      .ev-mini:disabled { opacity: .35; cursor: default; }
+      .ev-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 8px; }
+      .ev-eq { border: 2px solid var(--ev-linea); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 5px; background: rgba(233,238,250,.04); }
+      .ev-eq.sel { border-color: var(--ev-naranja); }
+      .ev-eq-img { display: flex; gap: 2px; background: #fff; border: 0; border-radius: 10px; height: 92px; padding: 4px; cursor: pointer; align-items: center; justify-content: center; }
       .ev-eq-img img { flex: 1; min-width: 0; max-height: 100%; object-fit: contain; }
       .ev-eq-img span { color: #555; font-size: .8rem; }
-      .ev-eq-nom { font-size: .82rem; font-weight: 700; text-align: center; }
+      .ev-eq-nom { font-size: .84rem; font-weight: 700; text-align: center; }
       .ev-eq-acc { display: flex; gap: 4px; justify-content: center; }
-      .ev-patro { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
-      .ev-patro button { position: relative; background: #fff; border: 2px solid transparent; border-radius: 10px; padding: 6px; height: 56px; cursor: pointer; }
+      .ev-patro { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+      .ev-patro button { position: relative; background: #fff; border: 3px solid transparent; border-radius: 12px; padding: 6px; height: 58px; cursor: pointer; }
       .ev-patro button img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; margin: auto; }
-      .ev-patro button.sel { border-color: #ff7a2e; }
-      .ev-patro button i { position: absolute; top: -7px; left: -7px; background: #ff5b00; color: #fff; font-style: normal; font-weight: 800; font-size: .72rem; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; }
+      .ev-patro button.sel { border-color: var(--ev-naranja); }
+      .ev-patro button i { position: absolute; top: -9px; left: -9px; background: var(--ev-naranja); color: #fff; font-style: normal; font-weight: 800; font-size: .74rem; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--ev-noche); }
       .ev-orden { display: flex; flex-direction: column; gap: 4px; }
-      .ev-orden div { display: flex; align-items: center; gap: 6px; font-size: .82rem; }
+      .ev-orden div { display: flex; align-items: center; gap: 6px; font-size: .84rem; }
       .ev-orden div span { flex: 1; }
-      .ev-prompt { font-size: .74rem; color: var(--txt-1, #e9eefa); white-space: pre-wrap; background: rgba(0,0,0,.25); border-radius: 8px; padding: 8px; max-height: 170px; overflow: auto; user-select: text; -webkit-user-select: text; }
-      .ev-estado { font-size: .8rem; color: var(--txt-2, #9fb0d8); }
-      .ev-ed { flex: none; border: 1px solid rgba(255,122,46,.45); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
-      .ev-ed h4 { margin: 0; font-family: var(--font-display); color: #fff; font-size: 1rem; }
-      .ev-capas { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-      .ev-capas .ev-mini { white-space: nowrap; flex: none; }
-      .ev-ctl { display: grid; grid-template-columns: 78px 1fr 44px; gap: 6px 8px; align-items: center; font-size: .8rem; }
-      .ev-ctl output { text-align: right; color: var(--txt-2, #9fb0d8); font-size: .74rem; }
-      .ev-ctl input[type=range] { width: 100%; }
-      .ev-ed textarea { width: 100%; min-height: 56px; resize: vertical; font: inherit; border-radius: 10px; padding: 8px; }
+      .ev-prompt { font-size: .76rem; line-height: 1.45; color: var(--ev-tiza); white-space: pre-wrap; background: rgba(0,0,0,.28); border: 1px solid var(--ev-linea); border-radius: 12px; padding: 10px; max-height: 180px; overflow: auto; user-select: text; -webkit-user-select: text; }
+      .ev-estado { font-size: .8rem; color: var(--ev-gris); }
+      .ev-acc { display: flex; gap: 6px; flex-wrap: wrap; margin-left: 34px; }
+      .ev-acc > * { flex: 1 1 140px; }
+      .ev-boton { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--ev-linea); background: rgba(233,238,250,.06); color: var(--ev-tiza); font: 700 .86rem Barlow, sans-serif; cursor: pointer; }
+      .ev-boton.prim { background: var(--ev-naranja); border-color: var(--ev-naranja); color: #fff; }
+      .ev-panel { flex: none; border-radius: 16px; background: var(--ev-pista); border: 1px solid var(--ev-linea); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+      .ev-panel h4 { margin: 0; font-family: "Barlow Condensed", var(--font-display); font-style: italic; font-weight: 800; font-size: 1.08rem; color: #fff; display: flex; align-items: center; gap: 8px; }
+      .ev-panel h4 small { margin-left: auto; font-family: Barlow, sans-serif; font-style: normal; font-weight: 400; font-size: .74rem; color: var(--ev-gris); }
+      .ev-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+      .ev-lista li { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 4px; border-radius: 12px; border: 1px solid transparent; background: rgba(233,238,250,.04); touch-action: pan-y; }
+      .ev-lista li.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.12); }
+      .ev-lista li.arrastrando { opacity: .9; box-shadow: 0 8px 22px rgba(0,0,0,.5); position: relative; z-index: 2; background: var(--ev-pista2); }
+      .ev-lista li.fija { opacity: .75; }
+      .ev-lista .asa { width: 34px; height: 38px; border: 0; background: none; color: var(--ev-gris); font-size: 18px; cursor: grab; touch-action: none; }
+      .ev-lista .num { flex: none; width: 22px; text-align: center; font: 800 .8rem "Barlow Condensed", sans-serif; color: var(--ev-gris); }
+      .ev-lista .nom { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: var(--ev-tiza); font: 600 .88rem Barlow, sans-serif; padding: 8px 2px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ev-lista .ojo { border: 0; background: none; font-size: 16px; width: 34px; height: 34px; cursor: pointer; color: var(--ev-tiza); }
+      .ev-lista .ojo[aria-pressed="false"] { opacity: .35; }
+      .ev-fuentes { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+      .ev-fuentes button { flex: none; min-width: 64px; height: 52px; border-radius: 12px; border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: #fff; font-size: 1.3rem; cursor: pointer; padding: 0 10px; }
+      .ev-fuentes button.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.18); }
+      .ev-colores { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .ev-colores button { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); cursor: pointer; padding: 0; }
+      .ev-colores button.sel { outline: 3px solid var(--ev-naranja); outline-offset: 2px; }
+      .ev-colores input[type=color] { width: 36px; height: 36px; border: 0; background: none; padding: 0; }
+      .ev-panel textarea { width: 100%; min-height: 64px; resize: vertical; font: 600 1rem Barlow, sans-serif; border-radius: 12px; padding: 10px; }
+      .ev-tog { display: flex; gap: 6px; flex-wrap: wrap; }
+      .ev-tog button { border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); border-radius: 999px; padding: 7px 12px; font: 600 .82rem Barlow, sans-serif; cursor: pointer; }
+      .ev-tog button[aria-pressed="true"] { background: var(--ev-tiza); color: var(--ev-noche); border-color: var(--ev-tiza); }
+      .ev-box :focus-visible { outline: 2px solid var(--ev-naranja2); outline-offset: 2px; }
     `;
     document.head.appendChild(s);
   }
@@ -424,28 +495,41 @@
   async function abrir() {
     ponerCss();
     cargarFuentes().then(() => pintar());
-    r = {}; abiertas = {}; img.fondo = img.pers = img.persOrig = null; E = capasIniciales(); sel = "fondo";
+    r = {}; abiertas = {}; img.fondo = img.pers = img.persOrig = null; E = capasIniciales(); sel = "fondo"; panel = "capas";
     quitarFondo = { activo: true, tol: 70, color: null };
     capa = document.createElement("div");
-    capa.className = "cp-modal";
+    capa.className = "cp-modal ev-modal";
     capa.setAttribute("role", "dialog"); capa.setAttribute("aria-modal", "true"); capa.setAttribute("aria-label", "Crear cartel de evento");
-    capa.style.padding = "12px";
     capa.innerHTML = `
       <div class="cp-modal-box ev-box">
-        <div class="ev-cab"><b>🎨 Cartel de evento</b>
+        <div class="ev-cab"><h3>Cartel de evento</h3>
           <button type="button" class="btn-close-modal" data-cerrar aria-label="Cerrar">✕</button></div>
-        <div class="ev-prev"><canvas id="evLienzo" width="270" height="480" aria-label="Vista previa del cartel: toca una capa para elegirla y arrástrala para moverla"></canvas></div>
+        <div class="ev-pasos" id="evPasos" aria-hidden="true"></div>
+        <div class="ev-escena" id="evEscena">
+          <canvas id="evLienzo" width="270" height="480" aria-label="Vista previa del cartel. Toca una capa para elegirla y arrástrala para moverla."></canvas>
+          <div class="ev-sel" id="evSel" hidden>
+            <button type="button" class="ev-h" data-h="accion" aria-label="Editar"></button>
+            <button type="button" class="ev-h" data-h="rot" aria-label="Girar (arrastra)">⟳</button>
+            <button type="button" class="ev-h" data-h="esc" aria-label="Tamaño (arrastra)">⤡</button>
+            <button type="button" class="ev-h" data-h="op" aria-label="Opacidad (arrastra arriba o abajo)">◐</button>
+            <span class="ev-medida" id="evMedida"></span>
+          </div>
+          <div class="ev-ayuda" id="evAyuda"></div>
+        </div>
+        <div class="ev-barra" id="evBarra" hidden></div>
         <div class="ev-cuerpo" id="evCuerpo"><div class="ev-estado">Cargando…</div></div>
       </div>`;
     document.body.appendChild(capa);
     capa.querySelector("[data-cerrar]").onclick = cerrar;
-    capa.addEventListener("click", e => { if (e.target === capa) cerrar(); });
     tocarLienzo(capa.querySelector("#evLienzo"));
+    tiradores(capa.querySelector("#evSel"));
+    window.addEventListener("resize", colocarSeleccion);
     await cargarCatalogos();
     render(true);
   }
   function cerrar() {
     if (capa && (img.fondo || img.pers || E.textos.length) && !confirm("¿Cerrar el cartel? Se perderá lo que no hayas descargado.")) return;
+    window.removeEventListener("resize", colocarSeleccion);
     if (capa) capa.remove();
     capa = null;
   }
@@ -479,6 +563,11 @@
   }
 
   /* ---------- Pintar la entrevista ---------- */
+  const ICONOS = { cartel: "🗂️", fondo: "🌄", pers: "🙋‍♀️", logos: "🛡️" };
+  function dice(q, nota) {
+    return `<div class="ev-dice"><img src="LOGO-NVA.png" alt=""><p>${esc(q)}${nota ? `<small>${esc(nota)}</small>` : ""}</p></div>`;
+  }
+  let preguntasVistas = new Set();
   function render(primera) {
     const cuerpo = capa && capa.querySelector("#evCuerpo");
     if (!cuerpo) return;
@@ -489,27 +578,52 @@
       if (!hecha && !actual) actual = s;
       if (!hecha && actual !== s) break;
       const abierta = !hecha || !!abiertas[s.id];
-      const resumen = hecha ? s.preguntas.filter(visible).map(etiqueta).filter(Boolean).join(" · ") : "";
-      html += `<div class="ev-sec"><button type="button" class="ev-sec-cab" data-sec="${s.id}" aria-expanded="${abierta}">
-          <span class="t">${hecha ? "✓ " : ""}${esc(s.t)}${resumen ? `<small>${esc(resumen)}</small>` : ""}</span><span>${abierta ? "▾" : "▸"}</span></button>`;
+      const resumen = hecha ? s.preguntas.filter(visible).map(etiqueta).filter(Boolean).join(", ") : "";
+      html += `<section class="ev-sec${hecha ? " hecha" : ""}"><button type="button" class="ev-sec-cab" data-sec="${s.id}" aria-expanded="${abierta}">
+          <span class="ev-sec-ico">${hecha ? "✓" : ICONOS[s.id]}</span>
+          <span class="t">${esc(s.t.replace(/^\S+\s/, ""))}${resumen ? `<small>${esc(resumen)}</small>` : ""}</span>${hecha ? `<span class="fl">›</span>` : ""}</button>`;
       if (abierta) {
         html += `<div class="ev-sec-cuerpo">`;
         for (const p of s.preguntas.filter(visible)) {
-          html += `<div class="ev-q" data-q="${p.id}">${preguntaHtml(p)}</div>`;
+          const nueva = !preguntasVistas.has(p.id);
+          preguntasVistas.add(p.id);
+          html += `<div class="ev-q${nueva && !primera ? " nueva" : ""}" data-q="${p.id}">${preguntaHtml(p)}</div>`;
           if (!contestada(p)) break;
         }
         html += `</div>`;
       }
-      html += `</div>`;
+      html += `</section>`;
     }
-    if (!actual) html += editorHtml();
+    const montaje = !actual;
+    if (montaje) html = editorHtml() + html;
     cuerpo.innerHTML = html;
     enlazar(cuerpo);
+    pintarPasos(actual);
+    pintarBarra(montaje);
     if (primera) cuerpo.scrollTop = 0;
-    else if (render.saltar) { render.saltar = false; const q = cuerpo.querySelectorAll(".ev-q, .ev-ed"); const ult = q[q.length - 1]; if (ult) ult.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
-    else cuerpo.scrollTop = scrollAntes;
+    else if (render.saltar) {
+      render.saltar = false;
+      const q = cuerpo.querySelectorAll(".ev-q"), ult = montaje ? cuerpo.firstElementChild : q[q.length - 1];
+      if (ult) ult.scrollIntoView({ block: montaje ? "start" : "nearest", behavior: "smooth" });
+    } else cuerpo.scrollTop = scrollAntes;
     pintar();
   }
+  function pintarPasos(actual) {
+    const el = capa.querySelector("#evPasos");
+    const i = actual ? SECCIONES.indexOf(actual) : SECCIONES.length;
+    el.innerHTML = SECCIONES.concat([{ id: "montaje" }]).map((s, n) => `<span class="${n < i ? "hecho" : n === i ? "ahora" : ""}"></span>`).join("");
+  }
+  function pintarBarra(montaje) {
+    const b = capa.querySelector("#evBarra");
+    b.hidden = !montaje;
+    capa.querySelector("#evAyuda").textContent = montaje ? "Toca una capa y arrástrala. Usa las esquinas para girar, cambiar el tamaño y la opacidad." : "";
+    if (!montaje) return;
+    b.innerHTML = `<button type="button" data-addtexto>＋ Texto</button>
+      <button type="button" data-panel="capas" aria-pressed="${panel === "capas"}">☰ Capas</button>
+      <button type="button" class="prim" data-bajar>⬇ Descargar</button>`;
+    enlazar(b);
+  }
+
 
   function otroHtml(id, ph) {
     if (r[id] !== "otro") return "";
@@ -519,18 +633,18 @@
 
   function preguntaHtml(p) {
     if (p.tipo === "imagen") return imagenHtml(p);
-    let h = `<div class="ev-burbuja">${esc(p.q)}${p.nota ? `<small>${esc(p.nota)}</small>` : ""}</div>`;
+    let h = dice(p.q, p.nota);
     const tipo = p.tipo || "chips";
     if (tipo === "chips" || tipo === "color") {
       h += `<div class="ev-ops">` + opcionesDe(p).map(o =>
-        `<button type="button" class="ev-op${r[p.id] === o.v ? " sel" : ""}" data-op="${p.id}" data-v="${esc(o.v)}">${o.e ? o.e + " " : ""}${esc(o.t)}</button>`).join("") + `</div>`;
+        `<button type="button" class="ev-op${o.v === "otro" ? " otro" : ""}${r[p.id] === o.v ? " sel" : ""}" data-op="${p.id}" data-v="${esc(o.v)}">${o.e ? o.e + " " : ""}${esc(o.t)}</button>`).join("") + `</div>`;
       if (tipo === "color" && r[p.id] === "otro") {
         h += `<div class="ev-fila">Elige el color: <input type="color" data-colotro="${p.id}" value="${esc(/^#/.test(r[p.id + "_o"] || "") ? r[p.id + "_o"] : "#1f3cff")}"></div>`;
       } else h += otroHtml(p.id, p.id === "formato" ? "Medidas, por ejemplo 1200x628" : "");
     } else if (tipo === "dorsal") {
       h += `<div class="ev-ops">` + ["1", "3", "5", "7", "9", "10", "11", "14"].map(n =>
         `<button type="button" class="ev-op${r.dorsal === n ? " sel" : ""}" data-op="dorsal" data-v="${n}">${n}</button>`).join("") +
-        `<button type="button" class="ev-op${r.dorsal === "otro" ? " sel" : ""}" data-op="dorsal" data-v="otro">✏️ Otro</button></div>` + otroHtml("dorsal", "Número del dorsal");
+        `<button type="button" class="ev-op otro${r.dorsal === "otro" ? " sel" : ""}" data-op="dorsal" data-v="otro">✏️ Otro</button></div>` + otroHtml("dorsal", "Número del dorsal");
     } else if (tipo === "equip") {
       h += `<div class="ev-eqs">` + equipaciones.map(e => `<div class="ev-eq${r.equip === e.id ? " sel" : ""}">
           <button type="button" class="ev-eq-img" data-op="equip" data-v="${esc(e.id)}" aria-label="${esc(e.nombre)}">
@@ -543,7 +657,7 @@
             <button type="button" class="ev-mini" data-eqacc="quitar" data-id="${esc(e.id)}" title="Quitar" aria-label="Quitar">🗑️</button>
           </div></div>`).join("") + `</div>
         <div class="ev-fila"><button type="button" class="ev-op" data-eqacc="nueva">➕ Añadir equipación</button>
-          <button type="button" class="ev-op${r.equip === "otro" ? " sel" : ""}" data-op="equip" data-v="otro">✏️ Otra (descríbela)</button>
+          <button type="button" class="ev-op otro${r.equip === "otro" ? " sel" : ""}" data-op="equip" data-v="otro">✏️ Otra (descríbela)</button>
           <span class="ev-estado" id="evEqEstado"></span></div>` + otroHtml("equip", "Describe la equipación");
     } else if (tipo === "patros") {
       const selP = r.patros || (r.patros = []);
@@ -571,24 +685,26 @@
     const eq = equipaciones.find(e => e.id === r.equip) || {};
     const fotosEq = !esFondo && esPersona() && r.equip !== "otro" && (eq.imagenes || []).length;
     const tiene = !!img[p.capa];
-    let h = `<div class="ev-burbuja">${esFondo
+    let h = dice(esFondo
       ? "Este es el encargo para la imagen de fondo. Cópialo, pégalo en Gemini o ChatGPT y sube aquí la imagen que te dé."
-      : "Y este es el del personaje. Lo pido sobre fondo verde liso para que la app lo recorte y quede como capa." + (fotosEq ? " Adjunta también las fotos de la camiseta." : "")}
-      <small>Si algo no te convence, cambia la respuesta arriba y el encargo se actualiza.</small></div>
-      <div class="ev-prompt" data-prompt="${p.capa}">${esc(txt)}</div>
-      <div class="ev-fila">
-        <button type="button" class="btn-pdf-mode2" style="flex:1" data-copiar="${p.capa}">📋 Copiar el encargo</button>
-        ${fotosEq ? `<button type="button" class="btn-pdf-mode2" style="flex:1" data-fotoseq>👕 Fotos de la camiseta</button>` : ""}
+      : "Y este, el del personaje. Lo pido sobre fondo verde liso para recortarlo y que quede como capa." + (fotosEq ? " Adjunta también las fotos de la camiseta." : ""),
+      "Si cambias una respuesta, el encargo se actualiza solo.") +
+      `<div class="ev-prompt" data-prompt="${p.capa}">${esc(txt)}</div>
+      <div class="ev-acc">
+        <button type="button" class="ev-boton" data-copiar="${p.capa}">📋 Copiar el encargo</button>
+        ${fotosEq ? `<button type="button" class="ev-boton" data-fotoseq>👕 Fotos de la camiseta</button>` : ""}
       </div>
-      <label class="btn-save-session" style="--c: var(--c-azul); display:flex; align-items:center; justify-content:center; cursor:pointer;">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir la imagen de fondo" : "Subir la imagen del personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
-      <div class="ev-fila">
-        <button type="button" class="ev-op" data-generar="${p.capa}" style="flex:1">✨ Generarla desde la app</button>
-        ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}" style="flex:1">La subo luego</button>` : ""}
+      <div class="ev-acc">
+        <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
       </div>
-      <div class="ev-estado" data-estado="${p.capa}"></div>`;
+      <div class="ev-acc">
+        <button type="button" class="ev-op" data-generar="${p.capa}">✨ Generarla desde la app</button>
+        ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">La subo luego</button>` : ""}
+      </div>
+      <div class="ev-estado" data-estado="${p.capa}" style="margin-left:34px"></div>`;
     if (!esFondo && tiene) {
-      h += `<div class="ev-fila" style="font-size:.82rem"><label><input type="checkbox" data-qf ${quitarFondo.activo ? "checked" : ""}> Quitar el fondo de color</label></div>
-        <label class="ev-fila" style="font-size:.8rem">Tolerancia <input type="range" data-qftol min="20" max="160" step="1" value="${quitarFondo.tol}" style="flex:1"></label>`;
+      h += `<div class="ev-fila" style="font-size:.84rem"><label><input type="checkbox" data-qf ${quitarFondo.activo ? "checked" : ""}> Quitar el fondo de color</label></div>
+        <label class="ev-fila" style="font-size:.82rem">Tolerancia del recorte <input type="range" data-qftol min="20" max="160" step="1" value="${quitarFondo.tol}" style="flex:1"></label>`;
     }
     return h;
   }
@@ -671,85 +787,96 @@
     img.pers = cv;
   }
 
-  /* ---------- Editor de capas ---------- */
+  /* ---------- Montaje por capas ---------- */
+  let panel = "capas";
+  const textoDe = id => E.textos.find(t => t.id === id);
+  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "patros" ? E.patros : textoDe(id); }
+  function existe(id) {
+    if (id === "pers") return !!img.pers;
+    if (id === "patros") return (r.patros || []).length > 0;
+    if (id === "logo") return true;
+    return !!textoDe(id);
+  }
+  // De atrás hacia delante, sin el fondo
+  function ordenVisible() { return E.orden.filter(existe); }
   function nombreCapa(id) {
-    if (id === "fondo") return "🌄 Fondo";
-    if (id === "pers") return "🙋‍♀️ Personaje";
-    if (id === "logo") return "🛡️ Escudo";
-    if (id === "patros") return "🤝 Patrocinadores";
-    const i = +id.slice(1), t = E.textos[i];
-    return `🔤 ${(t && t.t.trim().split("\n")[0].slice(0, 14)) || "Texto " + (i + 1)}`;
+    if (id === "fondo") return "Fondo";
+    if (id === "pers") return "Personaje";
+    if (id === "logo") return "Escudo del club";
+    if (id === "patros") return "Patrocinadores";
+    const t = textoDe(id);
+    return (t && t.t.trim().split("\n")[0].slice(0, 28)) || "Texto nuevo";
   }
-  function capasDisponibles() {
-    const l = ["fondo"];
-    if (img.pers) l.push("pers");
-    l.push("logo");
-    if ((r.patros || []).length) l.push("patros");
-    E.textos.forEach((t, i) => l.push("t" + i));
-    return l;
-  }
+  const ICONO_CAPA = { fondo: "🌄", pers: "🙋‍♀️", logo: "🛡️", patros: "🤝" };
   function editorHtml() {
-    if (!capasDisponibles().includes(sel)) sel = "fondo";
-    return `<div class="ev-ed">
-      <h4>🧩 Montaje por capas</h4>
-      <div class="ev-burbuja" style="max-width:100%">Toca una capa en la vista previa (o aquí) y arrástrala para moverla. Los textos pueden ir por delante o por detrás del personaje.</div>
-      <div class="ev-capas">${capasDisponibles().map(id => `<button type="button" class="ev-mini${sel === id ? " sel" : ""}" data-capa="${id}">${esc(nombreCapa(id))}</button>`).join("")}
-        <button type="button" class="ev-mini" data-addtexto>➕ Texto</button></div>
-      <div id="evCtl">${controlesHtml()}</div>
-      <button type="button" class="btn-save-session" data-bajar style="--c: var(--c-verde)">⬇️ Descargar el cartel</button>
-      ${formato() === FORMATOS.story && typeof window.igGetToken === "function" && window.igGetToken() && window.nvaStory ? `<button type="button" class="btn-pdf-mode2" data-story>📲 Guardar como borrador de Story</button>` : ""}
-      <div class="ev-estado" id="evEstado2"></div>
-    </div>`;
+    if (sel !== "fondo" && !existe(sel)) sel = "fondo";
+    let h = "";
+    const t = textoDe(sel);
+    if (t) h += panelTexto(t);
+    else if (sel === "patros") h += `<div class="ev-panel"><h4>🤝 Patrocinadores</h4>
+        <div class="ev-tog"><button type="button" data-placa aria-pressed="${E.patros.placa}">Placa blanca detrás</button></div>${ordenPatrosHtml()}</div>`;
+    else if (sel === "pers") h += `<div class="ev-panel"><h4>🙋‍♀️ Personaje</h4><div class="ev-tog"><button type="button" data-flip aria-pressed="${E.pers.flip}">⇋ Volteado</button><button type="button" data-centrar>Centrar</button></div></div>`;
+    if (panel === "capas") {
+      const lista = ordenVisible().slice().reverse();
+      h += `<div class="ev-panel"><h4>☰ Capas <small>Arrastra ⠿ para cambiar el orden</small></h4>
+        <ul class="ev-lista" id="evLista">${lista.map(id => filaCapa(id)).join("")}
+          <li class="fija${sel === "fondo" ? " sel" : ""}"><span class="asa" aria-hidden="true">🔒</span><span class="num">1</span>
+            <button type="button" class="nom" data-capa="fondo">🌄 Fondo</button></li></ul>
+        ${formato() === FORMATOS.story && typeof window.igGetToken === "function" && window.igGetToken() && window.nvaStory ? `<button type="button" class="ev-boton" data-story>📲 Guardar como borrador de Story</button>` : ""}
+        <div class="ev-estado" id="evEstado2"></div></div>`;
+    } else h += `<div class="ev-estado" id="evEstado2"></div>`;
+    return h;
   }
-  function deslizador(prop, txt, min, max, paso, val, fmt) {
-    return `<span>${txt}</span><input type="range" data-ctl="${prop}" min="${min}" max="${max}" step="${paso}" value="${val}"><output data-out="${prop}">${fmt ? fmt(val) : val}</output>`;
+  function filaCapa(id) {
+    const n = ordenVisible().indexOf(id) + 2, oculta = !!E.ocultas[id];
+    const ico = ICONO_CAPA[id] || "🔤";
+    return `<li class="${sel === id ? "sel" : ""}" data-fila="${id}">
+      <button type="button" class="asa" data-asa="${id}" aria-label="Mover la capa ${esc(nombreCapa(id))}">⠿</button>
+      <span class="num">${n}</span>
+      <button type="button" class="nom" data-capa="${id}">${ico} ${esc(nombreCapa(id))}</button>
+      <button type="button" class="ojo" data-ojo="${id}" aria-pressed="${!oculta}" aria-label="${oculta ? "Mostrar" : "Ocultar"}">${oculta ? "◌" : "👁"}</button>
+      <button type="button" class="ev-mini" data-arriba="${id}" aria-label="Subir una capa">▲</button>
+      <button type="button" class="ev-mini" data-abajo="${id}" aria-label="Bajar una capa">▼</button></li>`;
   }
-  const pct = v => Math.round(v * 100) + "%", grados = v => Math.round(v) + "°";
-  function controlesHtml() {
-    if (sel === "fondo") {
-      const f = E.fondo;
-      if (!img.fondo) return `<div class="ev-estado">${hayFondo() ? "Aún no has subido la imagen de fondo (sección 🌄)." : "Fondo de color. Cámbialo en la sección 🌄."}</div>`;
-      return `<div class="ev-ctl">${deslizador("z", "Zoom", 1, 3, 0.01, f.z, pct)}${deslizador("op", "Opacidad", 0, 1, 0.01, f.op, pct)}</div>
-        <div class="ev-fila"><button type="button" class="ev-mini" data-centrar>↺ Centrar</button></div>`;
-    }
-    if (sel === "pers") {
-      const p = E.pers;
-      return `<div class="ev-ctl">${deslizador("s", "Tamaño", 0.15, 1.6, 0.01, p.s, pct)}${deslizador("rot", "Ángulo", -180, 180, 1, p.rot, grados)}${deslizador("op", "Opacidad", 0, 1, 0.01, p.op, pct)}</div>
-        <div class="ev-fila"><button type="button" class="ev-mini" data-flip>⇋ Voltear</button><button type="button" class="ev-mini" data-centrar>↺ Centrar</button></div>`;
-    }
-    if (sel === "logo") {
-      const l = E.logo;
-      return `<div class="ev-ctl">${deslizador("s", "Tamaño", 0.06, 0.6, 0.01, l.s, pct)}${deslizador("rot", "Ángulo", -180, 180, 1, l.rot, grados)}${deslizador("op", "Opacidad", 0, 1, 0.01, l.op, pct)}</div>`;
-    }
-    if (sel === "patros") {
-      const p = E.patros;
-      return `<div class="ev-ctl">${deslizador("s", "Tamaño", 0.4, 2.5, 0.01, p.s, pct)}${deslizador("rot", "Ángulo", -180, 180, 1, p.rot, grados)}${deslizador("op", "Opacidad", 0, 1, 0.01, p.op, pct)}</div>
-        <div class="ev-fila" style="font-size:.82rem"><label><input type="checkbox" data-placa ${p.placa ? "checked" : ""}> Placa blanca detrás</label></div>${ordenPatrosHtml()}`;
-    }
-    const i = +sel.slice(1), t = E.textos[i];
-    if (!t) return "";
-    return `<textarea data-ttexto placeholder="Escribe el texto (Intro para otra línea)">${esc(t.t)}</textarea>
-      <div class="ev-fila"><select data-tfuente aria-label="Tipografía">${Object.keys(FUENTES).map(k => `<option value="${k}"${t.f === k ? " selected" : ""}>${esc(FUENTES[k].t)}</option>`).join("")}</select>
-        <input type="color" data-tcolor value="${esc(t.color)}" aria-label="Color" style="flex:none;width:44px;height:32px"></div>
-      <div class="ev-ctl">${deslizador("s", "Tamaño", 0.02, 0.4, 0.005, t.s, v => Math.round(v * 1000) / 10)}${deslizador("rot", "Ángulo", -180, 180, 1, t.rot, grados)}${deslizador("op", "Opacidad", 0, 1, 0.01, t.op, pct)}</div>
-      <div class="ev-fila">
-        <button type="button" class="ev-mini${t.capa === "detras" ? " sel" : ""}" data-tcapa="detras">⬇️ Detrás del personaje</button>
-        <button type="button" class="ev-mini${t.capa === "delante" ? " sel" : ""}" data-tcapa="delante">⬆️ Delante</button></div>
-      <div class="ev-fila" style="font-size:.82rem">
-        <label><input type="checkbox" data-tflag="mayus" ${t.mayus ? "checked" : ""}> MAYÚSCULAS</label>
-        <label><input type="checkbox" data-tflag="sombra" ${t.sombra ? "checked" : ""}> Sombra</label>
-        <label><input type="checkbox" data-tflag="contorno" ${t.contorno ? "checked" : ""}> Contorno</label></div>
-      <div class="ev-fila"><button type="button" class="ev-mini" data-tdup>⧉ Duplicar</button><button type="button" class="ev-mini" data-tdel>🗑️ Borrar</button></div>`;
+  const COLORES_T = ["#ffffff", "#ff5b00", "#2f4dff", "#f5c518", "#0b1236", "#000000", "#00e5ff", "#ff2d95"];
+  function panelTexto(t) {
+    return `<div class="ev-panel"><h4>🔤 Texto <small>Tamaño, giro y opacidad en las esquinas</small></h4>
+      <textarea data-ttexto placeholder="Escribe el texto. Intro para otra línea.">${esc(t.t)}</textarea>
+      <div class="ev-fuentes">${Object.keys(FUENTES).map(k => `<button type="button" class="${t.f === k ? "sel" : ""}" data-tfuente="${k}" title="${esc(FUENTES[k].t)}" aria-label="${esc(FUENTES[k].t)}" style="font-family:'${FUENTES[k].f}'; font-style:${FUENTES[k].w.includes("italic") ? "italic" : "normal"}; font-weight:${FUENTES[k].w.replace("italic", "").trim()}">Aa</button>`).join("")}</div>
+      <div class="ev-colores">${COLORES_T.map(c => `<button type="button" class="${t.color === c ? "sel" : ""}" style="background:${c}" data-tcol="${c}" aria-label="Color ${c}"></button>`).join("")}
+        <input type="color" data-tcolor value="${esc(t.color)}" aria-label="Otro color"></div>
+      <div class="ev-tog">
+        <button type="button" data-tflag="mayus" aria-pressed="${!!t.mayus}">MAYÚSCULAS</button>
+        <button type="button" data-tflag="sombra" aria-pressed="${!!t.sombra}">Sombra</button>
+        <button type="button" data-tflag="contorno" aria-pressed="${!!t.contorno}">Contorno</button>
+        <button type="button" data-tdup>Duplicar</button>
+        <button type="button" data-tdel>Borrar</button></div></div>`;
   }
-  function refrescarControles() {
-    const ed = capa && capa.querySelector(".ev-ed");
-    if (!ed) return;
-    ed.querySelector(".ev-capas").innerHTML = capasDisponibles().map(id => `<button type="button" class="ev-mini${sel === id ? " sel" : ""}" data-capa="${id}">${esc(nombreCapa(id))}</button>`).join("") +
-      `<button type="button" class="ev-mini" data-addtexto>➕ Texto</button>`;
-    ed.querySelector("#evCtl").innerHTML = controlesHtml();
-    enlazar(ed);
+  function refrescarEditor() {
+    const cuerpo = capa && capa.querySelector("#evCuerpo");
+    if (!cuerpo || capa.querySelector("#evBarra").hidden) return;
+    // Solo se rehace la parte del montaje (lo de arriba del cuerpo), sin tocar la entrevista
+    cuerpo.querySelectorAll(".ev-panel, #evEstado2").forEach(n => n.remove());
+    cuerpo.insertAdjacentHTML("afterbegin", editorHtml());
+    enlazar(cuerpo, true);
+    pintarBarra(true);
   }
-  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "patros" ? E.patros : E.textos[+id.slice(1)]; }
+  function elegir(id) { sel = id; refrescarEditor(); pintar(); }
+  function nuevoTexto() {
+    const t = { id: "t" + (++idTexto), t: "", f: "impacto", color: "#ffffff", x: 0.5, y: 0.22 + (E.textos.length % 5) * 0.12, s: 0.11, rot: 0, op: 1, sombra: true, contorno: false, mayus: true };
+    E.textos.push(t);
+    const i = E.orden.indexOf("logo");   // por debajo del escudo y los patrocinadores
+    E.orden.splice(i < 0 ? E.orden.length : i, 0, t.id);
+    sel = t.id; refrescarEditor(); pintar();
+    const ta = capa.querySelector("[data-ttexto]"); if (ta) ta.focus();
+  }
+  function moverCapa(id, paso) {   // paso +1 = hacia delante
+    const vis = ordenVisible(), i = vis.indexOf(id), j = i + paso;
+    if (i < 0 || j < 0 || j >= vis.length) return;
+    const a = E.orden.indexOf(vis[i]), b = E.orden.indexOf(vis[j]);
+    [E.orden[a], E.orden[b]] = [E.orden[b], E.orden[a]];
+    refrescarEditor(); pintar();
+  }
 
   /* ---------- Eventos de la ventana ---------- */
   function responder(id, v) {
@@ -826,49 +953,67 @@
     const qft = c.querySelector("[data-qftol]");
     if (qft) qft.onchange = () => { quitarFondo.tol = +qft.value; procesarPersonaje(); pintar(); };
 
-    // Editor
-    c.querySelectorAll("[data-capa]").forEach(b => b.onclick = () => { sel = b.dataset.capa; refrescarControles(); pintar(); });
-    const add = c.querySelector("[data-addtexto]");
-    if (add) add.onclick = () => {
-      E.textos.push({ t: "", f: "impacto", color: "#ffffff", x: 0.5, y: 0.25 + (E.textos.length % 5) * 0.1, s: 0.1, rot: 0, op: 1, capa: "delante", sombra: true, contorno: false, mayus: true });
-      sel = "t" + (E.textos.length - 1);
-      refrescarControles(); pintar();
-      const ta = capa.querySelector("[data-ttexto]"); if (ta) ta.focus();
-    };
-    c.querySelectorAll("[data-ctl]").forEach(inp => inp.oninput = () => {
-      const el = elemento(sel); if (!el) return;
-      el[inp.dataset.ctl] = parseFloat(inp.value);
-      const out = c.querySelector(`[data-out="${inp.dataset.ctl}"]`);
-      if (out) out.textContent = { op: pct, rot: grados, z: pct }[inp.dataset.ctl] ? { op: pct, rot: grados, z: pct }[inp.dataset.ctl](el[inp.dataset.ctl]) : (sel[0] === "t" ? Math.round(el.s * 1000) / 10 : pct(el.s));
-      pintar();
-    });
+    // Montaje
+    c.querySelectorAll("[data-capa]").forEach(b => b.onclick = () => elegir(b.dataset.capa));
+    c.querySelectorAll("[data-addtexto]").forEach(b => b.onclick = nuevoTexto);
+    c.querySelectorAll("[data-panel]").forEach(b => b.onclick = () => { panel = panel === "capas" ? "" : "capas"; refrescarEditor(); });
+    c.querySelectorAll("[data-ojo]").forEach(b => b.onclick = () => { const id = b.dataset.ojo; E.ocultas[id] = !E.ocultas[id]; refrescarEditor(); pintar(); });
+    c.querySelectorAll("[data-arriba]").forEach(b => b.onclick = () => moverCapa(b.dataset.arriba, +1));
+    c.querySelectorAll("[data-abajo]").forEach(b => b.onclick = () => moverCapa(b.dataset.abajo, -1));
+    c.querySelectorAll("[data-asa]").forEach(b => arrastrarFila(b));
     const centrar = c.querySelector("[data-centrar]");
-    if (centrar) centrar.onclick = () => {
-      if (sel === "fondo") Object.assign(E.fondo, { z: 1, ox: 0, oy: 0 });
-      if (sel === "pers") Object.assign(E.pers, { x: 0.5, y: 0.6, rot: 0 });
-      refrescarControles(); pintar();
-    };
+    if (centrar) centrar.onclick = () => { Object.assign(E.pers, { x: 0.5, y: 0.6, rot: 0 }); pintar(); };
     const flip = c.querySelector("[data-flip]");
-    if (flip) flip.onclick = () => { E.pers.flip = !E.pers.flip; pintar(); };
+    if (flip) flip.onclick = () => { E.pers.flip = !E.pers.flip; flip.setAttribute("aria-pressed", E.pers.flip); pintar(); };
     const placa = c.querySelector("[data-placa]");
-    if (placa) placa.onchange = () => { E.patros.placa = placa.checked; pintar(); };
-    const t = sel[0] === "t" ? E.textos[+sel.slice(1)] : null;
-    const ta = c.querySelector("[data-ttexto]");
-    if (ta && t) ta.oninput = () => { t.t = ta.value; pintar(); const bt = capa.querySelector(`[data-capa="${sel}"]`); if (bt) bt.textContent = nombreCapa(sel); };
-    const tf = c.querySelector("[data-tfuente]");
-    if (tf && t) tf.onchange = () => { t.f = tf.value; pintar(); };
-    const tc = c.querySelector("[data-tcolor]");
-    if (tc && t) tc.oninput = () => { t.color = tc.value; pintar(); };
-    c.querySelectorAll("[data-tcapa]").forEach(b => b.onclick = () => { if (t) { t.capa = b.dataset.tcapa; refrescarControles(); pintar(); } });
-    c.querySelectorAll("[data-tflag]").forEach(cb => cb.onchange = () => { if (t) { t[cb.dataset.tflag] = cb.checked; pintar(); } });
-    const dup = c.querySelector("[data-tdup]");
-    if (dup && t) dup.onclick = () => { E.textos.push(Object.assign({}, t, { y: Math.min(0.95, t.y + 0.06) })); sel = "t" + (E.textos.length - 1); refrescarControles(); pintar(); };
-    const del = c.querySelector("[data-tdel]");
-    if (del && t) del.onclick = () => { E.textos.splice(+sel.slice(1), 1); sel = "fondo"; refrescarControles(); pintar(); };
-    const bajar = c.querySelector("[data-bajar]");
-    if (bajar) bajar.onclick = descargar;
+    if (placa) placa.onclick = () => { E.patros.placa = !E.patros.placa; placa.setAttribute("aria-pressed", E.patros.placa); pintar(); };
+    const t = textoDe(sel);
+    if (t) {
+      const ta = c.querySelector("[data-ttexto]");
+      if (ta) ta.oninput = () => { t.t = ta.value; pintar(); const fila = capa.querySelector(`[data-capa="${sel}"]`); if (fila) fila.textContent = "🔤 " + nombreCapa(sel); };
+      c.querySelectorAll("[data-tfuente]").forEach(b => b.onclick = () => { t.f = b.dataset.tfuente; c.querySelectorAll("[data-tfuente]").forEach(x => x.classList.toggle("sel", x === b)); pintar(); });
+      c.querySelectorAll("[data-tcol]").forEach(b => b.onclick = () => { t.color = b.dataset.tcol; c.querySelectorAll("[data-tcol]").forEach(x => x.classList.toggle("sel", x === b)); pintar(); });
+      const tc = c.querySelector("[data-tcolor]");
+      if (tc) tc.oninput = () => { t.color = tc.value; c.querySelectorAll("[data-tcol]").forEach(x => x.classList.remove("sel")); pintar(); };
+      c.querySelectorAll("[data-tflag]").forEach(b => b.onclick = () => { const k = b.dataset.tflag; t[k] = !t[k]; b.setAttribute("aria-pressed", t[k]); pintar(); });
+      const dup = c.querySelector("[data-tdup]");
+      if (dup) dup.onclick = () => {
+        const n = Object.assign({}, t, { id: "t" + (++idTexto), y: Math.min(0.95, t.y + 0.07) });
+        E.textos.push(n); E.orden.splice(E.orden.indexOf(t.id) + 1, 0, n.id); elegir(n.id);
+      };
+      const del = c.querySelector("[data-tdel]");
+      if (del) del.onclick = () => { E.textos = E.textos.filter(x => x !== t); E.orden = E.orden.filter(x => x !== t.id); elegir("fondo"); };
+    }
+    c.querySelectorAll("[data-bajar]").forEach(b => b.onclick = descargar);
     const story = c.querySelector("[data-story]");
     if (story) story.onclick = () => guardarStory(story);
+  }
+
+  // Reordenar arrastrando el asa ⠿ de una fila (la lista va de delante a atrás)
+  function arrastrarFila(asa) {
+    asa.onpointerdown = e => {
+      const li = asa.closest("li"), ul = li.parentElement;
+      const filas = () => Array.from(ul.querySelectorAll("li[data-fila]"));
+      asa.setPointerCapture(e.pointerId);
+      li.classList.add("arrastrando");
+      const y0 = e.clientY;
+      let destino = filas().indexOf(li);
+      asa.onpointermove = ev => {
+        li.style.transform = `translateY(${ev.clientY - y0}px)`;
+        const resto = filas().filter(x => x !== li);
+        destino = resto.filter(x => { const rc = x.getBoundingClientRect(); return ev.clientY > rc.top + rc.height / 2; }).length;
+      };
+      asa.onpointerup = asa.onpointercancel = () => {
+        asa.onpointermove = asa.onpointerup = asa.onpointercancel = null;
+        li.classList.remove("arrastrando"); li.style.transform = "";
+        const lista = filas().map(x => x.dataset.fila).filter(x => x !== li.dataset.fila);
+        lista.splice(destino, 0, li.dataset.fila);                    // de delante a atrás
+        const nuevo = lista.slice().reverse();                        // de atrás a delante
+        const otros = E.orden.filter(id => !nuevo.includes(id));      // capas que ahora no están
+        E.orden = nuevo.concat(otros);
+        refrescarEditor(); pintar();
+      };
+    };
   }
 
   /* ---------- Generar desde la app (si la función está configurada) ---------- */
@@ -928,12 +1073,13 @@
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       cv.style.aspectRatio = `${F.w} / ${F.h}`;
       componer(cv.getContext("2d"), w, h, true);
+      colocarSeleccion();
     });
   }
 
   function fondoColor(ctx, W, H) {
     const v = r.fColor === "otro" ? (r.fColor_o || "#1f3cff") : (r.fColor || "club");
-    if (v === "club" || !hayFondo() && !r.fColor) {
+    if (v === "club") {
       const g = ctx.createLinearGradient(0, 0, W * 0.4, H);
       g.addColorStop(0, "#0a1f9e"); g.addColorStop(0.6, "#1f3cff"); g.addColorStop(1, "#ff5b00");
       ctx.fillStyle = g;
@@ -941,14 +1087,15 @@
     ctx.fillRect(0, 0, W, H);
   }
 
+  // cajas: dónde está cada capa (centro, tamaño sin girar y giro) para tocarla y poner los tiradores
   function componer(ctx, W, H, previa) {
     const M = Math.min(W, H);
     cajas = [];
     ctx.save();
     ctx.clearRect(0, 0, W, H);
 
-    // 1. Fondo
-    if (img.fondo) {
+    // Capa 1: el fondo
+    if (img.fondo && !E.ocultas.fondo) {
       ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
       const f = E.fondo, o = img.fondo;
       const s = Math.max(W / o.width, H / o.height) * f.z, dw = o.width * s, dh = o.height * s;
@@ -957,71 +1104,53 @@
       ctx.globalAlpha = 1;
     } else {
       fondoColor(ctx, W, H);
-      if (previa && hayFondo()) {
-        ctx.fillStyle = "rgba(255,255,255,.2)"; ctx.font = `700 ${M * 0.045}px Barlow, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      if (previa && hayFondo() && !img.fondo) {
+        ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.font = `600 ${M * 0.042}px Barlow, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText("Aquí irá la imagen de fondo", W / 2, H / 2);
       }
     }
-    cajas.push({ id: "fondo", x: 0, y: 0, w: W, h: H });
+    cajas.push({ id: "fondo", cx: W / 2, cy: H / 2, w: W, h: H, rot: 0 });
 
-    // 2. Textos de detrás, 3. personaje, 4. textos de delante
-    E.textos.forEach((t, i) => { if (t.capa === "detras") dibujarTexto(ctx, W, H, M, t, "t" + i); });
-    if (img.pers) {
-      const p = E.pers, o = img.pers;
-      const h = p.s * H, w = h * o.width / o.height;
-      const cx = p.x * W, cy = p.y * H;
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(p.rot * Math.PI / 180); if (p.flip) ctx.scale(-1, 1);
-      ctx.globalAlpha = p.op; ctx.drawImage(o, -w / 2, -h / 2, w, h); ctx.restore();
-      cajas.push(caja("pers", cx, cy, w, h, p.rot));
-    }
-    E.textos.forEach((t, i) => { if (t.capa !== "detras") dibujarTexto(ctx, W, H, M, t, "t" + i); });
-
-    // 5. Escudo
-    const logo = imgLista("LOGO-NVA.png");
-    if (logo) {
-      const l = E.logo, s = l.s * M, cx = l.x * W, cy = l.y * H;
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(l.rot * Math.PI / 180); ctx.globalAlpha = l.op;
-      ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = M * 0.02;
-      ctx.drawImage(logo, -s / 2, -s / 2, s, s); ctx.restore();
-      cajas.push(caja("logo", cx, cy, s, s, l.rot));
-    }
-
-    // 6. Patrocinadores (el primero, el más grande)
-    dibujarPatros(ctx, W, H, M);
-
-    // Marco de la capa elegida (solo en la vista previa)
-    if (previa && capa && capa.querySelector(".ev-ed")) {
-      const cj = cajas.find(c => c.id === sel);
-      if (cj && sel !== "fondo") {
-        ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.strokeStyle = "#ff7a2e";
-        ctx.strokeRect(cj.x, cj.y, cj.w, cj.h); ctx.restore();
-      }
+    // El resto, de atrás hacia delante
+    for (const id of ordenVisible()) {
+      if (E.ocultas[id]) continue;
+      if (id === "pers") dibujarPersonaje(ctx, W, H);
+      else if (id === "logo") dibujarLogo(ctx, W, H, M);
+      else if (id === "patros") dibujarPatros(ctx, W, H, M);
+      else dibujarTexto(ctx, W, H, M, textoDe(id), previa);
     }
     ctx.restore();
   }
-  // Caja recta que envuelve un rectángulo girado (para tocarlo)
-  function caja(id, cx, cy, w, h, rot) {
-    const a = (rot || 0) * Math.PI / 180, cw = Math.abs(w * Math.cos(a)) + Math.abs(h * Math.sin(a)), ch = Math.abs(w * Math.sin(a)) + Math.abs(h * Math.cos(a));
-    return { id, x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch };
+  function dibujarPersonaje(ctx, W, H) {
+    const p = E.pers, o = img.pers;
+    const h = p.s * H, w = h * o.width / o.height, cx = p.x * W, cy = p.y * H;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(p.rot * Math.PI / 180); if (p.flip) ctx.scale(-1, 1);
+    ctx.globalAlpha = p.op; ctx.drawImage(o, -w / 2, -h / 2, w, h); ctx.restore();
+    cajas.push({ id: "pers", cx, cy, w, h, rot: p.rot });
   }
-
+  function dibujarLogo(ctx, W, H, M) {
+    const logo = imgLista("LOGO-NVA.png");
+    if (!logo) return;
+    const l = E.logo, s = l.s * M, cx = l.x * W, cy = l.y * H;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(l.rot * Math.PI / 180); ctx.globalAlpha = l.op;
+    ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = M * 0.02;
+    ctx.drawImage(logo, -s / 2, -s / 2, s, s); ctx.restore();
+    cajas.push({ id: "logo", cx, cy, w: s, h: s, rot: l.rot });
+  }
   function dibujarPatros(ctx, W, H, M) {
-    const selP = r.patros || [];
-    if (!selP.length) return;
-    const lista = selP.map(a => imgLista("Patrocinadores/" + a)).filter(Boolean);
+    const lista = (r.patros || []).map(a => imgLista("Patrocinadores/" + a)).filter(Boolean);
     if (!lista.length) return;
     const P = E.patros, base = M * 0.085 * P.s, gap = M * 0.022 * P.s;
-    const factor = i => Math.max(0.5, 1 - i * 0.16);
+    const factor = i => Math.max(0.5, 1 - i * 0.16);   // el primero, el más grande
     const tam = lista.map((im, i) => { const h = base * factor(i), w = Math.min(h * im.width / im.height, M * 0.3 * factor(i) * P.s); return { im, w, h: w * im.height / im.width }; });
     const ancho = tam.reduce((s, t) => s + t.w, 0) + gap * (tam.length - 1), alto = Math.max(...tam.map(t => t.h));
-    const pad = P.placa ? M * 0.018 * P.s : 0;
-    const cx = P.x * W, cy = P.y * H;
+    const pad = P.placa ? M * 0.018 * P.s : 0, cx = P.x * W, cy = P.y * H;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(P.rot * Math.PI / 180); ctx.globalAlpha = P.op;
     if (P.placa) { ctx.fillStyle = "rgba(255,255,255,.94)"; redondo(ctx, -ancho / 2 - pad, -alto / 2 - pad, ancho + pad * 2, alto + pad * 2, M * 0.02 * P.s); ctx.fill(); }
     let x = -ancho / 2;
     tam.forEach(t => { ctx.drawImage(t.im, x, -t.h / 2, t.w, t.h); x += t.w + gap; });
     ctx.restore();
-    cajas.push(caja("patros", cx, cy, ancho + pad * 2, alto + pad * 2, P.rot));
+    cajas.push({ id: "patros", cx, cy, w: ancho + pad * 2, h: alto + pad * 2, rot: P.rot });
   }
   function redondo(ctx, x, y, w, h, rr) {
     ctx.beginPath();
@@ -1037,16 +1166,18 @@
     const n = parseInt(m[1], 16);
     return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 110;
   }
-  function dibujarTexto(ctx, W, H, M, t, id) {
-    const txt = (t.mayus ? t.t.toUpperCase() : t.t).replace(/\s+$/, "");
-    if (!txt.trim()) return;
+  function dibujarTexto(ctx, W, H, M, t, previa) {
+    if (!t) return;
+    const vacio = !t.t.trim();
+    if (vacio && !previa) return;   // el texto vacío solo se ve en la vista previa
+    const txt = vacio ? "Escribe tu texto" : (t.mayus ? t.t.toUpperCase() : t.t).replace(/\s+$/, "");
     const px = t.s * M, lineas = txt.split("\n"), alto = px * 1.05;
     ctx.save();
     ctx.font = fuenteCss(t.f, px);
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     const ancho = Math.max(...lineas.map(l => ctx.measureText(l).width)), altoTot = alto * lineas.length;
     const cx = t.x * W, cy = t.y * H;
-    ctx.translate(cx, cy); ctx.rotate(t.rot * Math.PI / 180); ctx.globalAlpha = t.op;
+    ctx.translate(cx, cy); ctx.rotate(t.rot * Math.PI / 180); ctx.globalAlpha = vacio ? 0.35 * t.op : t.op;
     lineas.forEach((l, i) => {
       const y = -altoTot / 2 + alto * (i + 0.5);
       if (t.contorno) { ctx.lineWidth = px * 0.12; ctx.strokeStyle = esOscuro(t.color) ? "#ffffff" : "#0b1236"; ctx.strokeText(l, 0, y); }
@@ -1055,35 +1186,114 @@
       ctx.shadowColor = "transparent";
     });
     ctx.restore();
-    cajas.push(caja(id, cx, cy, ancho + px * 0.2, altoTot, t.rot));
+    cajas.push({ id: t.id, cx, cy, w: ancho + px * 0.3, h: altoTot + px * 0.1, rot: t.rot });
   }
 
-  /* ---------- Tocar y arrastrar sobre la vista previa ---------- */
+  /* ---------- Tocar la vista previa ---------- */
+  function puntoLienzo(cv, e) {
+    const rc = cv.getBoundingClientRect();
+    return { x: (e.clientX - rc.left) * cv.width / rc.width, y: (e.clientY - rc.top) * cv.height / rc.height, k: rc.width / cv.width, rc };
+  }
+  function dentro(cj, x, y) {   // ¿el punto cae en la caja (girada)?
+    const a = -cj.rot * Math.PI / 180, dx = x - cj.cx, dy = y - cj.cy;
+    const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
+    return Math.abs(lx) <= cj.w / 2 + 6 && Math.abs(ly) <= cj.h / 2 + 6;
+  }
+  const montando = () => capa && !capa.querySelector("#evBarra").hidden;
   function tocarLienzo(cv) {
-    let ini = null;
+    let ini = null, ultimoToque = 0;
     cv.addEventListener("pointerdown", e => {
-      if (!E || !capa.querySelector(".ev-ed")) return;
-      const rc = cv.getBoundingClientRect();
-      const x = (e.clientX - rc.left) * cv.width / rc.width, y = (e.clientY - rc.top) * cv.height / rc.height;
-      // La capa de más arriba que esté bajo el dedo (la elegida tiene preferencia)
-      const bajo = cajas.filter(c => x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h).map(c => c.id);
+      if (!montando()) return;
+      const p = puntoLienzo(cv, e);
+      const bajo = cajas.filter(c => dentro(c, p.x, p.y)).map(c => c.id);
       const id = bajo.includes(sel) && sel !== "fondo" ? sel : (bajo[bajo.length - 1] || "fondo");
-      if (id !== sel) { sel = id; refrescarControles(); }
+      const doble = id === sel && Date.now() - ultimoToque < 350;
+      ultimoToque = Date.now();
+      if (id !== sel) elegir(id);
+      if (doble && textoDe(id)) { const ta = capa.querySelector("[data-ttexto]"); if (ta) ta.focus(); }
       const el = elemento(sel);
-      ini = { x: e.clientX, y: e.clientY, a: id === "fondo" ? { x: el.ox, y: el.oy } : { x: el.x, y: el.y } };
+      ini = { x: e.clientX, y: e.clientY, a: sel === "fondo" ? { x: el.ox, y: el.oy } : { x: el.x, y: el.y } };
       cv.setPointerCapture(e.pointerId);
-      pintar();
     });
     cv.addEventListener("pointermove", e => {
       if (!ini) return;
       const rc = cv.getBoundingClientRect(), el = elemento(sel);
       const dx = (e.clientX - ini.x) / rc.width, dy = (e.clientY - ini.y) / rc.height;
       if (sel === "fondo") { el.ox = ini.a.x + dx; el.oy = ini.a.y + dy; }
-      else { el.x = ini.a.x + dx; el.y = ini.a.y + dy; }
+      else {
+        el.x = ini.a.x + dx; el.y = ini.a.y + dy;
+        // Imán al centro
+        if (Math.abs(el.x - 0.5) < 0.012) el.x = 0.5;
+      }
       pintar();
     });
     const fin = () => { ini = null; };
     cv.addEventListener("pointerup", fin); cv.addEventListener("pointercancel", fin);
+  }
+
+  // Coloca el marco naranja y sus cuatro esquinas sobre la capa elegida
+  function colocarSeleccion() {
+    if (!capa) return;
+    const marco = capa.querySelector("#evSel"), cv = capa.querySelector("#evLienzo"), escena = capa.querySelector("#evEscena");
+    const cj = cajas.find(c => c.id === sel);
+    if (!montando() || !cj || E.ocultas[sel]) { marco.hidden = true; return; }
+    const rc = cv.getBoundingClientRect(), re = escena.getBoundingClientRect(), k = rc.width / cv.width;
+    marco.hidden = false;
+    Object.assign(marco.style, {
+      left: (rc.left - re.left + (cj.cx - cj.w / 2) * k) + "px", top: (rc.top - re.top + (cj.cy - cj.h / 2) * k) + "px",
+      width: cj.w * k + "px", height: cj.h * k + "px", transform: `rotate(${cj.rot}deg)`
+    });
+    const esFondo = sel === "fondo";
+    if (esFondo) Object.assign(marco.style, { left: rc.left - re.left + 14 + "px", top: rc.top - re.top + 14 + "px", width: rc.width - 28 + "px", height: rc.height - 28 + "px" });
+    const acc = marco.querySelector('[data-h="accion"]');
+    acc.hidden = !(textoDe(sel) || sel === "pers");
+    acc.textContent = textoDe(sel) ? "✎" : "⇋";
+    acc.setAttribute("aria-label", textoDe(sel) ? "Editar el texto" : "Voltear");
+    marco.querySelector('[data-h="rot"]').hidden = esFondo;
+  }
+
+  // Esquinas: ⟳ girar, ⤡ tamaño, ◐ opacidad (arriba/abajo), ✎ editar texto o ⇋ voltear
+  function tiradores(marco) {
+    const medida = marco.querySelector("#evMedida");
+    marco.querySelectorAll(".ev-h").forEach(h => {
+      h.addEventListener("pointerdown", e => {
+        e.stopPropagation(); e.preventDefault();
+        const tipo = h.dataset.h, el = elemento(sel), cj = cajas.find(c => c.id === sel);
+        if (!el || !cj) return;
+        if (tipo === "accion") {
+          if (textoDe(sel)) { const ta = capa.querySelector("[data-ttexto]"); if (ta) { ta.focus(); ta.scrollIntoView({ block: "nearest" }); } }
+          else if (sel === "pers") { E.pers.flip = !E.pers.flip; pintar(); }
+          return;
+        }
+        const cv = capa.querySelector("#evLienzo"), rc = cv.getBoundingClientRect(), k = rc.width / cv.width;
+        const cx = rc.left + cj.cx * k, cy = rc.top + cj.cy * k;
+        const d0 = Math.hypot(e.clientX - cx, e.clientY - cy) || 1, a0 = Math.atan2(e.clientY - cy, e.clientX - cx);
+        const prop = sel === "fondo" ? "z" : "s";
+        const ini = { v: el[prop], rot: el.rot || 0, op: el.op, y: e.clientY };
+        h.setPointerCapture(e.pointerId);
+        medida.classList.add("ver");
+        const mover = ev => {
+          if (tipo === "esc") {
+            const f = Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0;
+            const lim = prop === "z" ? [1, 4] : sel === "pers" ? [0.1, 2] : sel === "patros" ? [0.3, 3] : sel === "logo" ? [0.05, 0.8] : [0.015, 0.5];
+            el[prop] = Math.min(lim[1], Math.max(lim[0], ini.v * f));
+            medida.textContent = `Tamaño ${Math.round(el[prop] / ini.v * 100)}%`;
+          } else if (tipo === "rot") {
+            let g = ini.rot + (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180 / Math.PI;
+            g = ((g + 540) % 360) - 180;
+            for (const iman of [-180, -90, 0, 90, 180]) if (Math.abs(g - iman) < 4) g = iman;
+            el.rot = g;
+            medida.textContent = `Giro ${Math.round(g)}°`;
+          } else if (tipo === "op") {
+            el.op = Math.min(1, Math.max(0.05, ini.op - (ev.clientY - ini.y) / 160));
+            medida.textContent = `Opacidad ${Math.round(el.op * 100)}%`;
+          }
+          pintar();
+        };
+        const soltar = () => { h.removeEventListener("pointermove", mover); h.removeEventListener("pointerup", soltar); h.removeEventListener("pointercancel", soltar); medida.classList.remove("ver"); };
+        h.addEventListener("pointermove", mover); h.addEventListener("pointerup", soltar); h.addEventListener("pointercancel", soltar);
+      });
+    });
   }
 
   /* ---------- Guardar ---------- */
@@ -1140,3 +1350,4 @@
   window.evAbrirCartel = abrir;
   window.evCartel = { promptFondo, promptPersonaje, _estado: () => ({ r, E, sel }), _img: img, _poner: ponerImagen };
 })();
+

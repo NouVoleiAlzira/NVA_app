@@ -834,7 +834,6 @@
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="${p.capa}">📋 Copiar el encargo</button>
         ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
-        <button type="button" class="ev-boton prim" data-copiatodo="${modo === "ia" ? "fondo" : p.capa || "fondo"}">📦 Copiar todo en una imagen</button>
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
@@ -862,7 +861,6 @@
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="fondo">📋 Copiar el encargo</button>
         ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
-        <button type="button" class="ev-boton prim" data-copiatodo="${modo === "ia" ? "fondo" : p.capa || "fondo"}">📦 Copiar todo en una imagen</button>
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar el cartel" : "Subir el cartel creado"}<input type="file" accept="image/*" data-subir="fondo" hidden></label>
@@ -1255,10 +1253,9 @@
     const ss = seccionesRef();
     return ss.find(x => x.id === id) || (partidoSel && esLogoClub(partidoSel[id].src) ? ss.find(x => x.id === "club") : null);
   }
-  // Con «texto», el encargo va escrito arriba en la misma imagen (para pegar una sola imagen en la IA)
-  async function imagenReferencia(texto) {
+  async function imagenReferencia() {
     const secs = seccionesRef();
-    if (!secs.length && !texto) throw new Error("No hay nada que poner en la imagen de referencia");
+    if (!secs.length) throw new Error("No hay nada que poner en la imagen de referencia");
     const filas = [];
     for (const sc of secs) {
       let ims = [];
@@ -1276,28 +1273,10 @@
     }
     const W = 1400, pad = 36, cab = 64, alto = 480;
     const cv = document.createElement("canvas");
-    // Encargo partido en líneas que quepan en el ancho
-    const FT = "400 25px Arial, sans-serif", LH = 34, lineas = [];
-    if (texto) {
-      const m = document.createElement("canvas").getContext("2d"); m.font = FT;
-      const cab0 = `INSTRUCTIONS: create the image described below.${filas.length ? " The numbered sections under the instructions are the visual references it mentions (do not copy this white sheet, its frames or labels)." : ""}`;
-      [cab0, ""].concat(String(texto).split("\n")).forEach(par => {
-        if (!par.trim()) { lineas.push(""); return; }
-        let l = "";
-        par.split(/\s+/).forEach(w => { const t = l ? l + " " + w : w; if (m.measureText(t).width > W - pad * 2 - 60 && l) { lineas.push(l); l = w; } else l = t; });
-        lineas.push(l);
-      });
-    }
-    const altoTxt = lineas.length ? lineas.length * LH + pad * 2 : 0;
-    cv.width = W; cv.height = altoTxt + pad + filas.length * (cab + alto + pad);
+    cv.width = W; cv.height = pad + filas.length * (cab + alto + pad);
     const cx = cv.getContext("2d");
     cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, W, cv.height);
-    if (lineas.length) {
-      cx.fillStyle = "#111111"; cx.textAlign = "left"; cx.textBaseline = "top";
-      lineas.forEach((l, i) => { cx.font = i === 0 ? "700 25px Arial, sans-serif" : FT; cx.fillText(l, pad, pad + i * LH); });
-      cx.fillStyle = "#d5d9e3"; cx.fillRect(pad / 2, altoTxt - 2, W - pad, 2);
-    }
-    let y = altoTxt + pad;
+    let y = pad;
     filas.forEach(({ sc, ims }) => {
       cx.fillStyle = "#0b1236"; cx.font = "700 40px Barlow, Arial, sans-serif"; cx.textAlign = "left"; cx.textBaseline = "middle";
       cx.fillText(`${sc.n} · ${sc.t}`, pad, y + cab / 2);
@@ -1412,29 +1391,6 @@
         }
       }
       setTimeout(() => { if (b.isConnected) b.textContent = "🖼️ Copiar la imagen de referencia"; }, 3500);
-    });
-    // Imagen de referencia y texto del encargo de una vez: en el portapapeles van los dos;
-    // si el navegador no lo permite (móvil), se comparten juntos con la app de la IA.
-    c.querySelectorAll("[data-copiatodo]").forEach(b => b.onclick = async () => {
-      const txt = promptDe(b.dataset.copiatodo), base = "📦 Copiar todo en una imagen";
-      // Una sola imagen con el encargo escrito arriba y las referencias debajo
-      const promesa = imagenReferencia(txt.replace(/\bREFERENCE IMAGE: one image is attached with numbered sections:/, "REFERENCE IMAGE: this same image contains, under the instructions, numbered sections:").replace(/of the attached reference image/g, "of this image"));
-      try {
-        if (!navigator.clipboard || !window.ClipboardItem) throw new Error("sin portapapeles");
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": promesa })]);
-        b.textContent = "✅ Copiada: pega la imagen en la IA";
-      } catch (e) {
-        const blob = await promesa.catch(() => null);
-        const f = blob ? new File([blob], "referencia-cartel.png", { type: "image/png" }) : null;
-        const datos = f ? { files: [f] } : { text: txt };
-        if (navigator.canShare && navigator.canShare(datos)) {
-          try { await navigator.share(datos); b.textContent = "✅ Enviado"; } catch (er) { b.textContent = base; }
-        } else {
-          if (f) { const u = URL.createObjectURL(f), el = document.createElement("a"); el.href = u; el.download = f.name; document.body.appendChild(el); el.click(); el.remove(); }
-          b.textContent = "Te he guardado la imagen";
-        }
-      }
-      setTimeout(() => { if (b.isConnected) b.textContent = base; }, 3500);
     });
     const fotosEq = c.querySelector("[data-fotoseq]");
     if (fotosEq) fotosEq.onclick = async () => {

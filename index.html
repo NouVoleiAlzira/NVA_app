@@ -355,6 +355,11 @@
       <div class="date-container">
         <label for="matchDatePicker">📅 Fecha:</label>
         <input type="date" id="matchDatePicker" class="date-input">
+        <select id="matchNumPicker" class="match-num-picker" title="Si el equipo juega dos partidos el mismo día, elige cuál registras" aria-label="Partido del día">
+          <option value="1">1.º</option>
+          <option value="2">2.º</option>
+          <option value="3">3.º</option>
+        </select>
       </div>
       <div class="mode-switch"><span class="mode-label">PARTIDO</span><button type="button" class="mode-swap" onclick="goToTrainingScreen()" title="Cambiar a Entrenamiento" aria-label="Cambiar a Entrenamiento"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16"/><path d="M20 21v-5h-5"/></svg></button></div>
       <button class="btn-history" onclick="withLoading(openMatchHistoryModal, 'Cargando historial de partidos...')">📜<span class="hist-lbl"> Historial</span></button>

@@ -585,6 +585,13 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
   color-scheme: dark;
 }
 .date-input:focus { border-color: var(--balon); box-shadow: var(--foco); }
+/* Partido del día (1.º, 2.º…): un equipo puede jugar dos partidos el mismo día */
+.match-num-picker {
+  background: var(--sf-campo); color: #fff; border: 1px solid var(--borde); color-scheme: dark;
+  border-radius: 7px; padding: 4px 2px; font-size: 0.82rem; font-weight: 700; font-family: var(--font-body);
+  outline: none; flex-shrink: 0; width: auto !important;
+}
+.match-num-picker:focus { border-color: var(--balon); box-shadow: var(--foco); }
 .mode-swap { background: var(--g-azul); border-color: transparent; box-shadow: var(--sombra-btn); }
 
 /* Tarjetas de jugadora: siguen claras (se leen mejor los estados de color),

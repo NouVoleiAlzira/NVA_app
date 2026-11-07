@@ -265,7 +265,7 @@
         if (!res || !m.date) return;
         const mk = moveKey(key, m);
         const home = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
-        out.push({ key, fecha: m.date, rival: m.rival || "", home, res });
+        out.push({ key, fecha: m.date, rival: m.rival || "", home, res, n: numPartidoDia(cp.teams[key].matches, m) });
       });
     });
     return out;
@@ -288,13 +288,24 @@
     const tot = numOrNull(m.setsLocal) == null && numOrNull(m.setsVisitante) == null ? "" : `${numOrNull(m.setsLocal) ?? "-"}-${numOrNull(m.setsVisitante) ?? "-"}`;
     return (tot + (sets.length ? ` (${sets.join(", ")})` : "")).trim();
   }
-  // Registro de partido de un equipo y un día (Partidos/Partidos_<equipo>_<fecha>.json)
-  const rutaRegistro = (key, fecha) => `Partidos/Partidos_${sanitizeFileName(key)}_${fecha}.json`;
+  // Un equipo puede jugar 2 (o más) partidos el mismo día: cada uno tiene su número (1, 2…)
+  // por orden de hora. Nº del partido m entre los del equipo ese día.
+  function numPartidoDia(matches, m) {
+    const delDia = (matches || []).filter(x => x.date === m.date && !/DESCANS/i.test(x.rival || ""))
+      .sort((a, b) => (a.time || "").localeCompare(b.time || "") || (a.rival || "").localeCompare(b.rival || ""));
+    const i = delDia.findIndex(x => x === m || ((x.time || "") === (m.time || "") && (x.rival || "") === (m.rival || "")));
+    return i > 0 ? i + 1 : 1;
+  }
+  // Nº de partido de un registro (los antiguos no lo llevan: son el 1)
+  const numRegistro = (log) => { const n = parseInt(log && log.partido, 10); return n > 1 ? n : 1; };
+  // Registro de partido de un equipo y un día: Partidos/Partidos_<equipo>_<fecha>.json para el 1.º
+  // y Partidos/Partidos_<equipo>_<fecha>_2.json para el 2.º (y así).
+  const rutaRegistro = (key, fecha, n) => `Partidos/Partidos_${sanitizeFileName(key)}_${fecha}${n > 1 ? "_" + n : ""}.json`;
 
   raiz.nvaCalLectura = {
     normalizeTeamName, sanitizeFileName, moveKey, pdfLines, parseDate, parseTime,
     findFedName, previousFedName, extractMatches, significantChange, pairMatches, diffMatches,
     sameMatches, migrarClaves, aplicarLectura, parseResult, playedMatches, buildMarcador,
-    marcadorTxt, rutaRegistro, MATCH_SETS_COUNT: 5
+    marcadorTxt, rutaRegistro, numPartidoDia, numRegistro, MATCH_SETS_COUNT: 5
   };
 })(typeof window !== "undefined" ? window : globalThis);

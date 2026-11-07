@@ -166,12 +166,12 @@ async function actualizar(clave: string, quien: string) {
   // 3. Resultados a los registros de partido que ya existen
   let grabados = 0, distintos = 0, iguales = 0, fallos = 0;
   for (const p of L.playedMatches(cp, lecturas.map((x) => x.key))) {
-    const ruta = L.rutaRegistro(p.key, p.fecha);
+    const ruta = L.rutaRegistro(p.key, p.fecha, p.n);
     try {
       const reg = await leerArchivo(ruta);
       if (!reg) continue;
       const log = JSON.parse(reg.contenido);
-      if (log.equipo !== p.key || log.fecha !== p.fecha) continue;
+      if (log.equipo !== p.key || log.fecha !== p.fecha || L.numRegistro(log) !== p.n) continue;
       const nuevo = L.buildMarcador(p, L.MATCH_SETS_COUNT);
       const oldTxt = L.marcadorTxt(log.marcador);
       if (oldTxt && oldTxt !== L.marcadorTxt(nuevo)) { distintos++; continue; }

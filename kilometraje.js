@@ -181,8 +181,8 @@
   // Un registro con solo el resultado no vale. Sus km no cuentan.
   function tieneRegistro(f) {
     if (f.evento) return true;
-    const logs = typeof allMatchLogs !== "undefined" ? allMatchLogs : [];
-    return logs.some(l => l.equipo === f.key && l.fecha === f.date && Array.isArray(l.jugadores) && l.jugadores.length > 0);
+    if (!window.nvaPartidoRegistrado) return false;
+    return window.nvaPartidoRegistrado(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
   }
   function calcular() {
     st.filas.forEach(f => { f._lock = !tieneRegistro(f); });
@@ -343,6 +343,8 @@
     selectCoachAndTeam(coach, f.key, f.equipo);
     goToMatchScreen();
     const picker = document.getElementById("matchDatePicker");
+    const num = document.getElementById("matchNumPicker");
+    if (num) num.value = String(window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
     if (picker) { picker.value = f.date; initMatchData(); picker.dispatchEvent(new Event("change")); renderMatchPlayers(); }
   }
   const origGoBack = window.goBack;

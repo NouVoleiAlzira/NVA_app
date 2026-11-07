@@ -60,8 +60,15 @@
 
   // ¿Está registrado? Entrenamiento: existe el fichero. Partido: existe y tiene jugadores
   // (la carga automática de resultados crea ficheros de partido sin jugadores).
+  // Si el equipo juega 2 partidos ese día, cada uno tiene su registro (…_2.json el 2.º);
+  // a los alevines (varios partidos seguidos) les vale un solo registro para todo el día.
+  function numPartido(it) {
+    if (window.cpIsAlevin && window.cpIsAlevin(it.team)) return 1;
+    return window.nvaNumPartidoCalendario ? window.nvaNumPartidoCalendario(it.team, it.date, it.hora, it.rival || "") : 1;
+  }
   async function registrado(g, it) {
-    const path = it.tipo === "match" ? `Partidos/Partidos_${sanit(it.team)}_${it.date}.json` : `registros/Entrenamientos_${sanit(it.team)}_${it.date}.json`;
+    const n = it.tipo === "match" ? numPartido(it) : 1;
+    const path = it.tipo === "match" ? `Partidos/Partidos_${sanit(it.team)}_${it.date}${n > 1 ? "_" + n : ""}.json` : `registros/Entrenamientos_${sanit(it.team)}_${it.date}.json`;
     const { data } = await leer(g, path);
     if (!data) return false;
     return it.tipo !== "match" || (Array.isArray(data.jugadores) && data.jugadores.length > 0);

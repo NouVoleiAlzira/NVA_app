@@ -136,7 +136,7 @@
     return out.sort((x, y) => (x.date + x.hora) < (y.date + y.hora) ? -1 : 1);
   }
   function registrado(p) {
-    try { return (allMatchLogs || []).some(l => l.equipo === p.team && l.fecha === p.date && Array.isArray(l.jugadores) && l.jugadores.length); } catch (e) { return false; }
+    try { return window.nvaPartidoRegistrado(p.team, p.date, window.nvaNumPartidoCalendario(p.team, p.date, p.hora, p.rival)); } catch (e) { return false; }
   }
   function pintarPartidos() {
     document.querySelectorAll(".anul-sem").forEach(b => b.classList.toggle("on", Number(b.dataset.s) === semana));

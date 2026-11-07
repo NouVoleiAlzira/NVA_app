@@ -112,6 +112,7 @@
   // Alevines: un día al mes, varios partidos seguidos en un mismo pabellón (local o visitante da igual).
   // No ocupan la franja del Palau ni siguen sus premisas; solo cuenta que un entrenador no esté en dos sitios.
   const isAlevin = (key) => { const t = teamObj(key); return /ALEVIN/.test(normalizeTeamName((t && t.category) || key)); };
+  window.cpIsAlevin = isAlevin;
   const enPalau = (m) => isHome(m) && !m.alevin;
   const placeOf = (m) => isHome(m) ? "Palau" : (m.forced || !m.venue ? `campo de ${m.rival || "rival"}` : m.venue);
   const isWeekend = (iso) => { const d = dow(iso); return d === 6 || d === 0; };
@@ -769,9 +770,10 @@
     } catch (e) { console.error("No se pudo guardar el PDF en GitHub:", e); return false; }
   }
 
-  // ---------- Resultados en los registros de partido (Partidos/Partidos_<equipo>_<fecha>.json) ----------
+  // ---------- Resultados en los registros de partido (Partidos/Partidos_<equipo>_<fecha>[_2].json) ----------
   // Tras leer los PDF, el marcador de cada partido jugado pasa al registro de ese equipo y ese día,
-  // solo si el registro ya existe (no se crean registros nuevos).
+  // solo si el registro ya existe (no se crean registros nuevos). Si el equipo juega 2 partidos
+  // el mismo día, el 1.º por hora va al registro del 1.º partido y el 2.º al del 2.º.
   // Sin resultado grabado: se graba. Igual al grabado: no se toca. Distinto: se pregunta.
 
   const parseResult = L.parseResult;
@@ -781,7 +783,7 @@
   // Partidos con resultado de esos equipos (con el cambio local/visitante aplicado)
   const playedMatches = (keys) => L.playedMatches(cp, keys);
   const buildMarcador = (p) => L.buildMarcador(p, MATCH_SETS_COUNT);
-  const findLog = (p) => allMatchLogs.find(l => l.equipo === p.key && l.fecha === p.fecha);
+  const findLog = (p) => findMatchLog(p.key, p.fecha, p.n);
   // Partidos cuyo resultado ya estaba grabado y es distinto: se pregunta cuáles se reescriben
   function askOverwrite(list) {
     return new Promise((resolve) => {
@@ -791,7 +793,7 @@
         <div class="cp-modal-title">✏️ Resultados distintos a los grabados</div>
         <div class="cp-modal-txt">Estos partidos ya tienen un resultado grabado en su registro que no coincide con el del PDF. Marca los que quieras reescribir.</div>
         <div class="imp-list">${list.map((c, i) => `<label class="imp-item ca-item"><input type="checkbox" data-i="${i}" checked>
-          <span><b>${fmtDay(c.p.fecha)} · ${esc(c.p.key)}</b> ${c.p.home ? "🏠" : "✈️"} ${esc(apos(c.p.rival))}<br>
+          <span><b>${fmtDay(c.p.fecha)} · ${esc(c.p.key)}${c.p.n > 1 ? ` (${matchNumLabel(c.p.n)})` : ""}</b> ${c.p.home ? "🏠" : "✈️"} ${esc(apos(c.p.rival))}<br>
           Grabado: <s>${esc(L.marcadorTxt(c.old))}</s><br>Nuevo: <b class="ca-score">${esc(L.marcadorTxt(c.nuevo))}</b></span></label>`).join("")}</div>
         <div class="cp-modal-row">
           <button class="cp-modal-btn cp-modal-stop">No reescribir</button>
@@ -808,7 +810,7 @@
     const log = findLog(p);
     log.marcador = marcador;
     localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
-    return writeGitHubFile(`${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(p.key)}_${p.fecha}.json`, log, `Resultado partido ${p.key} - ${p.fecha}`);
+    return writeGitHubFile(matchLogFileName(p.key, p.fecha, p.n), log, `Resultado partido ${p.key} - ${p.fecha}${p.n > 1 ? ` (${matchNumLabel(p.n)})` : ""}`);
   }
   // Devuelve el resumen para enseñarlo, o "" si no había resultados que pasar
   async function syncResults(keys) {

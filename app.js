@@ -1449,7 +1449,7 @@
 
     resultsCandidateLogs = allMatchLogs
       .filter(l => l && l.fecha >= rangeStart && l.fecha <= rangeEnd)
-      .sort((a, b) => a.fecha === b.fecha ? String(a.equipo).localeCompare(String(b.equipo)) : a.fecha.localeCompare(b.fecha));
+      .sort((a, b) => a.fecha === b.fecha ? (String(a.equipo).localeCompare(String(b.equipo)) || matchNum(a) - matchNum(b)) : a.fecha.localeCompare(b.fecha));
 
     if (resultsCandidateLogs.length === 0) {
       alert(`No existen partidos guardados entre ${rangeStart} y ${rangeEnd}.`);
@@ -1472,7 +1472,7 @@
       label.innerHTML = `
         <input type="checkbox" class="results-match-check" data-idx="${i}" checked onchange="updateResultsSelectionUI()" style="width:18px; height:18px; flex-shrink:0;">
         <span style="min-width:0;">
-          <span style="font-weight:700; color:var(--txt-1);">${fmtDate(log.fecha)} · ${escapeHtml(log.equipo)}</span><br>
+          <span style="font-weight:700; color:var(--txt-1);">${fmtDate(log.fecha)} · ${escapeHtml(log.equipo)}${matchNum(log) > 1 || teamHasSeveralMatches(log.equipo, log.fecha) ? ` · ${matchNumLabel(matchNum(log))}` : ""}</span><br>
           <span style="color:var(--txt-2);">${scoreTxt}</span>
         </span>`;
       list.appendChild(label);
@@ -2840,7 +2840,7 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}H`;
   }
 
-  function logDatesKey(log, kind) { return `${kind}|${log.equipo}|${log.fecha}`; }
+  function logDatesKey(log, kind) { return `${kind}|${log.equipo}|${log.fecha}` + (kind === "match" && matchNum(log) > 1 ? `|${matchNum(log)}` : ""); }
   function logDatesCache() { try { return JSON.parse(localStorage.getItem("NVA_REG_FECHAS") || "{}"); } catch (e) { return {}; } }
 
   function logDatesResolved(log, kind) {
@@ -2870,7 +2870,7 @@
     if (ghSettings.token) headers["Authorization"] = `token ${ghSettings.token}`;
     await Promise.all(pending.map(async log => {
       const path = kind === "match"
-        ? `${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(log.equipo)}_${log.fecha}.json`
+        ? matchLogFileName(log.equipo, log.fecha, log.partido)
         : `${TRAINING_LOGS_FOLDER}/Entrenamientos_${sanitizeFileName(log.equipo)}_${log.fecha}.json`;
       try {
         const r = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/commits?path=${encodeURIComponent(path)}&per_page=100`, { headers, cache: "no-store" });
@@ -3328,21 +3328,24 @@
   //  Se elimina de la caché local y del fichero de la carpeta "registros/".
   //  Si no hay conexión (o falla), el borrado queda en la cola offline.
   // ---------------------------------------------------------------------
-  function isLogPendingDelete(equipo, fecha, kind) {
-    return offlineQueue.some(op => op.deleteLog && op.equipo === equipo && op.fecha === fecha && (op.kind || 'train') === (kind || 'train'));
+  // n: nº del partido de ese día (solo partidos; 1 si no se indica)
+  function isLogPendingDelete(equipo, fecha, kind, n) {
+    return offlineQueue.some(op => op.deleteLog && op.equipo === equipo && op.fecha === fecha && (op.kind || 'train') === (kind || 'train') &&
+      (kind !== 'match' || matchNum({ partido: op.partido }) === matchNum({ partido: n })));
   }
 
-  function enqueueOfflineDeleteLog(equipo, fecha, kind) {
+  function enqueueOfflineDeleteLog(equipo, fecha, kind, n) {
     kind = kind || 'train';
-    if (isLogPendingDelete(equipo, fecha, kind)) return;
+    if (isLogPendingDelete(equipo, fecha, kind, n)) return;
     const esPartido = kind === 'match';
     offlineQueue.push({
       deleteLog: true,
       kind: kind,
       equipo: equipo,
       fecha: fecha,
+      ...(esPartido && { partido: matchNum({ partido: n }) }),
       fileName: esPartido
-        ? `${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(equipo)}_${fecha}.json`
+        ? matchLogFileName(equipo, fecha, n)
         : `${TRAINING_LOGS_FOLDER}/Entrenamientos_${sanitizeFileName(equipo)}_${fecha}.json`,
       commitMessage: `Borrar registro ${esPartido ? 'partido' : 'entrenamiento'} ${equipo} - ${fecha}`,
       timestamp: Date.now()
@@ -3353,7 +3356,7 @@
   // Borra en GitHub el/los fichero(s) que contienen el registro de ese equipo y fecha.
   // Devuelve true si ya no queda nada de ese registro en el repositorio.
   // kind: 'train' (carpeta registros/, Entrenamientos_*) o 'match' (carpeta Partidos/, Partidos_*)
-  async function githubDeleteTrainingLogFiles(equipo, fecha, kind) {
+  async function githubDeleteTrainingLogFiles(equipo, fecha, kind, n) {
     if (!ghSettings.user || !ghSettings.repo || !ghSettings.token || !navigator.onLine) return false;
     const esPartido = kind === 'match';
     const folder = esPartido ? MATCH_LOGS_FOLDER : TRAINING_LOGS_FOLDER;
@@ -3374,7 +3377,9 @@
       try { parsed = JSON.parse(b64_to_utf8(getJson.content)); } catch (e) { continue; }
 
       const entries = Array.isArray(parsed) ? parsed : [parsed];
-      const isTarget = e => e && e.equipo === equipo && e.fecha === fecha;
+      // Partidos: solo el de ese número (el fichero «_2» lleva el 2.º partido del día)
+      const isTarget = e => e && e.equipo === equipo && e.fecha === fecha &&
+        (!esPartido || matchNum(e.partido ? e : { partido: matchNumFromFileName(file.name) }) === matchNum({ partido: n }));
       if (!entries.some(isTarget)) continue;
 
       const remaining = entries.filter(e => !isTarget(e));
@@ -3404,19 +3409,19 @@
 
   let pendingDeleteLog = null;   // { equipo, fecha }
 
-  function openDeleteLogModal(equipo, fecha, kind) {
+  function openDeleteLogModal(equipo, fecha, kind, n) {
     kind = kind || 'train';
     const esPartido = kind === 'match';
-    const existe = (esPartido ? allMatchLogs : allTrainingLogs).some(l => l.equipo === equipo && l.fecha === fecha);
+    const existe = esPartido ? !!findMatchLog(equipo, fecha, n) : allTrainingLogs.some(l => l.equipo === equipo && l.fecha === fecha);
     if (!existe) {
       alert(`Este ${esPartido ? 'partido' : 'entrenamiento'} no tiene registro guardado: no hay nada que borrar.`);
       return;
     }
-    pendingDeleteLog = { equipo, fecha, kind };
+    pendingDeleteLog = { equipo, fecha, kind, n: esPartido ? matchNum({ partido: n }) : 1 };
     const p = String(fecha).split("-");
     const fechaTxt = p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : fecha;
     document.getElementById("deleteLogText").innerText =
-      `¿Quieres borrar el registro de ${esPartido ? 'partido' : 'entrenamiento'} de ${equipo} del ${fechaTxt}?`;
+      `¿Quieres borrar el registro de ${esPartido ? (teamHasSeveralMatches(equipo, fecha) ? 'el ' + matchNumLabel(n) : 'partido') : 'entrenamiento'} de ${equipo} del ${fechaTxt}?`;
     const modalDel = document.getElementById("modalDeleteLog");
     document.body.appendChild(modalDel);   // por encima del Historial abierto
     modalDel.classList.add("active");
@@ -3435,7 +3440,7 @@
     const esPartido = d.kind === 'match';
     const noEs = l => !(l.equipo === d.equipo && l.fecha === d.fecha);
     if (esPartido) {
-      allMatchLogs = allMatchLogs.filter(noEs);
+      allMatchLogs = allMatchLogs.filter(l => !isSameMatchLog(l, d.equipo, d.fecha, d.n));
       localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
     } else {
       allTrainingLogs = allTrainingLogs.filter(noEs);
@@ -3444,11 +3449,11 @@
 
     let ok = false;
     try {
-      ok = await githubDeleteTrainingLogFiles(d.equipo, d.fecha, d.kind);
+      ok = await githubDeleteTrainingLogFiles(d.equipo, d.fecha, d.kind, d.n);
     } catch (e) {
       console.error("Error al borrar el registro en GitHub:", e);
     }
-    if (!ok) enqueueOfflineDeleteLog(d.equipo, d.fecha, d.kind);
+    if (!ok) enqueueOfflineDeleteLog(d.equipo, d.fecha, d.kind, d.n);
 
     if (document.getElementById("modalHistory").classList.contains("active")) renderHistoryList();
     if (document.getElementById("modalMatchHistory").classList.contains("active")) renderMatchHistoryList();
@@ -3470,7 +3475,7 @@
       if (op.fileName === QUERIES_FILE) { queryOps.push(op); continue; }
       if (op.deleteLog) {
         try {
-          if (!(await githubDeleteTrainingLogFiles(op.equipo, op.fecha, op.kind))) remaining.push(op);
+          if (!(await githubDeleteTrainingLogFiles(op.equipo, op.fecha, op.kind, op.partido))) remaining.push(op);
         } catch (e) {
           remaining.push(op);
         }
@@ -3922,6 +3927,42 @@
   // =====================================================================
   const MATCH_LOGS_FOLDER = "Partidos";
 
+  // Un equipo puede jugar 2 (o más) partidos el mismo día. Cada registro lleva su número
+  // en «partido» (1, 2…; los antiguos no lo llevan y son el 1) y va en su propio fichero:
+  // Partidos_<equipo>_<fecha>.json el 1.º, Partidos_<equipo>_<fecha>_2.json el 2.º…
+  const MAX_MATCHES_PER_DAY = 3;
+  function matchNum(log) { const n = parseInt(log && log.partido, 10); return n > 1 ? n : 1; }
+  function isSameMatchLog(l, equipo, fecha, n) { return !!l && l.equipo === equipo && l.fecha === fecha && matchNum(l) === matchNum({ partido: n }); }
+  function findMatchLog(equipo, fecha, n) { return allMatchLogs.find(l => isSameMatchLog(l, equipo, fecha, n)); }
+  function matchLogFileName(equipo, fecha, n) {
+    n = matchNum({ partido: n });
+    return `${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(equipo)}_${fecha}${n > 1 ? "_" + n : ""}.json`;
+  }
+  // Nº de partido según el nombre del fichero («…_2026-09-15_2.json» = 2.º)
+  function matchNumFromFileName(name) { const m = String(name || "").match(/_\d{4}-\d{2}-\d{2}_(\d+)\.json$/); return m ? +m[1] : 1; }
+  function matchNumLabel(n) { return `${matchNum({ partido: n })}.º partido`; }
+  // ¿Hay más de un partido registrado ese día? (para enseñar el número solo cuando hace falta)
+  function teamHasSeveralMatches(equipo, fecha) { return allMatchLogs.filter(l => l.equipo === equipo && l.fecha === fecha).length > 1; }
+
+  // Nº del partido del calendario (equipo, día, hora, rival) entre los de ese equipo ese día
+  window.nvaNumPartidoCalendario = function (equipo, fecha, hora, rival) {
+    const cp = window.cpGetData ? window.cpGetData() : null;
+    const L = window.nvaCalLectura;
+    const ms = cp && cp.teams && cp.teams[equipo] && cp.teams[equipo].matches;
+    if (!L || !ms) return 1;
+    const m = ms.find(x => x.date === fecha && (x.rival || "") === (rival || "") && (!hora || (x.time || "") === hora)) ||
+              ms.find(x => x.date === fecha && (x.rival || "") === (rival || ""));
+    return m ? L.numPartidoDia(ms, m) : 1;
+  };
+  // ¿Está hecho el registro (con jugadores/as) de ese partido? Los alevines juegan varios
+  // partidos seguidos un mismo día y un solo registro vale para todo el día.
+  window.nvaPartidoRegistrado = function (equipo, fecha, n, logs) {
+    logs = logs || allMatchLogs;
+    const conJug = l => l && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0;
+    const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
+    return logs.some(l => conJug(l) && (alevin || matchNum(l) === matchNum({ partido: n })));
+  };
+
   let matchData = [];
   let allMatchLogs = JSON.parse(localStorage.getItem("NVA_MATCH_LOGS")) || [];
   let matchCommentBoxOpen = {};
@@ -3930,12 +3971,52 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const picker = document.getElementById("matchDatePicker");
-    if (picker) picker.addEventListener("change", () => { loadMatchScoreForDate(); renderMatchScoreboard(); });
+    const onChange = () => { matchEditing = null; loadMatchScoreForDate(); renderMatchScoreboard(); };
+    if (picker) picker.addEventListener("change", onChange);
+    const num = document.getElementById("matchNumPicker");
+    if (num) num.addEventListener("change", onChange);
   });
+
+  // Partido del día que se está registrando (1.º, 2.º…) y el registro cargado con «Cargar/Editar»
+  let matchEditing = null;   // { fecha, n }
+  function currentMatchNum() {
+    const sel = document.getElementById("matchNumPicker");
+    return matchNum({ partido: sel ? sel.value : 1 });
+  }
+  function setCurrentMatchNum(n) {
+    const sel = document.getElementById("matchNumPicker");
+    if (sel) sel.value = String(matchNum({ partido: n }));
+  }
 
   function resetMatchToTodayDate() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById("matchDatePicker").value = today;
+    setCurrentMatchNum(1);
+    matchEditing = null;
+  }
+
+  // Ya hay un registro con jugadores/as de ese partido y no es el que se está editando:
+  // se pregunta si es otro partido del mismo día o si se reemplaza. Devuelve el nº o 0 (cancelar).
+  function askMatchNumForSave(fecha, n) {
+    const libre = Array.from({ length: MAX_MATCHES_PER_DAY }, (_, i) => i + 1).find(k => !findMatchLog(currentTeam, fecha, k));
+    return new Promise(resolve => {
+      const o = document.createElement("div");
+      o.className = "modal-backdrop active";
+      o.style.zIndex = "100000";
+      const p = String(fecha).split("-");
+      o.innerHTML = `<div class="modal-box" style="max-width:380px;">
+        <div class="modal-header"><div class="modal-title">⚠️ Ya hay un partido ese día</div></div>
+        <p style="font-size:0.88rem; line-height:1.4; margin-bottom:12px;">${escapeHtml(currentTeam)} ya tiene guardado el <b>${matchNumLabel(n)}</b> del ${p[2]}/${p[1]}/${p[0]}.
+        Si ese día habéis jugado otro partido, guárdalo como partido nuevo para no pisar el que ya está.</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${libre ? `<button type="button" class="btn-save-session" data-v="${libre}">➕ Es otro partido: guardar como ${matchNumLabel(libre)}</button>` : ""}
+          <button type="button" class="btn-save-session" data-v="${n}" style="background:linear-gradient(135deg,#f59e0b,#b45309);">✏️ Es el mismo: reemplazar el ${matchNumLabel(n)}</button>
+          <button type="button" class="btn-save-session" data-v="0" style="background:#64748b;">Cancelar</button>
+        </div>
+      </div>`;
+      document.body.appendChild(o);
+      o.querySelectorAll("button[data-v]").forEach(b => b.onclick = () => { o.remove(); resolve(+b.dataset.v); });
+    });
   }
 
   function initMatchData() {
@@ -4135,7 +4216,7 @@
   function loadMatchScoreForDate() {
     const picker = document.getElementById("matchDatePicker");
     const fecha = picker ? picker.value : "";
-    const log = allMatchLogs.find(l => l.equipo === currentTeam && l.fecha === fecha);
+    const log = findMatchLog(currentTeam, fecha, currentMatchNum());
     loadMatchScoreFromLog(log);
   }
 
@@ -4984,14 +5065,26 @@
       return;
     }
 
-    const prevLog = allMatchLogs.find(l => l.equipo === currentTeam && l.fecha === dateVal);
+    let n = currentMatchNum();
+    const otro = findMatchLog(currentTeam, dateVal, n);
+    const editando = matchEditing && matchEditing.fecha === dateVal && matchEditing.n === n;
+    if (otro && !editando && Array.isArray(otro.jugadores) && otro.jugadores.length) {
+      ocultarCargando();
+      n = await askMatchNumForSave(dateVal, n);
+      if (!n) return;
+      mostrarCargando("Guardando partido...");
+      setCurrentMatchNum(n);
+    }
+    const matchFileName = matchLogFileName(currentTeam, dateVal, n);
+
+    const prevLog = findMatchLog(currentTeam, dateVal, n);
     let marcador = (prevLog && prevLog.marcador) || null;
     if (!marcador && ghSettings.user && ghSettings.repo && navigator.onLine) {
       // Puede que el resultado se cargara desde otro dispositivo: se mira el registro en GitHub
       try {
         const headers = {};
         if (ghSettings.token) headers["Authorization"] = `token ${ghSettings.token}`;
-        const r = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(currentTeam)}_${dateVal}.json`, { headers, cache: "no-store" });
+        const r = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${matchFileName}`, { headers, cache: "no-store" });
         if (r.ok) { const remote = JSON.parse(b64_to_utf8((await r.json()).content)); if (remote && remote.marcador) marcador = remote.marcador; }
       } catch (e) { console.warn("No se pudo leer el registro del partido en GitHub:", e); }
     }
@@ -5000,13 +5093,14 @@
     const logEntry = {
       fecha: dateVal,
       equipo: currentTeam,
+      ...(n > 1 && { partido: n }),
       entrenador: currentCoach ? currentCoach.name : "",
       jugadores: playersForSave(matchData),
       marcador: marcador
     };
     stampLogDates(logEntry, prevLog);
 
-    const existingIndex = allMatchLogs.findIndex(l => l.equipo === currentTeam && l.fecha === dateVal);
+    const existingIndex = allMatchLogs.findIndex(l => isSameMatchLog(l, currentTeam, dateVal, n));
     if (existingIndex >= 0) {
       allMatchLogs[existingIndex] = logEntry;
     } else {
@@ -5014,9 +5108,9 @@
     }
 
     localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
+    matchEditing = { fecha: dateVal, n };
 
-    const matchFileName = `${MATCH_LOGS_FOLDER}/Partidos_${sanitizeFileName(currentTeam)}_${dateVal}.json`;
-    const success = await writeGitHubFile(matchFileName, logEntry, `Registro partido ${currentTeam} - ${dateVal}`);
+    const success = await writeGitHubFile(matchFileName, logEntry, `Registro partido ${currentTeam} - ${dateVal}${n > 1 ? ` (${matchNumLabel(n)})` : ""}`);
 
     if (success) {
       alert("¡Partido guardado y sincronizado!");
@@ -5038,7 +5132,11 @@
     const relevantMatchFiles = files.filter(file => file.name && file.name.startsWith("Partidos_") && file.name.endsWith(".json"));
     const matchResults = await Promise.all(relevantMatchFiles.map(async file => {
       try {
-        return await readListedGitHubJson(file, headers);
+        const parsed = await readListedGitHubJson(file, headers);
+        // El nº del partido sale del registro o, si no lo lleva, del nombre del fichero
+        const n = matchNumFromFileName(file.name);
+        if (parsed && n > 1) (Array.isArray(parsed) ? parsed : [parsed]).forEach(e => { if (e && !e.partido) e.partido = n; });
+        return parsed;
       } catch (e) {
         console.error(`Error al leer ${file.name}:`, e);
         return null;
@@ -5050,7 +5148,7 @@
       const entries = Array.isArray(parsed) ? parsed : [parsed];
       entries.forEach(remoteLog => {
         if (!remoteLog || !remoteLog.equipo || !remoteLog.fecha) return;
-        const idx = allMatchLogs.findIndex(l => l.equipo === remoteLog.equipo && l.fecha === remoteLog.fecha);
+        const idx = allMatchLogs.findIndex(l => isSameMatchLog(l, remoteLog.equipo, remoteLog.fecha, remoteLog.partido));
         if (idx >= 0) {
           allMatchLogs[idx] = remoteLog;
         } else {
@@ -5091,8 +5189,10 @@
       return;
     }
 
-    teamLogs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    teamLogs.sort((a, b) => (new Date(b.fecha) - new Date(a.fecha)) || (matchNum(b) - matchNum(a)));
     teamLogs.slice(0, matchHistoryLimit).forEach((log) => {
+      const n = matchNum(log);
+      const numTxt = teamHasSeveralMatches(log.equipo, log.fecha) || n > 1 ? ` · ${matchNumLabel(n)}` : "";
       const m = log.marcador;
       const resultHtml = m
         ? `<div style="font-size:0.72rem; color:#0f172a; font-weight:700; margin-top:2px;">${escapeHtml(m.local || 'Home')} ${m.setsLocal ?? 0} - ${m.setsVisitante ?? 0} ${escapeHtml(m.visitante || 'VISIT')}</div>`
@@ -5102,13 +5202,13 @@
       card.className = "history-card";
       card.innerHTML = `
         <div>
-          <div class="hist-fecha-row"><div style="font-weight:700; font-size:0.85rem; color:var(--azul-dark);">📅 ${escapeHtml(log.fecha)}</div>${logDatesHtml(log, 'match')}</div>
+          <div class="hist-fecha-row"><div style="font-weight:700; font-size:0.85rem; color:var(--azul-dark);">📅 ${escapeHtml(log.fecha)}${numTxt}</div>${logDatesHtml(log, 'match')}</div>
           ${historyLogSummaryHtml(log, 'match')}
           ${resultHtml}
         </div>
         <div class="history-actions">
-          <button class="btn-edit-history" onclick="loadMatchRecordForEditing(${jsArg(log.fecha)})">✏️ Cargar/Editar</button>
-          <button class="btn-delete-history" onclick="openDeleteLogModal(currentTeam, ${jsArg(log.fecha)}, 'match')">🗑️ Borrar</button>
+          <button class="btn-edit-history" onclick="loadMatchRecordForEditing(${jsArg(log.fecha)}, ${n})">✏️ Cargar/Editar</button>
+          <button class="btn-delete-history" onclick="openDeleteLogModal(currentTeam, ${jsArg(log.fecha)}, 'match', ${n})">🗑️ Borrar</button>
         </div>
       `;
       container.appendChild(card);
@@ -5117,10 +5217,12 @@
     fillLogDatesFromCommits(teamLogs.slice(0, matchHistoryLimit), 'match');
   }
 
-  function loadMatchRecordForEditing(fecha) {
-    const log = allMatchLogs.find(l => l.equipo === currentTeam && l.fecha === fecha);
+  function loadMatchRecordForEditing(fecha, n) {
+    const log = findMatchLog(currentTeam, fecha, n);
     if (!log) return;
     document.getElementById("matchDatePicker").value = log.fecha;
+    setCurrentMatchNum(matchNum(log));
+    matchEditing = { fecha: log.fecha, n: matchNum(log) };
     if (log.jugadores && log.jugadores.length) matchData = JSON.parse(JSON.stringify(log.jugadores));
     else initMatchData();
     matchCommentBoxOpen = {};
@@ -5128,7 +5230,7 @@
     renderMatchScoreboard();
     renderMatchPlayers();
     closeMatchHistoryModal();
-    alert(`Se ha cargado el partido del ${log.fecha} para modificar. Al terminar pulsa "Guardar Partido".`);
+    alert(`Se ha cargado el ${teamHasSeveralMatches(log.equipo, log.fecha) || matchNum(log) > 1 ? matchNumLabel(matchNum(log)) : "partido"} del ${log.fecha} para modificar. Al terminar pulsa "Guardar Partido".`);
   }
 
   // =====================================================================

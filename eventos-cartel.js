@@ -401,16 +401,38 @@
 
   function finalHtml() {
     const ia = usaIA(r);
+    const eq = equipaciones.find(e => e.id === r.equip) || {};
+    const fotosEq = esPersona(r) && (eq.imagenes || []).length;
     return `<div class="ev-final">
-      <div class="ev-burbuja">¡Ya lo tengo todo! ${ia ? "Pulsa «Generar imagen» y en unos segundos verás la propuesta. Si no te convence, genera otra: cada vez sale distinta." : "Revisa la vista previa y descárgalo."} Puedes tocar cualquier respuesta de arriba para cambiarla.</div>
+      <div class="ev-burbuja">¡Ya lo tengo todo! ${ia ? "Tienes dos caminos para la imagen: pulsa «Generar imagen» y la pinta la app, o copia el encargo, pégalo en Gemini o ChatGPT" + (fotosEq ? " junto con las fotos de la camiseta" : "") + " y sube aquí la imagen que te dé." : "Revisa la vista previa y descárgalo."} Puedes tocar cualquier respuesta de arriba para cambiarla.</div>
       ${ia ? `<button type="button" class="btn-save-session" data-generar style="--c: var(--c-violeta)">✨ ${imgPrincipal ? "Generar otra" : "Generar imagen"}</button>
         <div class="ev-estado" id="evEstado"></div>
-        <details><summary style="font-size:.78rem;color:var(--txt-2);cursor:pointer">Ver el encargo que recibe la IA</summary><div class="ev-prompt">${esc(construirPrompt())}</div></details>` : ""}
+        <div class="ev-bloque" style="margin-top:4px">O hazla tú en Gemini / ChatGPT</div>
+        <div class="ev-prompt" id="evPromptExt" style="max-height:160px; user-select:text; -webkit-user-select:text;">${esc(promptExterno())}</div>
+        <div class="ev-fila">
+          <button type="button" class="btn-pdf-mode2" style="flex:1" data-copiar>📋 Copiar el encargo</button>
+          ${fotosEq ? `<button type="button" class="btn-pdf-mode2" style="flex:1" data-fotoseq>👕 Fotos de la camiseta</button>` : ""}
+        </div>
+        <label class="btn-save-session" style="--c: var(--c-azul); display:flex; align-items:center; justify-content:center; cursor:pointer;">📥 ${imgPrincipal ? "Cambiar por otra imagen" : "Subir la imagen creada"}<input type="file" accept="image/*" data-subirext hidden></label>` : ""}
       ${imgPrincipal && r.principal !== "foto" ? zoomHtml() : ""}
       <button type="button" class="btn-save-session" data-bajar style="--c: var(--c-verde)">⬇️ Descargar el cartel</button>
       ${r.formato === "story" && typeof window.igGetToken === "function" && window.igGetToken() && window.nvaStory ? `<button type="button" class="btn-pdf-mode2" data-story>📲 Guardar como borrador de Story</button>` : ""}
       <div class="ev-estado" id="evEstado2"></div>
     </div>`;
+  }
+
+  // Encargo para pegarlo a mano en Gemini o ChatGPT (con las fotos de la camiseta adjuntas)
+  function promptExterno() {
+    const F = FORMATOS[r.formato] || FORMATOS.story;
+    const orient = F.w > F.h ? "horizontal" : F.w < F.h ? "vertical" : "square";
+    const partes = [`Create a ${orient} image with ${F.ar} aspect ratio (${F.w}x${F.h} px).`, construirPrompt()];
+    if (esPersona(r)) {
+      const eq = equipaciones.find(e => e.id === r.equip) || {};
+      const n = r.principal === "jugadora" ? `the shirt number ${r.dorsal || ""}` : "different shirt numbers";
+      if ((eq.imagenes || []).length) partes.push(`Use the attached photos of our volleyball jersey (front and back) as reference: the player${r.principal === "equipo" ? "s" : ""} must wear EXACTLY that kit (same colours, cut, stripes and details), with ${n} and no player name. Ignore the sponsor logos printed on the jersey if they get blurry.`);
+      if (eq.descripcion) partes.push(`Kit description: ${eq.descripcion}.`);
+    }
+    return partes.join("\n\n");
   }
 
   function responder(id, v) {
@@ -479,6 +501,42 @@
     const pOk = c.querySelector("[data-patrook]");
     if (pOk) pOk.onclick = () => { r.patros_ok = true; render.saltar = true; render(); };
 
+    const copiar = c.querySelector("[data-copiar]");
+    if (copiar) copiar.onclick = async () => {
+      const txt = promptExterno();
+      try { await navigator.clipboard.writeText(txt); copiar.textContent = "✅ Copiado"; }
+      catch (e) {
+        const rg = document.createRange(), caja = c.querySelector("#evPromptExt");
+        rg.selectNodeContents(caja); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(rg);
+        copiar.textContent = "Mantén pulsado el texto para copiarlo";
+      }
+      setTimeout(() => { if (copiar.isConnected) copiar.textContent = "📋 Copiar el encargo"; }, 2500);
+    };
+    const fotosEq = c.querySelector("[data-fotoseq]");
+    if (fotosEq) fotosEq.onclick = async () => {
+      const eq = equipaciones.find(e => e.id === r.equip) || {};
+      const files = [];
+      for (const a of eq.imagenes || []) {
+        const b = await (await fetch("Equipacion/" + a)).blob();
+        files.push(new File([b], a, { type: b.type || "image/jpeg" }));
+      }
+      if (navigator.canShare && navigator.canShare({ files })) {
+        try { await navigator.share({ files }); return; } catch (e) { if (e.name === "AbortError") return; }
+      }
+      for (const f of files) {
+        const u = URL.createObjectURL(f), el = document.createElement("a");
+        el.href = u; el.download = f.name; document.body.appendChild(el); el.click(); el.remove();
+        await new Promise(ok => setTimeout(ok, 400));
+      }
+    };
+    const subirExt = c.querySelector("[data-subirext]");
+    if (subirExt) subirExt.onchange = () => {
+      const f = subirExt.files && subirExt.files[0];
+      if (!f) return;
+      const i = new Image();
+      i.onload = () => { imgPrincipal = i; ajuste = { z: 1, ox: 0, oy: 0 }; render(); };
+      i.src = URL.createObjectURL(f);
+    };
     const gen = c.querySelector("[data-generar]");
     if (gen) gen.onclick = () => generar(gen);
     const bajar = c.querySelector("[data-bajar]");

@@ -85,7 +85,12 @@
   /* ---------- La entrevista ----------
      Cada opción lleva «p»: lo que se añade al encargo (en inglés, que es como mejor
      responden Gemini y ChatGPT). «✏️ Otro» se añade solo a todas las preguntas. */
-  const esPersona = () => r.pTipo === "jugadora" || r.pTipo === "equipo";
+  // Número de personas del protagonista (0 = balón, nadie o algo descrito en «Otro»)
+  function nPers() {
+    const v = parseInt(r.pTipo === "otro" ? (r.pTipo_o || "") : r.pTipo, 10);
+    return v > 0 ? Math.min(v, 30) : 0;
+  }
+  const esPersona = () => nPers() > 0;
   const hayFondo = () => r.fTipo && r.fTipo !== "sin";
   const hayPers = () => r.pTipo && r.pTipo !== "ninguno";
 
@@ -148,19 +153,19 @@
     ] },
 
     { id: "pers", t: "🙋‍♀️ Personaje principal", preguntas: [
-      { id: "pTipo", q: "Ahora el protagonista, que irá en otra capa. ¿Quién es?",
-        op: [{ v: "jugadora", e: "🙋‍♀️", t: "Una jugadora" }, { v: "equipo", e: "👯", t: "Varias jugadoras" },
-             { v: "balon", e: "🏐", t: "El balón" }, { v: "ninguno", e: "🚫", t: "Sin personaje" }] },
-      { id: "equip", tipo: "equip", q: "Vestirá la equipación del club. ¿Cuál?", cuando: esPersona, nota: "Las fotos de la camiseta se adjuntan al encargo. Puedes añadir otra equipación o cambiar sus fotos." },
-      { id: "dorsal", tipo: "dorsal", q: "¿Qué dorsal lleva?", cuando: () => r.pTipo === "jugadora" },
-      { id: "nJug", q: "¿Cuántas jugadoras?", cuando: () => r.pTipo === "equipo",
-        op: [{ v: "2", t: "Dos", p: "two female volleyball players" }, { v: "3", t: "Tres", p: "three female volleyball players" },
-             { v: "6", t: "Un seis completo", p: "a team of six female volleyball players" }] },
+      { id: "pTipo", q: "Ahora el protagonista, que irá en otra capa. ¿Cuántas personas salen?", nota: "En «Otro» escribe el número de personas (o describe lo que quieras).",
+        op: [{ v: "1", e: "🙋", t: "1 persona" }, { v: "2", e: "👯", t: "2 personas" }, { v: "3", t: "3 personas" }, { v: "6", t: "Equipo (6)" },
+             { v: "balon", e: "🏐", t: "Solo el balón" }, { v: "ninguno", e: "🚫", t: "Nadie" }] },
+      { id: "sexo", q: "¿Femenino, masculino o mixto?", cuando: esPersona,
+        op: [{ v: "femenino", e: "♀️", t: "Femenino", p: "female" }, { v: "masculino", e: "♂️", t: "Masculino", p: "male" },
+             { v: "mixto", e: "⚥", t: "Mixto (chicas y chicos)", p: "mixed", cuando: () => nPers() > 1 }] },
+      { id: "equip", tipo: "equip", q: "¿Con qué equipación del club?", cuando: esPersona, nota: "Sus fotos van en la imagen de referencia del encargo. Puedes añadir otra equipación o cambiar sus fotos." },
+      { id: "dorsal", tipo: "dorsal", q: "¿Qué dorsal lleva?", cuando: () => nPers() === 1 },
       { id: "edad", q: "¿Qué edad aparenta?", cuando: esPersona,
         op: [{ v: "alevin", t: "Alevín (10-11)", p: "about 10 years old" }, { v: "infantil", t: "Infantil (12-13)", p: "about 13 years old" },
              { v: "cadete", t: "Cadete (14-15)", p: "about 15 years old" }, { v: "juvenil", t: "Juvenil (16-18)", p: "about 17 years old" },
-             { v: "senior", t: "Sénior (adulta)", p: "adult, around 24 years old" }] },
-      { id: "rasgos", q: "¿Qué rasgos tiene?", cuando: esPersona,
+             { v: "senior", t: "Sénior (adulto)", p: "adult, around 24 years old" }] },
+      { id: "rasgos", q: "¿Qué rasgos?", cuando: esPersona,
         op: [{ v: "mediterranea", t: "Mediterránea", p: "Mediterranean (Spanish) features, olive skin" }, { v: "europea", t: "Europea clara", p: "fair-skinned European features" },
              { v: "latina", t: "Latina", p: "Latina features" }, { v: "negra", t: "Negra", p: "Black, dark skin" },
              { v: "asiatica", t: "Asiática", p: "East Asian features" }, { v: "arabe", t: "Árabe", p: "North African features" },
@@ -173,18 +178,21 @@
              { v: "pelirrojo", t: "Pelirrojo", p: "red hair" }, { v: "variado", t: "Variado", p: "different hair colours" }] },
       { id: "peinado", q: "¿Peinado?", cuando: esPersona,
         op: [{ v: "coleta", t: "Coleta alta", p: "a high ponytail" }, { v: "trenza", t: "Trenza", p: "a braid" }, { v: "trenzas", t: "Dos trenzas", p: "double dutch braids" },
-             { v: "mono", t: "Moño", p: "a bun" }, { v: "corto", t: "Corto", p: "short hair" }, { v: "rizado", t: "Rizado con cinta", p: "curly hair with a headband" }] },
-      { id: "pose", q: "¿Qué está haciendo?", cuando: () => r.pTipo === "jugadora", nota: "La pose marca toda la energía del cartel.",
+             { v: "mono", t: "Moño", p: "a bun" }, { v: "melena", t: "Melena suelta", p: "long loose hair" }, { v: "corto", t: "Corto", p: "short hair" },
+             { v: "rapado", t: "Rapado / degradado", p: "a short fade haircut" }, { v: "rizado", t: "Rizado con cinta", p: "curly hair with a headband" }, { v: "variado", t: "Variado", p: "different hairstyles" }] },
+      { id: "barba", q: "¿Barba?", cuando: () => esPersona() && (r.sexo === "masculino" || r.sexo === "mixto"),
+        op: [{ v: "no", t: "Sin barba", p: "clean-shaven" }, { v: "corta", t: "Barba corta", p: "short beard" }, { v: "completa", t: "Barba poblada", p: "full beard" }] },
+      { id: "pose", q: "¿Qué está haciendo?", cuando: () => nPers() === 1, nota: "La pose marca toda la energía del cartel.",
         op: [{ v: "remate", e: "💥", t: "Rematando en el aire", p: "jumping high and spiking the ball, arm fully extended" },
-             { v: "saque", e: "🚀", t: "Saque en salto", p: "doing a jump serve, ball above her" },
+             { v: "saque", e: "🚀", t: "Saque en salto", p: "doing a jump serve, ball above {ella}" },
              { v: "recepcion", e: "🙌", t: "Recepción", p: "receiving the ball with a forearm pass, low stance" },
-             { v: "colocacion", e: "☝️", t: "Colocando", p: "setting the ball with her fingertips above her forehead" },
+             { v: "colocacion", e: "☝️", t: "Colocando", p: "setting the ball with {su} fingertips above {su} forehead" },
              { v: "bloqueo", e: "🧱", t: "Bloqueando", p: "blocking with both hands up" },
              { v: "plancha", e: "🤸", t: "Plancha", p: "diving to save the ball, horizontal in the air" },
              { v: "celebra", e: "🔥", t: "Celebrando", p: "celebrating a point, fist pumping and shouting" },
-             { v: "posado", e: "😎", t: "Posado con balón", p: "standing confidently holding a volleyball on her hip, looking at the camera" }] },
-      { id: "poseEq", q: "¿Cómo las colocamos?", cuando: () => r.pTipo === "equipo",
-        op: [{ v: "pina", t: "Haciendo piña", p: "in a team huddle, arms around each other" }, { v: "celebran", t: "Celebrando juntas", p: "jumping and celebrating together" },
+             { v: "posado", e: "😎", t: "Posado con balón", p: "standing confidently holding a volleyball on {su} hip, looking at the camera" }] },
+      { id: "poseEq", q: "¿Cómo los colocamos?", cuando: () => nPers() > 1,
+        op: [{ v: "pina", t: "Haciendo piña", p: "in a team huddle, arms around each other" }, { v: "celebran", t: "Celebrando", p: "jumping and celebrating together" },
              { v: "v", t: "Posado en V", p: "posing in a V formation, arms crossed" }, { v: "accion", t: "En plena jugada", p: "in the middle of a play, one spiking and the others covering" }] },
       { id: "balon", q: "¿Cómo es el balón?", cuando: () => r.pTipo === "balon",
         op: [{ v: "fuego", e: "🔥", t: "En llamas", p: "a volleyball on fire" }, { v: "rayos", e: "⚡", t: "Con rayos", p: "a volleyball surrounded by electric lightning" },
@@ -193,8 +201,8 @@
         op: [{ v: "entero", t: "Cuerpo entero", p: "full body, head to feet" }, { v: "medio", t: "Plano medio", p: "medium shot from the waist up" },
              { v: "contrapicado", t: "Contrapicado heroico", p: "full body seen from a low heroic angle" }] },
       { id: "expresion", q: "¿Qué transmite su cara?", cuando: esPersona,
-        op: [{ v: "concentrada", t: "Concentrada", p: "focused, determined expression" }, { v: "desafiante", t: "Desafiante", p: "fierce look" },
-             { v: "alegre", t: "Alegre", p: "big joyful smile" }, { v: "grito", t: "Grito de euforia", p: "shouting with euphoria" }] },
+        op: [{ v: "concentrada", t: "Concentración", p: "focused, determined expression" }, { v: "desafiante", t: "Desafío", p: "fierce look" },
+             { v: "alegre", t: "Alegría", p: "big joyful smile" }, { v: "grito", t: "Grito de euforia", p: "shouting with euphoria" }] },
       { id: "pEstilo", q: "¿Con qué estilo lo dibujamos?", cuando: hayPers,
         op: [{ v: "igual", e: "🔗", t: "El mismo que el fondo" }].concat(ESTILOS) },
       { id: "persImg", tipo: "imagen", capa: "pers", cuando: hayPers }
@@ -226,22 +234,43 @@
     { v: "blanco", t: "Blanco", c: "#d9dde6", p: "a white kit" }, { v: "morado", t: "Morado", c: "#6a1b9a", p: "a purple kit" },
     { v: "celeste", t: "Celeste", c: "#4fa8e0", p: "a sky-blue kit" }
   ];
+  // Colores principales del cartel: c1 = principal, c2 = acento
+  const PALETAS = [
+    { v: "club", t: "Azul marino y naranja (club)", c: ["#1f3cff", "#ff5b00"], p: "navy blue and vivid orange (the club colours)" },
+    { v: "azulblanco", t: "Azul y blanco", c: ["#1f3cff", "#e9eefa"], p: "royal blue and white" },
+    { v: "azuldorado", t: "Azul y dorado", c: ["#0a1f9e", "#f5b400"], p: "navy blue and gold" },
+    { v: "azulceleste", t: "Azul y celeste", c: ["#0a1f9e", "#4fc3f7"], p: "navy blue and sky blue" },
+    { v: "naranjanegro", t: "Naranja y negro", c: ["#ff5b00", "#151515"], p: "vivid orange and black" },
+    { v: "naranjablanco", t: "Naranja y blanco", c: ["#ff5b00", "#f2f2f2"], p: "vivid orange and white" },
+    { v: "rojonegro", t: "Rojo y negro", c: ["#c1121f", "#151515"], p: "red and black" },
+    { v: "moradodorado", t: "Morado y dorado", c: ["#5b1a8f", "#f5b400"], p: "purple and gold" },
+    { v: "verdenegro", t: "Verde y negro", c: ["#1b8a3a", "#151515"], p: "green and black" },
+    { v: "blanconegro", t: "Blanco y negro", c: ["#f2f2f2", "#151515"], p: "black and white, high contrast" },
+    { v: "plata", t: "Plata y azul", c: ["#9aa3b5", "#1f3cff"], p: "metallic silver and royal blue" },
+    { v: "neon", t: "Neón (cian y rosa)", c: ["#00e5ff", "#ff2d95"], p: "neon cyan and magenta with glow" },
+    { v: "atardecer", t: "Atardecer (naranja y morado)", c: ["#ff7a1a", "#5b1a8f"], p: "sunset orange and deep purple" }
+  ];
+  function coloresElegidos() {
+    if (r.colores === "otro") { const m = (r.colores_o || "").split(","); return { c: [m[0] || "#1f3cff", m[1] || "#ff5b00"], p: `main colour ${m[0] || "#1f3cff"} and accent colour ${m[1] || "#ff5b00"}` }; }
+    return PALETAS.find(x => x.v === r.colores) || null;
+  }
   const estiloElegido = () => window.evEstilos && window.evEstilos.LISTA.find(e => e.v === r.estiloCartel);
   const SECCIONES_IA = [
     { id: "cartel", t: "🗂️ El cartel", preguntas: [P("evento"), PREG_PARTIDO, P("formato")] },
     { id: "fondo", t: "🌄 El escenario", preguntas: [
       { id: "fTipo", q: "Empecemos por el escenario. ¿Qué se ve detrás?", nota: "El estilo del cartel lo eliges al final; esto es lo que habrá detrás.",
         op: P("fTipo").op.filter(o => o.v !== "sin").concat([{ v: "liso", e: "🎨", t: "Fondo liso con textura", p: "a plain textured backdrop" }]) },
-      P("fPaleta"), P("fLuz"), P("fAmb")
+      P("fLuz"), P("fAmb")
     ] },
     { id: "pers", t: "🙋‍♀️ Protagonista", preguntas: [
       Object.assign({}, P("pTipo"), { q: "¿Quién protagoniza el cartel?", op: P("pTipo").op.map(o => o.v === "ninguno" ? { v: "ninguno", e: "🚫", t: "Nadie, solo ambiente" } : o) })
-    ].concat(["equip", "dorsal", "nJug", "edad", "rasgos", "complexion", "peloColor", "peinado", "pose", "poseEq", "balon", "plano", "expresion"].map(P)) },
+    ].concat(["sexo", "equip", "dorsal", "edad", "rasgos", "complexion", "peloColor", "peinado", "barba", "pose", "poseEq", "balon", "plano", "expresion"].map(P)) },
     { id: "textos", t: "🔤 Títulos y textos", preguntas: TEXTOS_IA },
     { id: "logos", t: "🛡️ Escudo y patrocinadores", preguntas: [Object.assign({}, P("patros"), {
       q: "El escudo del club y los patrocinadores los pongo yo encima del cartel. ¿Qué patrocinadores salen? Tócalos por orden de importancia.", nota: "El encargo le pide a la IA que les deje sitio." })] },
     { id: "estilo", t: "✨ Estilo del cartel", preguntas: [
       { id: "estiloCartel", tipo: "estilo", q: "Con todo esto, ¿qué estilo de cartel te gusta más?", nota: "Son bocetos con tus textos. La imagen de verdad la hará la IA." },
+      { id: "colores", tipo: "colores", q: "¿Con qué colores principales?", nota: "El boceto se pinta con ellos. En «Otro» eliges los dos a tu gusto.", op: PALETAS },
       { id: "rivalColor", q: "Este estilo enfrenta a dos jugadoras. ¿De qué color viste el rival?", cuando: () => !!(estiloElegido() || {}).duo, op: COLORES_RIVAL },
       { id: "acabado", q: "¿Y el acabado de la imagen?", op: [{ v: "auto", e: "✨", t: "El que pida el estilo", p: "" }].concat(ESTILOS) }
     ] },
@@ -270,14 +299,15 @@
   function capasIniciales() {
     return {
       fondo: { z: 1, ox: 0, oy: 0, op: 1 },
+      marca: { x: 0.5, y: 0.46, s: 0.62, rot: 0, op: 0.14 },
       pers: { x: 0.5, y: 0.6, s: 0.72, rot: 0, op: 1, flip: false },
       logo: { x: 0.5, y: 0.09, s: 0.2, rot: 0, op: 1 },
       escL: { x: 0.28, y: 0.8, s: 0.17, rot: 0, op: 1 },
       escV: { x: 0.72, y: 0.8, s: 0.17, rot: 0, op: 1 },
       patros: { x: 0.74, y: 0.93, s: 1, rot: 0, op: 1, placa: true },
       textos: [],
-      orden: ["pers", "escL", "escV", "logo", "patros"],
-      ocultas: {}
+      orden: ["marca", "pers", "escL", "escV", "logo", "patros"],
+      ocultas: { logo: true }   // el escudo va integrado en el fondo (marca); el de arriba se puede mostrar con el ojo
     };
   }
 
@@ -558,6 +588,8 @@
       .ev-partido > b { color: var(--ev-naranja2); font: 800 italic .85rem "Barlow Condensed", sans-serif; }
       .ev-partido small { grid-column: 1 / -1; text-align: center; color: var(--ev-gris); font-size: .74rem; }
       .ev-partido.sel { border-color: var(--ev-naranja); background: rgba(255,91,0,.12); }
+      .ev-sw { display: inline-block; width: 22px; height: 14px; border-radius: 7px; margin-right: 7px; vertical-align: -2px; background: linear-gradient(90deg, var(--a) 50%, var(--b) 50%); box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
+      .ev-ref { margin-left: 34px; max-width: calc(100% - 34px); max-height: 150px; object-fit: contain; align-self: flex-start; background: #fff; border-radius: 8px; padding: 4px; }
       .ev-box :focus-visible { outline: 2px solid var(--ev-naranja2); outline-offset: 2px; }
     `;
     document.head.appendChild(s);
@@ -619,7 +651,7 @@
     return true;
   }
   const completa = s => s.preguntas.filter(visible).every(contestada);
-  function opcionesDe(p) { return (p.op || []).concat([{ v: "otro", e: "✏️", t: "Otro" }]); }
+  function opcionesDe(p) { return (p.op || []).filter(o => !o.cuando || o.cuando()).concat([{ v: "otro", e: "✏️", t: "Otro" }]); }
   // Texto elegido (para el resumen de la sección)
   function etiqueta(p) {
     if (p.tipo === "imagen") return img[p.capa] ? "imagen ✓" : "sin imagen";
@@ -629,6 +661,7 @@
     if (p.tipo === "texto") return r[p.id + "_no"] ? "" : (r[p.id] || "").trim().split("\n")[0];
     if (p.tipo === "partido" && r.partido !== "otro") return partidoSel ? `${partidoSel.local.nombre} vs ${partidoSel.visit.nombre}` : "";
     if (p.tipo === "estilo" && r.estiloCartel !== "otro") return (estiloElegido() || {}).t || "";
+    if (p.tipo === "colores" && r.colores === "otro") return "colores a mano";
     if (r[p.id] === "otro") return r[p.id + "_o"];
     const o = (p.op || []).find(x => x.v === r[p.id]);
     return o ? o.t : "";
@@ -637,7 +670,8 @@
   function pr(id) {
     if (r[id] === "otro") return (r[id + "_o"] || "").trim();
     const p = SECC().reduce((a, s) => a.concat(s.preguntas), []).find(x => x.id === id), o = p && (p.op || []).find(x => x.v === r[id]);
-    return (o && o.p) || "";
+    const su = r.sexo === "masculino" ? "his" : r.sexo === "femenino" ? "her" : "their", ella = r.sexo === "masculino" ? "him" : r.sexo === "femenino" ? "her" : "them";
+    return ((o && o.p) || "").replace(/\{su\}/g, su).replace(/\{ella\}/g, ella);
   }
 
   /* ---------- Pintar la entrevista ---------- */
@@ -719,6 +753,12 @@
       if (tipo === "color" && r[p.id] === "otro") {
         h += `<div class="ev-fila">Elige el color: <input type="color" data-colotro="${p.id}" value="${esc(/^#/.test(r[p.id + "_o"] || "") ? r[p.id + "_o"] : "#1f3cff")}"></div>`;
       } else h += otroHtml(p.id, p.id === "formato" ? "Medidas, por ejemplo 1200x628" : "");
+    } else if (tipo === "colores") {
+      h += `<div class="ev-ops">` + opcionesDe(p).map(o => `<button type="button" class="ev-op${o.v === "otro" ? " otro" : ""}${r[p.id] === o.v ? " sel" : ""}" data-op="${p.id}" data-v="${esc(o.v)}">${o.c ? `<span class="ev-sw" style="--a:${o.c[0]};--b:${o.c[1]}"></span>` : "✏️ "}${esc(o.t)}</button>`).join("") + `</div>`;
+      if (r.colores === "otro") {
+        const [a, b] = (r.colores_o || "#1f3cff,#ff5b00").split(",");
+        h += `<div class="ev-fila">Principal <input type="color" data-colpar="0" value="${esc(a)}"> Acento <input type="color" data-colpar="1" value="${esc(b)}"></div>`;
+      }
     } else if (tipo === "dorsal") {
       h += `<div class="ev-ops">` + ["1", "3", "5", "7", "9", "10", "11", "14"].map(n =>
         `<button type="button" class="ev-op${r.dorsal === n ? " sel" : ""}" data-op="dorsal" data-v="${n}">${n}</button>`).join("") +
@@ -785,16 +825,17 @@
     const esFondo = p.capa === "fondo";
     const txt = esFondo ? promptFondo() : promptPersonaje();
     const eq = equipaciones.find(e => e.id === r.equip) || {};
-    const fotosEq = !esFondo && esPersona() && r.equip !== "otro" && (eq.imagenes || []).length;
+    const fotosEq = !esFondo && fotosKit(), hayRef = fotosEq;
     const tiene = !!img[p.capa];
     let h = dice(esFondo
       ? "Este es el encargo para la imagen de fondo. Cópialo, pégalo en Gemini o ChatGPT y sube aquí la imagen que te dé."
-      : "Y este, el del personaje. Lo pido sobre fondo verde liso para recortarlo y que quede como capa." + (fotosEq ? " Adjunta también las fotos de la camiseta." : ""),
+      : "Y este, el del personaje. Lo pido sobre fondo verde liso para recortarlo y que quede como capa." + (fotosEq ? " Pega también la imagen de referencia con la camiseta." : ""),
       "Si cambias una respuesta, el encargo se actualiza solo.") +
       `<div class="ev-prompt" data-prompt="${p.capa}">${esc(txt)}</div>
+      ${fotosEq ? `<img class="ev-ref" data-refprev alt="Imagen de referencia" hidden>` : ""}
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="${p.capa}">📋 Copiar el encargo</button>
-        ${fotosEq ? `<button type="button" class="ev-boton" data-copiareq>📋 Copiar la camiseta</button><button type="button" class="ev-boton" data-fotoseq>👕 Guardar sus fotos</button>` : ""}
+        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
@@ -814,14 +855,14 @@
   // Paso final del «Cartel con estilo»: el encargo completo y subir el cartel
   function encargoHtml(p) {
     const est = estiloElegido(), tiene = !!img.fondo;
-    const eq = equipaciones.find(e => e.id === r.equip) || {};
-    const fotosEq = esPersona() && r.equip !== "otro" && (eq.imagenes || []).length;
-    return dice(`Este es el encargo completo del cartel${est ? ` con el estilo «${est.t}»` : ""}. Cópialo y pégalo en Gemini o ChatGPT${fotosEq ? " junto con las fotos de la camiseta" : ""}, y sube aquí el cartel que te dé.`,
-        `Encima pondré el escudo del club${(r.patros || []).length ? ", los patrocinadores" : ""}${partidoActivo() ? " y los escudos de los dos equipos" : ""}, y podrás añadir más textos.`) +
+    const hayRef = seccionesRef().length > 0;
+    return dice(`Este es el encargo completo del cartel${est ? ` con el estilo «${est.t}»` : ""}. Copia el encargo y la imagen de referencia (${seccionesRef().map(x => x.id === "kit" ? "camiseta" : x.id === "club" ? "escudo del club" : "escudo de " + partidoSel[x.id].nombre).join(", ")}), pégalos juntos en Gemini o ChatGPT y sube aquí el cartel que te dé.`,
+        `El escudo del club va integrado en el fondo como marca de agua. ${(r.patros || []).length ? "Encima pondré los patrocinadores y podrás" : "Después podrás"} añadir más textos.`) +
       `<div class="ev-prompt" data-prompt="fondo">${esc(promptCartel())}</div>
+      ${hayRef ? `<img class="ev-ref" data-refprev alt="Imagen de referencia" hidden>` : ""}
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="fondo">📋 Copiar el encargo</button>
-        ${fotosEq ? `<button type="button" class="ev-boton" data-copiareq>📋 Copiar la camiseta</button><button type="button" class="ev-boton" data-fotoseq>👕 Guardar sus fotos</button>` : ""}
+        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar el cartel" : "Subir el cartel creado"}<input type="file" accept="image/*" data-subir="fondo" hidden></label>
@@ -900,20 +941,45 @@
     const v = id => r[id + "_no"] ? "" : (r[id] || "").trim();
     const ev = r.evento === "otro" ? (r.evento_o || "") : ((P("evento").op.find(o => o.v === r.evento) || {}).t || "");
     const rc = COLORES_RIVAL.find(c => c.v === r.rivalColor);
-    return { titulo: v("titulo") || "Tu título", sub: v("subtitulo"), vs: v("vs"), fecha: v("fecha"), hora: v("hora"), lugar: v("lugar"),
-      extra: v("extra"), redes: v("redes"), evento: ev, rivalColor: rc ? rc.c : (r.rivalColor === "otro" ? "#7a7a7a" : "") };
+    // Sin datos repetidos: un texto que ya está dentro de otro anterior no se vuelve a poner
+    const norm = t => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const T = { titulo: v("titulo"), sub: v("subtitulo"), vs: v("vs"), fecha: v("fecha"), hora: v("hora"), lugar: v("lugar"), extra: v("extra"), redes: v("redes") };
+    const vistos = [];
+    Object.keys(T).forEach(k => {
+      const n = norm(T[k]);
+      if (!n) return;
+      if (vistos.some(x => x.includes(n))) T[k] = ""; else vistos.push(n);
+    });
+    const pal = coloresElegidos();
+    return Object.assign(T, { titulo: T.titulo || "Tu título", evento: norm(ev) && !vistos.some(x => x.includes(norm(ev))) ? ev : "",
+      rivalColor: rc ? rc.c : (r.rivalColor === "otro" ? "#7a7a7a" : ""), c1: pal ? pal.c[0] : "", c2: pal ? pal.c[1] : "" });
+  }
+  const NUM_EN = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  const may = t => t.charAt(0).toUpperCase() + t.slice(1);
+  // Quién sale: número, sexo y características
+  function personasTexto(delClub) {
+    const n = nPers(), de = delClub ? " of our club" : "";
+    const sx = r.sexo === "otro" ? (r.sexo_o || "").trim() : r.sexo;
+    const gen = sx === "femenino" ? "female " : sx === "masculino" ? "male " : sx && sx !== "mixto" ? sx + " " : "";
+    const quien = n === 1 ? `A ${gen}volleyball player${de}`
+      : `${may(NUM_EN[n] || String(n))} ${sx === "mixto" ? "" : gen}volleyball players${de}${sx === "mixto" ? " (a mixed group of women and men)" : ""}`;
+    const mixto = sx === "mixto";
+    const pelo = [pr("peloColor"), pr("peinado") ? (n === 1 ? "in " : mixto ? "the women with " : "with ") + pr("peinado") : ""].filter(Boolean).join(mixto ? ", " : " ");
+    const barba = pr("barba") ? (mixto ? "the men " + pr("barba") : pr("barba")) : "";
+    return `${quien}, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pelo}, ${barba}, ${n === 1 ? pr("pose") : pr("poseEq")}. ${pr("plano")}, ${pr("expresion")}.`;
   }
   function kitTexto() {
     if (!esPersona()) return "";
-    const n = r.pTipo === "jugadora" ? `the shirt number ${r.dorsal === "otro" ? r.dorsal_o : r.dorsal || ""}` : "different shirt numbers";
+    const n = nPers() === 1 ? `the shirt number ${r.dorsal === "otro" ? r.dorsal_o : r.dorsal || ""}` : "different shirt numbers";
     if (r.equip === "otro") return `Kit: ${r.equip_o}, with ${n}, knee pads and indoor volleyball shoes.`;
     const eq = equipaciones.find(e => e.id === r.equip) || {};
-    return `Use the attached photos of our volleyball jersey (front and back) as reference: ${r.pTipo === "equipo" ? "every player of our club" : "our player"} must wear EXACTLY that kit (same colours, cut, stripes and details), with ${n} and no player name. Knee pads and indoor volleyball shoes.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`;
+    const sec = seccionesRef().find(x => x.id === "kit");
+    const ref = sec ? `section ${sec.n} (KIT) of the attached reference image, which shows the front and back of our jersey` : "the attached photos of our volleyball jersey (front and back)";
+    return `Use ${ref}: ${nPers() > 1 ? "every player of our club" : "our player"} must wear EXACTLY that kit (same colours, cut, stripes and details), with ${n} and no player name. Knee pads and indoor volleyball shoes.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`;
   }
   function sujetoIA() {
     const s = [];
-    if (r.pTipo === "jugadora") s.push(`A female volleyball player of our club, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")} in ${pr("peinado")}, ${pr("pose")}. ${pr("plano")}, ${pr("expresion")}.`);
-    else if (r.pTipo === "equipo") s.push(`${pr("nJug")} of our club, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")}, ${pr("peinado")}, ${pr("poseEq")}. ${pr("plano")}, ${pr("expresion")}.`);
+    if (esPersona()) s.push(personasTexto(true));
     else if (r.pTipo === "balon") s.push(`${pr("balon")}, a volleyball with blue, yellow and white panels.`);
     else if (r.pTipo === "ninguno") s.push("No people: the poster is built with the scene, volleyball elements and the typography.");
     else if (r.pTipo === "otro") s.push(`${pr("pTipo")}.`);
@@ -930,19 +996,28 @@
     const estilo = est ? est.p : r.estiloCartel === "otro" ? (r.estiloCartel_o || "").trim() : "Modern, powerful sports poster with a clear hierarchy: a big title, the main subject and an info block.";
     const q = t => `"${String(t).replace(/"/g, "”").replace(/\n+/g, " / ")}"`;
     const roles = [["TITLE", T.titulo], ["SUBTITLE", T.sub], ["MATCHUP", T.vs], ["DATE", T.fecha], ["TIME", T.hora], ["VENUE", T.lugar], ["INFO", T.extra], ["CONTACT", T.redes]].filter(x => x[1]);
-    const huecos = ["a clean, uncluttered space at the top centre for the club crest"];
-    if ((r.patros || []).length) huecos.push(`a clean strip in a bottom corner for ${r.patros.length} small sponsor logo${r.patros.length > 1 ? "s" : ""}`);
-    if (partidoActivo()) huecos.push("a small clean space next to each team name for its crest");
+    const secs = seccionesRef(), club = secs.find(x => x.id === "club"), pal = coloresElegidos();
+    const logos = [];
+    const clubEnEquipo = partidoActivo() && T.vs && ["local", "visit"].some(id => esLogoClub(partidoSel[id].src));
+    if (club) logos.push(`CLUB CREST AS A WATERMARK: integrate the club crest from section ${club.n} of the reference image into the background as a watermark: large (about 55-65% of the poster width), centred behind the main subject, blended into the scene with soft diffusion and low opacity (around 10-15%), clearly recognisable but never competing with the subject or the texts. Keep its design exactly as in the reference${clubEnEquipo ? "; besides the watermark it only appears small next to our team name" : " and do not repeat it anywhere else"}.`);
+    if (partidoActivo() && T.vs) {
+      const l = seccionEscudo("local"), v = seccionEscudo("visit");
+      const eqs = [[l, "home"], [v, "away"]].filter(x => x[0]).map(([x, lado]) => `the ${lado} team crest (section ${x.n}) next to the ${lado} team name`);
+      if (eqs.length) logos.push(`TEAM CRESTS: place ${eqs.join(" and ")}, small and clean, reproduced exactly as in the reference.`);
+    }
+    logos.push(`Do not draw any other logo, emblem or brand${(r.patros || []).length ? `, and leave a clean strip in a bottom corner for ${r.patros.length} small sponsor logo${r.patros.length > 1 ? "s" : ""} (added afterwards)` : ""}.`);
     const partes = [
-      `Design a complete, finished ${orientacion(F)} volleyball event poster, ${F.ar} aspect ratio (${F.w}x${F.h} px). Professional sports graphic design, print quality.${ev ? ` It announces ${ev} of the volleyball club Nou Volei Alzira (NVA), from Alzira (Spain), whose colours are navy blue and orange.` : ""}`,
+      `Design a complete, finished ${orientacion(F)} volleyball event poster, ${F.ar} aspect ratio (${F.w}x${F.h} px). Professional sports graphic design, print quality.${ev ? ` It announces ${ev} of the volleyball club Nou Volei Alzira (NVA), from Alzira (Spain).` : ""}`,
+      secs.length ? `REFERENCE IMAGE: one image is attached with numbered sections: ${secs.map(x => `${x.n}) ${x.t}`).join("; ")}. Use it only as a visual reference: do not copy its white background, frames or labels.` : "",
       `STYLE AND LAYOUT: ${estilo}`,
+      `COLOURS: use ${pal ? pal.p : "navy blue and vivid orange (the club colours)"} as the main colours of the whole poster (they replace any colour named in the layout).`,
       r.acabado && r.acabado !== "auto" ? `RENDERING: ${pr("acabado")}.` : "",
       `MAIN SUBJECT: ${sujetoIA()}`,
-      `SCENE: ${pr("fTipo")}. ${pr("fPaleta")}. ${pr("fLuz")}. ${pr("fAmb")}.`,
+      `SCENE: ${pr("fTipo")}. ${pr("fLuz")}. ${pr("fAmb")}.`,
       `TEXTS: write ONLY these texts, exactly as given (Spanish, with correct accents and spelling), following the typographic hierarchy of the layout:\n` +
         roles.map(([k, v]) => `${k}: ${q(v)}`).join("\n") + `\nIf the layout mentions a text that is not in this list, leave that element out.`,
-      `LOGOS: do not draw any logo, crest, emblem or sponsor brand (they are added afterwards). Leave ${huecos.length > 1 ? huecos.slice(0, -1).join(", ") + " and " + huecos[huecos.length - 1] : huecos[0]}.`,
-      "No watermarks and no extra or invented text."
+      `LOGOS: ${logos.join(" ")}`,
+      "No other watermarks and no extra or invented text."
     ];
     return limpiar(partes.filter(Boolean).join("\n\n"));
   }
@@ -969,29 +1044,20 @@
   function promptPersonaje() {
     const F = formato();
     const estilo = r.pEstilo === "igual" || !r.pEstilo ? estiloFondo() : pr("pEstilo");
-    const vertical = r.pTipo !== "equipo" || F.h >= F.w;
+    const vertical = nPers() <= 1 || F.h >= F.w;
     const partes = [`Create a ${vertical ? "vertical image with 3:4" : "horizontal image with 4:3"} aspect ratio.`];
-    if (r.pTipo === "jugadora") {
-      partes.push(`${estilo}. A female volleyball player, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")} in ${pr("peinado")}, ${pr("pose")}. ${pr("plano")}, ${pr("expresion")}.`);
-    } else if (r.pTipo === "equipo") {
-      partes.push(`${estilo}. ${pr("nJug")}, ${pr("edad")}, ${pr("rasgos")}, ${pr("complexion")}, ${pr("peloColor")}, ${pr("peinado")}, ${pr("poseEq")}. ${pr("plano")}, ${pr("expresion")}.`);
+    if (esPersona()) {
+      partes.push(`${estilo}. ${personasTexto(false)}`);
     } else if (r.pTipo === "balon") {
       partes.push(`${estilo}. ${pr("balon")}, a volleyball with blue, yellow and white panels.`);
     } else if (r.pTipo === "otro") {
       partes.push(`${estilo}. ${pr("pTipo")}.`);
     }
-    if (esPersona()) {
-      const n = r.pTipo === "jugadora" ? `the shirt number ${r.dorsal === "otro" ? r.dorsal_o : r.dorsal || ""}` : "different shirt numbers";
-      if (r.equip === "otro") partes.push(`Kit: ${r.equip_o}, with ${n}, knee pads and indoor volleyball shoes.`);
-      else {
-        const eq = equipaciones.find(e => e.id === r.equip) || {};
-        partes.push(`Use the attached photos of our volleyball jersey (front and back) as reference: ${r.pTipo === "equipo" ? "every player" : "the player"} must wear EXACTLY that kit (same colours, cut, stripes and details), with ${n} and no player name. Knee pads and indoor volleyball shoes.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`);
-      }
-    }
+    partes.push(kitTexto());
     const luz = hayFondo() ? pr("fLuz") : "";
     if (luz) partes.push(`Light the subject with ${luz}, so it matches a background of ${pr("fTipo")}.`);
-    partes.push("IMPORTANT: the subject is isolated on a flat, solid, pure green chroma key background (#00FF00), evenly lit, with no shadows, no floor and no scenery. The whole subject fits inside the frame with some margin, sharp clean edges, no green reflections on the subject. No text, no logos, no watermarks" + (r.pTipo === "jugadora" ? " (only the shirt number)." : "."));
-    return limpiar(partes.join("\n\n"));
+    partes.push("IMPORTANT: the subject is isolated on a flat, solid, pure green chroma key background (#00FF00), evenly lit, with no shadows, no floor and no scenery. The whole subject fits inside the frame with some margin, sharp clean edges, no green reflections on the subject. No text, no logos, no watermarks" + (nPers() === 1 ? " (only the shirt number)." : "."));
+    return limpiar(partes.filter(Boolean).join("\n\n"));
   }
 
   /* ---------- Quitar el fondo verde (o de un color liso) del personaje ---------- */
@@ -1031,11 +1097,11 @@
   const textoDe = id => E.textos.find(t => t.id === id);
   const esEscudo = id => id === "escL" || id === "escV";
   const imgEscudo = id => partidoActivo() ? partidoSel[id === "escL" ? "local" : "visit"].logo : null;
-  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "patros" ? E.patros : esEscudo(id) ? E[id] : textoDe(id); }
+  function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "marca" ? E.marca : id === "patros" ? E.patros : esEscudo(id) ? E[id] : textoDe(id); }
   function existe(id) {
     if (id === "pers") return !!img.pers;
     if (id === "patros") return (r.patros || []).length > 0;
-    if (id === "logo") return true;
+    if (id === "logo" || id === "marca") return true;
     if (esEscudo(id)) return !!imgEscudo(id);
     return !!textoDe(id);
   }
@@ -1046,11 +1112,12 @@
     if (esEscudo(id)) return `Escudo ${partidoSel ? partidoSel[id === "escL" ? "local" : "visit"].nombre : ""}`;
     if (id === "pers") return "Personaje";
     if (id === "logo") return "Escudo del club";
+    if (id === "marca") return "Escudo en el fondo (marca de agua)";
     if (id === "patros") return "Patrocinadores";
     const t = textoDe(id);
     return (t && t.t.trim().split("\n")[0].slice(0, 28)) || "Texto nuevo";
   }
-  const ICONO_CAPA = { fondo: "🌄", pers: "🙋‍♀️", logo: "🛡️", patros: "🤝", escL: "🏠", escV: "✈️" };
+  const ICONO_CAPA = { fondo: "🌄", pers: "🙋‍♀️", logo: "🛡️", marca: "💧", patros: "🤝", escL: "🏠", escV: "✈️" };
   function editorHtml() {
     if (sel !== "fondo" && !existe(sel)) sel = "fondo";
     let h = "";
@@ -1130,25 +1197,68 @@
     render();
   }
 
-  // Fotos de la equipación elegida juntas (delante y detrás) en un PNG
-  async function imagenCamiseta() {
-    const eq = equipaciones.find(e => e.id === r.equip) || {};
-    const fotos = [];
-    for (const ru of (eq.imagenes || []).slice(0, 3)) {
-      const b = await blobEq(ru).catch(() => null);
-      if (!b) continue;
-      const im = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = URL.createObjectURL(b); });
-      if (im) fotos.push(im);
+  /* ---------- Imagen de referencia para la IA: camiseta y escudos ----------
+     Secciones numeradas que el encargo nombra: KIT, escudo del club y escudos de
+     los equipos del partido (si no son el mismo escudo del club). */
+  const fotosKit = () => esPersona() && r.equip !== "otro" && ((equipaciones.find(e => e.id === r.equip) || {}).imagenes || []).length > 0;
+  const esLogoClub = src => /LOGO-NVA\.png|LOGO%20NVA|LOGO NVA/i.test(src || "");
+  function seccionesRef() {
+    const s = [];
+    if (fotosKit()) s.push({ id: "kit", t: "KIT (front / back)" });
+    if (modo === "ia") {
+      s.push({ id: "club", t: "CLUB CREST · NOU VOLEI ALZIRA" });
+      if (partidoActivo()) [["local", "HOME TEAM"], ["visit", "AWAY TEAM"]].forEach(([id, lado]) => {
+        const e = partidoSel[id];
+        if (e.src && !esLogoClub(e.src)) s.push({ id, t: `${lado} · ${e.nombre}` });
+      });
     }
-    if (!fotos.length) throw new Error("No hay fotos de la camiseta");
-    const alto = 900, pad = 30, anchos = fotos.map(i => i.width * alto / i.height);
+    return s.map((x, i) => Object.assign(x, { n: i + 1 }));
+  }
+  // Sección con el escudo de un equipo (o la del club si es el mismo escudo)
+  function seccionEscudo(id) {
+    const ss = seccionesRef();
+    return ss.find(x => x.id === id) || (partidoSel && esLogoClub(partidoSel[id].src) ? ss.find(x => x.id === "club") : null);
+  }
+  async function imagenReferencia() {
+    const secs = seccionesRef();
+    if (!secs.length) throw new Error("No hay nada que poner en la imagen de referencia");
+    const filas = [];
+    for (const sc of secs) {
+      let ims = [];
+      if (sc.id === "kit") {
+        const eq = equipaciones.find(e => e.id === r.equip) || {};
+        for (const ru of (eq.imagenes || []).slice(0, 3)) {
+          const b = await blobEq(ru).catch(() => null);
+          if (!b) continue;
+          const im = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = URL.createObjectURL(b); });
+          if (im) ims.push(im);
+        }
+      } else if (sc.id === "club") ims = [await cargarImg("LOGO-NVA.png")];
+      else ims = [partidoSel[sc.id].logo];
+      filas.push({ sc, ims: ims.filter(Boolean) });
+    }
+    const W = 1400, pad = 36, cab = 64, alto = 480;
     const cv = document.createElement("canvas");
-    cv.width = Math.round(anchos.reduce((a, b) => a + b, 0) + pad * (fotos.length + 1)); cv.height = alto + pad * 2;
+    cv.width = W; cv.height = pad + filas.length * (cab + alto + pad);
     const cx = cv.getContext("2d");
-    cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, cv.width, cv.height);
-    let x = pad;
-    fotos.forEach((im, i) => { cx.drawImage(im, x, pad, anchos[i], alto); x += anchos[i] + pad; });
+    cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, W, cv.height);
+    let y = pad;
+    filas.forEach(({ sc, ims }) => {
+      cx.fillStyle = "#0b1236"; cx.font = "700 40px Barlow, Arial, sans-serif"; cx.textAlign = "left"; cx.textBaseline = "middle";
+      cx.fillText(`${sc.n} · ${sc.t}`, pad, y + cab / 2);
+      cx.strokeStyle = "#d5d9e3"; cx.lineWidth = 2; cx.strokeRect(pad / 2, y + cab, W - pad, alto);
+      const anchos = ims.map(i => Math.min(i.width * (alto - 40) / i.height, (W - pad * (ims.length + 1)) / ims.length));
+      const total = anchos.reduce((a, b) => a + b, 0) + pad * (ims.length - 1);
+      let x = (W - total) / 2;
+      ims.forEach((im, i) => { const h = anchos[i] * im.height / im.width; cx.drawImage(im, x, y + cab + (alto - h) / 2, anchos[i], h); x += anchos[i] + pad; });
+      y += cab + alto + pad;
+    });
     return await new Promise((ok, ko) => cv.toBlob(b => b ? ok(b) : ko(new Error("No se pudo crear la imagen")), "image/png"));
+  }
+  async function verReferencia(c) {
+    const el = (c || capa).querySelector("[data-refprev]");
+    if (!el) return;
+    try { const b = await imagenReferencia(); if (el.isConnected) { el.src = URL.createObjectURL(b); el.hidden = false; } } catch (e) { /* sin imagen */ }
   }
   function confirmarTexto(id) {
     const inp = capa.querySelector(`[data-txt="${id}"]`);
@@ -1168,7 +1278,11 @@
     return new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("No se puede abrir la imagen")); i.src = URL.createObjectURL(file); });
   }
   async function ponerImagen(capaId, imagen) {
-    if (capaId === "fondo") { img.fondo = imagen; E.fondo = { z: 1, ox: 0, oy: 0, op: 1 }; }
+    if (capaId === "fondo") {
+      img.fondo = imagen; E.fondo = { z: 1, ox: 0, oy: 0, op: 1 };
+      // En el cartel de la IA ya vienen el escudo (marca de agua) y los de los equipos: no se repiten
+      if (modo === "ia") ["marca", "logo", "escL", "escV"].forEach(id => { E.ocultas[id] = true; });
+    }
     else { img.persOrig = imagen; procesarPersonaje(); }
     render.saltar = true;
     render();
@@ -1177,7 +1291,7 @@
   function enlazar(c) {
     c.querySelectorAll("[data-sec]").forEach(b => b.onclick = () => { const s = SECC().find(x => x.id === b.dataset.sec); if (completa(s)) { abiertas[s.id] = !abiertas[s.id]; render(); } });
     c.querySelectorAll("[data-op]").forEach(b => b.onclick = () => {
-      if (b.dataset.v === "otro") { r[b.dataset.op] = "otro"; render(); const inp = capa.querySelector(`[data-otro="${b.dataset.op}"]`); if (inp) inp.focus(); return; }
+      if (b.dataset.v === "otro") { r[b.dataset.op] = "otro"; if (b.dataset.op === "colores" && !r.colores_o) r.colores_o = "#1f3cff,#ff5b00"; render(); const inp = capa.querySelector(`[data-otro="${b.dataset.op}"]`); if (inp) inp.focus(); return; }
       responder(b.dataset.op, b.dataset.v);
     });
     c.querySelectorAll("[data-otro]").forEach(inp => {
@@ -1196,8 +1310,13 @@
     });
     c.querySelectorAll("[data-txtok]").forEach(b => b.onclick = () => confirmarTexto(b.dataset.txtok));
     c.querySelectorAll("[data-txtno]").forEach(b => b.onclick = () => { const id = b.dataset.txtno; r[id] = ""; r[id + "_no"] = true; render.saltar = true; render(); });
+    c.querySelectorAll("[data-colpar]").forEach(inp => {
+      const poner = () => { const v = (r.colores_o || "#1f3cff,#ff5b00").split(","); v[+inp.dataset.colpar] = inp.value; r.colores_o = v.join(","); dibujarMinis(); pintar(); };
+      inp.oninput = poner; inp.onchange = () => { poner(); render(); };
+    });
     c.querySelectorAll("[data-partido]").forEach(b => b.onclick = () => elegirPartido(b.dataset.partido));
     dibujarMinis(c);
+    verReferencia(c);
     c.querySelectorAll("[data-eqimg]").forEach(im => urlEq(im.dataset.eqimg).then(u => { if (u) im.src = u; }));
     c.querySelectorAll("[data-eqacc]").forEach(b => b.onclick = () => accionEq(b.dataset.eqacc, b.dataset.id));
 
@@ -1222,22 +1341,22 @@
     });
     // Copia las fotos de la camiseta en una sola imagen para pegarla en Gemini o ChatGPT junto al encargo
     c.querySelectorAll("[data-copiareq]").forEach(b => b.onclick = async () => {
-      const promesa = imagenCamiseta();
+      const promesa = imagenReferencia();
       try {
         if (!navigator.clipboard || !window.ClipboardItem) throw new Error("sin portapapeles");
         await navigator.clipboard.write([new ClipboardItem({ "image/png": promesa })]);
-        b.textContent = "✅ Copiada: pégala en el chat";
+        b.textContent = "✅ Copiada: pégala junto al encargo";
       } catch (e) {
         const blob = await promesa.catch(() => null);
-        if (!blob) { b.textContent = "No hay fotos de la camiseta"; }
+        if (!blob) { b.textContent = "No hay camiseta ni escudos que copiar"; }
         else {
-          const f = new File([blob], "camiseta.png", { type: "image/png" });
+          const f = new File([blob], "referencia-cartel.png", { type: "image/png" });
           if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); } catch (er) { /* cancelado */ } }
           else { const u = URL.createObjectURL(f), el = document.createElement("a"); el.href = u; el.download = f.name; document.body.appendChild(el); el.click(); el.remove(); }
           b.textContent = "Este navegador no deja copiar imágenes: te la he guardado";
         }
       }
-      setTimeout(() => { if (b.isConnected) b.textContent = "📋 Copiar la camiseta"; }, 3500);
+      setTimeout(() => { if (b.isConnected) b.textContent = "🖼️ Copiar la imagen de referencia"; }, 3500);
     });
     const fotosEq = c.querySelector("[data-fotoseq]");
     if (fotosEq) fotosEq.onclick = async () => {
@@ -1346,7 +1465,7 @@
         ? Object.assign({ prompt: promptCartel(), aspecto: F.ar, dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq())
         : capaId === "fondo"
         ? { prompt: promptFondo(), aspecto: F.ar }
-        : Object.assign({ prompt: promptPersonaje(), aspecto: r.pTipo !== "equipo" || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
+        : Object.assign({ prompt: promptPersonaje(), aspecto: nPers() <= 1 || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
       const { data, error } = await sb.functions.invoke("generar-cartel", { body });
       if (error) {
         let msg = error.message;
@@ -1430,6 +1549,7 @@
       if (E.ocultas[id]) continue;
       if (id === "pers") dibujarPersonaje(ctx, W, H);
       else if (id === "logo") dibujarLogo(ctx, W, H, M);
+      else if (id === "marca") dibujarMarca(ctx, W, H, M);
       else if (esEscudo(id)) dibujarEscudo(ctx, W, H, M, id);
       else if (id === "patros") dibujarPatros(ctx, W, H, M);
       else dibujarTexto(ctx, W, H, M, textoDe(id), previa);
@@ -1451,6 +1571,17 @@
     ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = M * 0.02;
     ctx.drawImage(logo, -s / 2, -s / 2, s, s); ctx.restore();
     cajas.push({ id: "logo", cx, cy, w: s, h: s, rot: l.rot });
+  }
+  // Escudo del club integrado en el fondo: grande, difuminado y casi transparente
+  function dibujarMarca(ctx, W, H, M) {
+    const logo = imgLista("LOGO-NVA.png");
+    if (!logo) return;
+    const l = E.marca, s = l.s * M, cx = l.x * W, cy = l.y * H;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(l.rot * Math.PI / 180); ctx.globalAlpha = l.op;
+    if ("filter" in ctx) ctx.filter = `blur(${Math.max(0.5, M * 0.0025)}px) saturate(.75)`;
+    ctx.drawImage(logo, -s / 2, -s / 2, s, s);
+    ctx.filter = "none"; ctx.restore();
+    cajas.push({ id: "marca", cx, cy, w: s, h: s, rot: l.rot });
   }
   function dibujarEscudo(ctx, W, H, M, id) {
     const im = imgEscudo(id);
@@ -1599,7 +1730,7 @@
         const mover = ev => {
           if (tipo === "esc") {
             const f = Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0;
-            const lim = prop === "z" ? [1, 4] : sel === "pers" ? [0.1, 2] : sel === "patros" ? [0.3, 3] : sel === "logo" || esEscudo(sel) ? [0.05, 0.8] : [0.015, 0.5];
+            const lim = prop === "z" ? [1, 4] : sel === "pers" ? [0.1, 2] : sel === "patros" ? [0.3, 3] : sel === "marca" ? [0.15, 1.6] : sel === "logo" || esEscudo(sel) ? [0.05, 0.8] : [0.015, 0.5];
             el[prop] = Math.min(lim[1], Math.max(lim[0], ini.v * f));
             medida.textContent = `Tamaño ${Math.round(el[prop] / ini.v * 100)}%`;
           } else if (tipo === "rot") {
@@ -1609,7 +1740,7 @@
             el.rot = g;
             medida.textContent = `Giro ${Math.round(g)}°`;
           } else if (tipo === "op") {
-            el.op = Math.min(1, Math.max(0.05, ini.op - (ev.clientY - ini.y) / 160));
+            el.op = Math.min(1, Math.max(0.03, ini.op - (ev.clientY - ini.y) / 160));
             medida.textContent = `Opacidad ${Math.round(el.op * 100)}%`;
           }
           pintar();

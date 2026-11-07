@@ -94,7 +94,7 @@
       ] },
     { id: "foto", bloque: "La imagen central", tipo: "foto", q: "Sube la foto que quieres usar.", nota: "Mejor en vertical y con buena luz. Luego podrás moverla y ampliarla.", cuando: r => r.principal === "foto" && r.inicio !== "subir" },
 
-    { id: "equip", bloque: "La jugadora", q: "Vestirá la equipación del club. ¿Cuál?", cuando: esPersona, nota: "Uso las fotos de la equipación como referencia para la IA.", dinamica: "equipaciones" },
+    { id: "equip", bloque: "La jugadora", tipo: "equip", q: "Vestirá la equipación del club. ¿Cuál?", cuando: esPersona, nota: "Uso las fotos de la camiseta como referencia para la IA. Puedes añadir otra equipación o cambiar sus fotos." },
     { id: "dorsal", bloque: "La jugadora", tipo: "dorsal", q: "¿Qué dorsal lleva en la camiseta?", cuando: r => r.principal === "jugadora", nota: "Si es una jugadora concreta, pon su número." },
     { id: "nJug", bloque: "Las jugadoras", q: "¿Cuántas jugadoras salen?", cuando: r => r.principal === "equipo",
       op: [{ v: "2", e: "2️⃣", t: "Dos", p: "two female volleyball players" }, { v: "3", e: "3️⃣", t: "Tres", p: "three female volleyball players" },
@@ -226,11 +226,129 @@
   }
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  async function cargarCatalogos() {
+  /* ---------- Equipaciones ----------
+     Las de serie están en Equipacion/ (repo). Si alguien añade o cambia alguna desde la
+     app, la lista completa se guarda en Supabase: Eventos/equipaciones.json, con las fotos
+     nuevas en Eventos/equipacion/. Cada imagen guarda su ruta completa. */
+  const RUTA_EQ = "Eventos/equipaciones.json";
+  function datos() {
+    if (!window.nvaStory || !window.nvaStory.gh) return null;
+    let cfg = {};
+    try { cfg = JSON.parse(localStorage.getItem("NVA_GH_SETTINGS") || "{}"); } catch (e) { /* nada */ }
+    return cfg.user ? window.nvaStory.gh(cfg) : null;
+  }
+  const urlsEq = {};
+  // URL que se puede pintar: las de serie, directas; las subidas, desde Supabase
+  function urlEq(ruta) {
+    if (!urlsEq[ruta]) {
+      urlsEq[ruta] = ruta.startsWith("Equipacion/") ? Promise.resolve(ruta)
+        : (async () => { const g = datos(); return g ? URL.createObjectURL(await g.blob(ruta)) : ""; })().catch(() => "");
+    }
+    return urlsEq[ruta];
+  }
+  async function blobEq(ruta) {
+    const u = await urlEq(ruta);
+    return u ? (await fetch(u)).blob() : null;
+  }
+  async function cargarEquipaciones() {
+    try {
+      const g = datos();
+      // Si no hay sesión, el puente de datos espera; no se bloquea la ventana por eso
+      const j = g && await Promise.race([g.json(RUTA_EQ), new Promise(ok => setTimeout(() => ok(null), 6000))]);
+      if (j && Array.isArray(j.equipaciones) && j.equipaciones.length) { equipaciones = j.equipaciones; return; }
+    } catch (e) { /* sin lista propia: las de serie */ }
     try {
       const j = await (await fetch("Equipacion/equipacion.json", { cache: "no-cache" })).json();
-      if (Array.isArray(j.equipaciones) && j.equipaciones.length) equipaciones = j.equipaciones;
+      if (Array.isArray(j.equipaciones) && j.equipaciones.length) {
+        equipaciones = j.equipaciones.map(e => Object.assign({}, e, { imagenes: (e.imagenes || []).map(a => "Equipacion/" + a) }));
+      }
     } catch (e) { /* sin catálogo: equipación por defecto */ }
+  }
+  async function guardarEquipaciones() {
+    const g = datos();
+    if (!g) throw new Error("No hay conexión con los datos.");
+    await g.putJson(RUTA_EQ, { equipaciones }, "Equipaciones para los carteles de eventos");
+  }
+  // Las fotos nuevas se guardan a 512 px como máximo (lo que admite la IA)
+  async function reducirEq(file) {
+    const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("No se puede abrir la imagen")); i.src = URL.createObjectURL(file); });
+    const k = Math.min(1, 512 / Math.max(img.width, img.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    const cx = cv.getContext("2d");
+    cx.fillStyle = "#fff"; cx.fillRect(0, 0, cv.width, cv.height);
+    cx.drawImage(img, 0, 0, cv.width, cv.height);
+    return new Promise(ok => cv.toBlob(ok, "image/jpeg", 0.9));
+  }
+  async function subirFotosEq(files) {
+    const g = datos();
+    if (!g) throw new Error("No hay conexión con los datos.");
+    const rutas = [], base = Date.now().toString(36);
+    for (let i = 0; i < Math.min(files.length, 3); i++) {
+      const ruta = `Eventos/equipacion/${base}-${i + 1}.jpg`;
+      await g.putBlob(ruta, await reducirEq(files[i]), "Foto de equipación");
+      rutas.push(ruta);
+    }
+    return rutas;
+  }
+  function elegirFotos() {
+    return new Promise(ok => {
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+      inp.onchange = () => ok(Array.from(inp.files || []));
+      inp.click();
+    });
+  }
+  async function accionEq(tipo, id) {
+    const est = capa && capa.querySelector("#evEqEstado");
+    const avisar = t => { if (est) est.textContent = t; };
+    try {
+      if (tipo === "nueva") {
+        const nombre = (prompt("Nombre de la equipación (por ejemplo «Camiseta naranja»):") || "").trim();
+        if (!nombre) return;
+        alert("Ahora elige de 1 a 3 fotos de la camiseta (delante, detrás…).");
+        const files = await elegirFotos();
+        if (!files.length) return;
+        avisar("Guardando las fotos…");
+        const imagenes = await subirFotosEq(files);
+        const nueva = { id: "eq" + Date.now().toString(36), nombre, descripcion: "", imagenes };
+        equipaciones.push(nueva);
+        await guardarEquipaciones();
+        r.equip = nueva.id;
+        avisar("✅ Equipación añadida.");
+      } else if (tipo === "fotos") {
+        const eq = equipaciones.find(e => e.id === id);
+        if (!eq) return;
+        const files = await elegirFotos();
+        if (!files.length) return;
+        avisar("Guardando las fotos…");
+        eq.imagenes = await subirFotosEq(files);
+        eq.descripcion = "";   // la descripción antigua ya no vale para las fotos nuevas
+        await guardarEquipaciones();
+        avisar("✅ Fotos cambiadas.");
+      } else if (tipo === "nombre") {
+        const eq = equipaciones.find(e => e.id === id);
+        if (!eq) return;
+        const nombre = (prompt("Nuevo nombre:", eq.nombre) || "").trim();
+        if (!nombre) return;
+        eq.nombre = nombre;
+        await guardarEquipaciones();
+      } else if (tipo === "quitar") {
+        const eq = equipaciones.find(e => e.id === id);
+        if (!eq || equipaciones.length < 2) { alert("Tiene que quedar al menos una equipación."); return; }
+        if (!confirm(`¿Quitar «${eq.nombre}» de la lista?`)) return;
+        equipaciones = equipaciones.filter(e => e.id !== id);
+        await guardarEquipaciones();
+        if (r.equip === id) delete r.equip;
+      }
+      render();
+    } catch (e) {
+      avisar("❌ " + (e.message || e) + (/permiso|403/i.test(e.message || "") ? " (hace falta «Editar» en Eventos)" : ""));
+    }
+  }
+
+  async function cargarCatalogos() {
+    await cargarEquipaciones();
     try {
       const j = await (await fetch("Patrocinadores/patrocinadores.json", { cache: "no-cache" })).json();
       patrocinadores = (j.equipos || []).map(x => ({ archivo: x.archivo, nombre: x.nombre }))
@@ -273,6 +391,14 @@
       .ev-orden div { display: flex; align-items: center; gap: 6px; font-size: .82rem; }
       .ev-orden div span { flex: 1; }
       .ev-mini { border: 1px solid var(--tiza-borde, rgba(233,238,250,.16)); background: var(--tiza-fondo, rgba(233,238,250,.07)); color: var(--txt-1, #e9eefa); border-radius: 8px; min-width: 30px; height: 28px; cursor: pointer; font: inherit; }
+      .ev-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+      .ev-eq { border: 2px solid var(--tiza-borde, rgba(233,238,250,.16)); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 4px; background: var(--tiza-fondo, rgba(233,238,250,.07)); }
+      .ev-eq.sel { border-color: #ff7a2e; background: rgba(255,91,0,.14); }
+      .ev-eq-img { display: flex; gap: 2px; background: #fff; border: 0; border-radius: 8px; height: 92px; padding: 4px; cursor: pointer; align-items: center; justify-content: center; }
+      .ev-eq-img img { flex: 1; min-width: 0; max-height: 100%; object-fit: contain; }
+      .ev-eq-img span { color: #555; font-size: .8rem; }
+      .ev-eq-nom { font-size: .82rem; font-weight: 700; text-align: center; }
+      .ev-eq-acc { display: flex; gap: 4px; justify-content: center; }
       .ev-final { border-top: 1px solid var(--borde, rgba(255,255,255,.12)); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
       .ev-estado { font-size: .82rem; color: var(--txt-2, #9fb0d8); min-height: 1em; }
       .ev-prompt { font-size: .72rem; color: var(--txt-2, #9fb0d8); white-space: pre-wrap; background: rgba(0,0,0,.2); border-radius: 8px; padding: 8px; max-height: 120px; overflow: auto; }
@@ -318,7 +444,6 @@
   const visibles = () => PREGUNTAS.filter(p => !p.cuando || p.cuando(r));
 
   function opcionesDe(p) {
-    if (p.dinamica === "equipaciones") return equipaciones.map(e => ({ v: e.id, e: "👕", t: e.nombre, nota: (e.imagenes || []).length ? "" : "sin foto de referencia aún" }));
     if (p.dinamica === "fuentes") return Object.keys(FUENTES).map(k => ({ v: k, t: FUENTES[k].t, nota: FUENTES[k].nota, fuente: FUENTES[k] }));
     return p.op || [];
   }
@@ -353,6 +478,18 @@
         const estiloF = o.fuente ? ` style="font-family:'${o.fuente.f}'; font-size:.95rem;"` : "";
         return `<button type="button" class="ev-op${r[p.id] === o.v ? " sel" : ""}" data-op="${p.id}" data-v="${esc(o.v)}"${estiloF}>${o.e ? o.e + " " : ""}${esc(o.t)}${o.nota ? `<small style="font-family:inherit">${esc(o.nota)}</small>` : ""}</button>`;
       }).join("") + `</div>`;
+    } else if (tipo === "equip") {
+      h += `<div class="ev-eqs">` + equipaciones.map(e => `<div class="ev-eq${r.equip === e.id ? " sel" : ""}">
+          <button type="button" class="ev-eq-img" data-op="equip" data-v="${esc(e.id)}" aria-label="${esc(e.nombre)}">
+            ${(e.imagenes || []).length ? (e.imagenes || []).slice(0, 2).map(ru => `<img data-eqimg="${esc(ru)}" alt="">`).join("") : `<span>Sin fotos</span>`}
+          </button>
+          <div class="ev-eq-nom">${esc(e.nombre)}</div>
+          <div class="ev-eq-acc">
+            <button type="button" class="ev-mini" data-eqacc="nombre" data-id="${esc(e.id)}" title="Cambiar nombre" aria-label="Cambiar nombre">✏️</button>
+            <button type="button" class="ev-mini" data-eqacc="fotos" data-id="${esc(e.id)}" title="Cambiar fotos" aria-label="Cambiar fotos">📷</button>
+            <button type="button" class="ev-mini" data-eqacc="quitar" data-id="${esc(e.id)}" title="Quitar" aria-label="Quitar">🗑️</button>
+          </div></div>`).join("") + `</div>
+        <div class="ev-fila"><button type="button" class="ev-op" data-eqacc="nueva">➕ Añadir equipación</button><span class="ev-estado" id="evEqEstado"></span></div>`;
     } else if (tipo === "dorsal") {
       h += `<div class="ev-ops">` + ["1", "3", "5", "7", "9", "10", "11", "14"].map(n =>
         `<button type="button" class="ev-op${r.dorsal === n ? " sel" : ""}" data-op="dorsal" data-v="${n}">${n}</button>`).join("") + `</div>
@@ -464,6 +601,8 @@
 
   function enlazar(c) {
     c.querySelectorAll("[data-op]").forEach(b => b.onclick = () => responder(b.dataset.op, b.dataset.v));
+    c.querySelectorAll("[data-eqimg]").forEach(im => urlEq(im.dataset.eqimg).then(u => { if (u) im.src = u; }));
+    c.querySelectorAll("[data-eqacc]").forEach(b => b.onclick = () => accionEq(b.dataset.eqacc, b.dataset.id));
     c.querySelectorAll("[data-txt]").forEach(inp => {
       inp.oninput = () => { r[inp.dataset.txt] = inp.value; pintar(); };
       inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); if (inp.value.trim()) { render.saltar = true; render(); } } };
@@ -538,8 +677,8 @@
       const eq = equipaciones.find(e => e.id === r.equip) || {};
       const files = [];
       for (const a of eq.imagenes || []) {
-        const b = await (await fetch("Equipacion/" + a)).blob();
-        files.push(new File([b], a, { type: b.type || "image/jpeg" }));
+        const b = await blobEq(a);
+        if (b) files.push(new File([b], a.split("/").pop(), { type: b.type || "image/jpeg" }));
       }
       if (navigator.canShare && navigator.canShare({ files })) {
         try { await navigator.share({ files }); return; } catch (e) { if (e.name === "AbortError") return; }
@@ -589,6 +728,20 @@
     return partes.join("\n").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s+\./g, ".");
   }
 
+  // Fotos de la camiseta elegida, para mandarlas a la función como referencia
+  async function referenciasEq() {
+    if (!esPersona(r)) return {};
+    const eq = equipaciones.find(e => e.id === r.equip) || {};
+    const referencias = [];
+    for (const ru of (eq.imagenes || []).slice(0, 3)) {
+      const b = await blobEq(ru).catch(() => null);
+      if (!b) continue;
+      const b64 = await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(String(f.result).split(",")[1]); f.readAsDataURL(b); });
+      referencias.push({ mime: b.type || "image/jpeg", datos: b64 });
+    }
+    return { equipacion: eq.id || "", descripcionEq: eq.descripcion || eq.nombre || "", referencias };
+  }
+
   async function generar(btn) {
     const est = capa.querySelector("#evEstado");
     const sb = window.nva && window.nva.cliente;
@@ -598,7 +751,7 @@
     const reloj = setInterval(() => { est.textContent = `🎨 Pintando la imagen… ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);
     try {
       const { data, error } = await sb.functions.invoke("generar-cartel", {
-        body: { prompt: construirPrompt(), aspecto: FORMATOS[r.formato].ar, equipacion: esPersona(r) ? r.equip : "", dorsal: r.dorsal || "" }
+        body: { prompt: construirPrompt(), aspecto: FORMATOS[r.formato].ar, dorsal: r.dorsal || "", ...(await referenciasEq()) }
       });
       if (error) {
         let msg = error.message;

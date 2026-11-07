@@ -128,8 +128,21 @@ Deno.serve(async (req) => {
 
   let texto = prompt;
   let refs: Referencia[] = [];
-  if (cuerpo.equipacion) {
-    const eq = await referenciasEquipacion(String(cuerpo.equipacion));
+  // La app manda las fotos de la camiseta elegida (las de serie o las subidas desde la app);
+  // si no llegan, se leen las de serie de Equipacion/.
+  const enviadas = Array.isArray(cuerpo.referencias) ? cuerpo.referencias.slice(0, 3) : [];
+  if (enviadas.length || cuerpo.equipacion) {
+    const eq = enviadas.length
+      ? {
+        refs: enviadas
+          .filter((x: { datos?: string }) => typeof x?.datos === "string" && x.datos.length < 1_500_000)
+          .map((x: { mime?: string; datos: string }) => ({
+            mime: /^image\/(png|jpeg|webp)$/.test(x.mime ?? "") ? x.mime! : "image/jpeg",
+            datos: Uint8Array.from(atob(x.datos), (ch) => ch.charCodeAt(0)).buffer,
+          })),
+        descripcion: String(cuerpo.descripcionEq ?? "").slice(0, 500),
+      }
+      : await referenciasEquipacion(String(cuerpo.equipacion));
     refs = eq.refs;
     if (refs.length) {
       texto += `\n\nThe player must wear EXACTLY the volleyball kit shown in the reference image${refs.length > 1 ? "s" : ""} (same colours, cut, pattern and details), but with the shirt number ${cuerpo.dorsal ?? ""} and no player name. Do not copy the background of the reference.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`;

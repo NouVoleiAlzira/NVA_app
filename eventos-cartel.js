@@ -266,8 +266,6 @@
       Object.assign({}, P("pTipo"), { q: "¿Quién protagoniza el cartel?", op: P("pTipo").op.map(o => o.v === "ninguno" ? { v: "ninguno", e: "🚫", t: "Nadie, solo ambiente" } : o) })
     ].concat(["sexo", "equip", "dorsal", "edad", "rasgos", "complexion", "peloColor", "peinado", "barba", "pose", "poseEq", "balon", "plano", "expresion"].map(P)) },
     { id: "textos", t: "🔤 Títulos y textos", preguntas: TEXTOS_IA },
-    { id: "logos", t: "🛡️ Escudo y patrocinadores", preguntas: [Object.assign({}, P("patros"), {
-      q: "El escudo del club y los patrocinadores los pongo yo encima del cartel. ¿Qué patrocinadores salen? Tócalos por orden de importancia.", nota: "El encargo le pide a la IA que les deje sitio." })] },
     { id: "estilo", t: "✨ Estilo del cartel", preguntas: [
       { id: "estiloCartel", tipo: "estilo", q: "Con todo esto, ¿qué estilo de cartel te gusta más?", nota: "Son bocetos con tus textos. La imagen de verdad la hará la IA." },
       { id: "colores", tipo: "colores", q: "¿Con qué colores principales?", nota: "El boceto se pinta con ellos. En «Otro» eliges los dos a tu gusto.", op: PALETAS },
@@ -835,7 +833,8 @@
       ${fotosEq ? `<img class="ev-ref" data-refprev alt="Imagen de referencia" hidden>` : ""}
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="${p.capa}">📋 Copiar el encargo</button>
-        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
+        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>
+        <button type="button" class="ev-boton prim" data-copiatodo="${modo === "ia" ? "fondo" : p.capa || "fondo"}">📦 Copiar todo (imagen + encargo)</button>` : ""}
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
@@ -857,12 +856,13 @@
     const est = estiloElegido(), tiene = !!img.fondo;
     const hayRef = seccionesRef().length > 0;
     return dice(`Este es el encargo completo del cartel${est ? ` con el estilo «${est.t}»` : ""}. Copia el encargo y la imagen de referencia (${seccionesRef().map(x => x.id === "kit" ? "camiseta" : x.id === "club" ? "escudo del club" : "escudo de " + partidoSel[x.id].nombre).join(", ")}), pégalos juntos en Gemini o ChatGPT y sube aquí el cartel que te dé.`,
-        `El escudo del club va integrado en el fondo como marca de agua. ${(r.patros || []).length ? "Encima pondré los patrocinadores y podrás" : "Después podrás"} añadir más textos.`) +
+        `El escudo del club va integrado en el fondo como marca de agua. Después podrás añadir más textos.`) +
       `<div class="ev-prompt" data-prompt="fondo">${esc(promptCartel())}</div>
       ${hayRef ? `<img class="ev-ref" data-refprev alt="Imagen de referencia" hidden>` : ""}
       <div class="ev-acc">
         <button type="button" class="ev-boton" data-copiar="fondo">📋 Copiar el encargo</button>
-        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>` : ""}
+        ${hayRef ? `<button type="button" class="ev-boton" data-copiareq>🖼️ Copiar la imagen de referencia</button>
+        <button type="button" class="ev-boton prim" data-copiatodo="${modo === "ia" ? "fondo" : p.capa || "fondo"}">📦 Copiar todo (imagen + encargo)</button>` : ""}
       </div>
       <div class="ev-acc">
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar el cartel" : "Subir el cartel creado"}<input type="file" accept="image/*" data-subir="fondo" hidden></label>
@@ -991,11 +991,42 @@
     } else if (est && esPersona()) s.push("Adapt the pose and framing to the layout described above if needed.");
     return s.filter(Boolean).join(" ");
   }
+  /* Las descripciones de estilo usan TITLE, DATE… como marcadores: en el encargo van en minúscula y sin etiquetas. */
+  const ROLES_ES = { TITLE: "the main title", SUBTITLE: "the subtitle", MATCHUP: "the match line", DATE: "the date", TIME: "the time", VENUE: "the venue", INFO: "the extra info", CONTACT: "the contact line" };
+  function sinRoles(t) {
+    return String(t || "")
+      .replace(/\b(SUBTITLE|TITLE|MATCHUP|DATE|TIME|VENUE|INFO|CONTACT)\b/g, m => ROLES_ES[m])
+      .replace(/\(the /g, "(").replace(/\b(the|The) the /g, "$1 ");
+  }
+  /* Red social del contacto: el nombre se cambia por su icono. Un @usuario sin red dicha es Instagram. */
+  const REDES = [
+    { re: /\b(instagram|insta|ig)\b:?/i, n: "Instagram" }, { re: /\b(facebook|fb)\b:?/i, n: "Facebook" },
+    { re: /\b(whats ?app|wsp|wasap)\b:?/i, n: "WhatsApp" }, { re: /\btik ?tok\b:?/i, n: "TikTok" },
+    { re: /\b(youtube|yt)\b:?/i, n: "YouTube" }, { re: /\b(twitter|x\.com)\b:?/i, n: "X (Twitter)" },
+    { re: /\btelegram\b:?/i, n: "Telegram" }
+  ];
+  function redesContacto(txt) {
+    const partes = String(txt).split(/\s*(?:[\/|·,;]|\s-\s)\s*/).filter(Boolean), iconos = [], textos = [], pares = [];
+    partes.forEach(pz => {
+      let n = null, t = pz;
+      for (const R of REDES) if (R.re.test(t)) { n = R.n; t = t.replace(R.re, "").trim(); break; }
+      if (!n && /@/.test(t) && /\S+@\S+\.\S+/.test(t)) n = "email";
+      else if (!n && /^@/.test(t)) n = "Instagram";
+      else if (!n && /^\+?[\d\s]{9,}$/.test(t)) n = "phone";
+      else if (!n && /(https?:\/\/|www\.|\.(com|es|org|net)\b)/i.test(t)) n = "website (globe)";
+      if (n && !iconos.includes(n)) iconos.push(n);
+      if (t) { textos.push(t); if (n) pares.push(`the ${n} icon right before "${t}"`); }
+    });
+    return { texto: textos.join(" / ") || txt, iconos, pares };
+  }
+  // En los bocetos el contacto va sin el nombre de la red (en el cartel será un icono)
+  function textosBoceto() { const T = textosIA(); if (T.redes) T.redes = redesContacto(T.redes).texto; return T; }
   function promptCartel() {
     const F = formato(), est = estiloElegido(), T = textosIA(), ev = pr("evento");
     const estilo = est ? est.p : r.estiloCartel === "otro" ? (r.estiloCartel_o || "").trim() : "Modern, powerful sports poster with a clear hierarchy: a big title, the main subject and an info block.";
     const q = t => `"${String(t).replace(/"/g, "”").replace(/\n+/g, " / ")}"`;
-    const roles = [["TITLE", T.titulo], ["SUBTITLE", T.sub], ["MATCHUP", T.vs], ["DATE", T.fecha], ["TIME", T.hora], ["VENUE", T.lugar], ["INFO", T.extra], ["CONTACT", T.redes]].filter(x => x[1]);
+    const redC = T.redes ? redesContacto(T.redes) : null;
+    const roles = [["the main title", T.titulo], ["the subtitle", T.sub], ["the match line", T.vs], ["the date", T.fecha], ["the time", T.hora], ["the venue", T.lugar], ["the extra info", T.extra], ["the contact line", redC ? redC.texto : ""]].filter(x => x[1]);
     const secs = seccionesRef(), club = secs.find(x => x.id === "club"), pal = coloresElegidos();
     const logos = [];
     const clubEnEquipo = partidoActivo() && T.vs && ["local", "visit"].some(id => esLogoClub(partidoSel[id].src));
@@ -1005,17 +1036,19 @@
       const eqs = [[l, "home"], [v, "away"]].filter(x => x[0]).map(([x, lado]) => `the ${lado} team crest (section ${x.n}) next to the ${lado} team name`);
       if (eqs.length) logos.push(`TEAM CRESTS: place ${eqs.join(" and ")}, small and clean, reproduced exactly as in the reference.`);
     }
-    logos.push(`Do not draw any other logo, emblem or brand${(r.patros || []).length ? `, and leave a clean strip in a bottom corner for ${r.patros.length} small sponsor logo${r.patros.length > 1 ? "s" : ""} (added afterwards)` : ""}.`);
+    logos.push(`Do not draw any other logo, emblem or brand${redC && redC.pares.length ? ` (except the social network icons of the contact line)` : ""}. No sponsor logos and no space reserved for sponsors.`);
     const partes = [
       `Design a complete, finished ${orientacion(F)} volleyball event poster, ${F.ar} aspect ratio (${F.w}x${F.h} px). Professional sports graphic design, print quality.${ev ? ` It announces ${ev} of the volleyball club Nou Volei Alzira (NVA), from Alzira (Spain).` : ""}`,
       secs.length ? `REFERENCE IMAGE: one image is attached with numbered sections: ${secs.map(x => `${x.n}) ${x.t}`).join("; ")}. Use it only as a visual reference: do not copy its white background, frames or labels.` : "",
-      `STYLE AND LAYOUT: ${estilo}`,
+      `STYLE AND LAYOUT: ${sinRoles(estilo)}`,
       `COLOURS: use ${pal ? pal.p : "navy blue and vivid orange (the club colours)"} as the main colours of the whole poster (they replace any colour named in the layout).`,
       r.acabado && r.acabado !== "auto" ? `RENDERING: ${pr("acabado")}.` : "",
       `MAIN SUBJECT: ${sujetoIA()}`,
       `SCENE: ${pr("fTipo")}. ${pr("fLuz")}. ${pr("fAmb")}.`,
       `TEXTS: write ONLY these texts, exactly as given (Spanish, with correct accents and spelling), following the typographic hierarchy of the layout:\n` +
-        roles.map(([k, v]) => `${k}: ${q(v)}`).join("\n") + `\nIf the layout mentions a text that is not in this list, leave that element out.`,
+        roles.map(([k, v]) => `- ${k}: ${q(v)}`).join("\n") +
+        `\nThe descriptions before each colon are only for you: never write them. Do not add any caption, heading or label word above or next to the texts (such as Title, Subtitle, Matchup, Date, Time, Venue, Info, Contact, Fecha, Hora, Lugar or Contacto); each text appears on its own${T.fecha || T.hora || T.lugar ? ", and if the layout needs a visual cue use a small line icon (calendar, clock, location pin) instead of a word" : ""}. If the layout mentions a text that is not in this list, leave that element out.` +
+        (redC && redC.pares.length ? `\nCONTACT ICONS: in the contact line put ${redC.pares.join(" and ")} (official, simple and recognisable icons, in the poster colours or white), instead of writing the network name.` : ""),
       `LOGOS: ${logos.join(" ")}`,
       "No other watermarks and no extra or invented text."
     ];
@@ -1100,7 +1133,7 @@
   function elemento(id) { return id === "fondo" ? E.fondo : id === "pers" ? E.pers : id === "logo" ? E.logo : id === "marca" ? E.marca : id === "patros" ? E.patros : esEscudo(id) ? E[id] : textoDe(id); }
   function existe(id) {
     if (id === "pers") return !!img.pers;
-    if (id === "patros") return (r.patros || []).length > 0;
+    if (id === "patros") return modo !== "ia" && (r.patros || []).length > 0;
     if (id === "logo" || id === "marca") return true;
     if (esEscudo(id)) return !!imgEscudo(id);
     return !!textoDe(id);
@@ -1270,7 +1303,7 @@
   // Bocetos de los estilos con los textos de la entrevista
   function dibujarMinis(c) {
     if (!window.evEstilos) return;
-    const T = textosIA();
+    const T = textosBoceto();
     (c || capa).querySelectorAll("canvas[data-mini]").forEach(cv => window.evEstilos.dibujar(cv.getContext("2d"), cv.width, cv.height, cv.dataset.mini, T));
   }
 
@@ -1357,6 +1390,28 @@
         }
       }
       setTimeout(() => { if (b.isConnected) b.textContent = "🖼️ Copiar la imagen de referencia"; }, 3500);
+    });
+    // Imagen de referencia y texto del encargo de una vez: en el portapapeles van los dos;
+    // si el navegador no lo permite (móvil), se comparten juntos con la app de la IA.
+    c.querySelectorAll("[data-copiatodo]").forEach(b => b.onclick = async () => {
+      const txt = promptDe(b.dataset.copiatodo), promesa = imagenReferencia(), base = "📦 Copiar todo (imagen + encargo)";
+      try {
+        if (!navigator.clipboard || !window.ClipboardItem) throw new Error("sin portapapeles");
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([txt], { type: "text/plain" }), "image/png": promesa })]);
+        b.textContent = "✅ Copiado: pégalo en la IA";
+      } catch (e) {
+        const blob = await promesa.catch(() => null);
+        const f = blob ? new File([blob], "referencia-cartel.png", { type: "image/png" }) : null;
+        const datos = f ? { files: [f], text: txt } : { text: txt };
+        if (navigator.canShare && navigator.canShare(datos)) {
+          try { await navigator.share(datos); b.textContent = "✅ Enviado"; } catch (er) { b.textContent = base; }
+        } else {
+          try { await navigator.clipboard.writeText(txt); } catch (er) { /* nada */ }
+          if (f) { const u = URL.createObjectURL(f), el = document.createElement("a"); el.href = u; el.download = f.name; document.body.appendChild(el); el.click(); el.remove(); }
+          b.textContent = "Texto copiado y la imagen guardada";
+        }
+      }
+      setTimeout(() => { if (b.isConnected) b.textContent = base; }, 3500);
     });
     const fotosEq = c.querySelector("[data-fotoseq]");
     if (fotosEq) fotosEq.onclick = async () => {
@@ -1528,7 +1583,7 @@
       ctx.drawImage(o, (W - dw) / 2 + f.ox * W, (H - dh) / 2 + f.oy * H, dw, dh);
       ctx.globalAlpha = 1;
     } else if (modo === "ia" && window.evEstilos) {
-      window.evEstilos.dibujar(ctx, W, H, r.estiloCartel || "", textosIA());
+      window.evEstilos.dibujar(ctx, W, H, r.estiloCartel || "", textosBoceto());
       if (previa) {
         ctx.font = `700 ${M * 0.034}px Barlow, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
         const t = "Boceto", w = ctx.measureText(t).width;

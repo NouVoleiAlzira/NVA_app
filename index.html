@@ -171,6 +171,10 @@
         <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; background: var(--btn-fondoVerde);" onclick="withLoading(refreshTablon, 'Refrescando Tablón...')">🔄 Refrescar</button>
         <button class="btn-save-session" style="flex:1; background: var(--btn-fondoAmarillo);" onclick="openOtros()">🗃️ Otras INFOs</button>
       </div>
+      <div data-nva-menu="tablon.calendario">
+      <div class="section-subtitle" style="margin-top:14px;">Calendario de encuentros</div>
+      <button class="btn-pdf-mode2" style="margin-bottom:0;" onclick="icsAbrir()">📆 Exportar partidos a Google / Outlook (.ics)</button>
+      </div>
     </div>
 
     <!-- ===== Sección plegable: Calendario de partidos (empieza plegada) ===== -->
@@ -651,6 +655,38 @@
     </div>
   </div>
 
+  <!-- MODAL: CALENDARIO DE ENCUENTROS .ics (calendario-ics.js) -->
+  <div class="modal-backdrop" id="modalIcs" onclick="if(event.target===this)icsCerrar()">
+    <div class="modal-box hist-box">
+      <div class="modal-header">
+        <div class="modal-title">📆 Calendario de encuentros</div>
+        <button class="hist-cerrar" onclick="icsCerrar()" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="hist-estado">Marca los equipos y descarga un archivo .ics con sus partidos para importarlo en Google Calendar, Outlook o el calendario del móvil.</p>
+      <div class="av-semanas">
+        <button class="hist-chip ics-per on" data-p="proximos" onclick="icsPeriodo('proximos')">Desde hoy</button>
+        <button class="hist-chip ics-per" data-p="todo" onclick="icsPeriodo('todo')">Toda la temporada</button>
+      </div>
+      <div class="av-semanas">
+        <button class="hist-chip" onclick="icsTodos(true)">✔ Todos</button>
+        <button class="hist-chip" onclick="icsTodos(false)">✕ Ninguno</button>
+      </div>
+      <div class="hist-list" id="icsEquipos"></div>
+      <p class="hist-estado" id="icsEstado" style="margin-top:6px;"></p>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-pdf-mode2" id="icsBtnDescargar" style="flex:1; min-width:0; margin-bottom:0;" onclick="icsDescargar()">⬇️ Descargar .ics</button>
+        <button class="btn-pdf-mode" id="icsBtnCompartir" style="flex:1; min-width:0; margin-bottom:0;" onclick="icsCompartir()" hidden>📤 Compartir</button>
+      </div>
+      <details class="ics-ayuda">
+        <summary>¿Cómo se importa?</summary>
+        <p><b>Google Calendar</b> (desde el ordenador): calendar.google.com › ⚙️ Configuración › Importar y exportar › Importar, elige el archivo y el calendario.</p>
+        <p><b>Outlook</b>: Calendario › Agregar calendario › Cargar desde archivo (en Outlook de escritorio: Archivo › Abrir › Importar).</p>
+        <p><b>iPhone / Android</b>: abre el archivo descargado y pulsa «Añadir» o elige el calendario.</p>
+        <p>Si vuelves a importar un archivo nuevo, los partidos que ya estaban se actualizan (cambios de hora o de fecha) en vez de duplicarse.</p>
+      </details>
+    </div>
+  </div>
+
   <!-- MODAL: MENSAJE DE AVISO (avisos.js) -->
   <div class="modal-backdrop" id="modalAvisos" onclick="if(event.target===this)closeAvisos()">
     <div class="modal-box hist-box">
@@ -980,6 +1016,7 @@
 <script src="calendario-partidos.js" defer></script>
 <script src="importar-datos.js" defer></script>
 <script src="partidos-semana.js" defer></script>
+<script src="calendario-ics.js" defer></script>
 <script src="cuadrante-pdf.js" defer></script>
 <script src="drive-pdfs.js" defer></script>
 <script src="fichas-federacion.js" defer></script>

@@ -46,6 +46,7 @@
     "informes.autorizaciones": ["#fedAutorizaciones"],
     "informes.drive": ["[data-nva-menu=\"informes.drive\"]"],
     "informes.kilometraje": ["[data-nva-menu=\"informes.kilometraje\"]"],
+    "tablon.calendario": ["[data-nva-menu=\"tablon.calendario\"]"],
     "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],
     "calendario.avisos": ["#cpSubHead_warn", "#cpSub_warn"],
     "calendario.lista": ["#cpSubHead_list", "#cpSub_list"],

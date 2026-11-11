@@ -176,6 +176,23 @@
     };
   }
 
+  // Cambios hechos a mano en la ventana (✏️ de cada partido): solo para esta story o este reel.
+  // cambio: { nva, rival, home, campo, fecha, hora } (solo los campos que se han cambiado)
+  const idDe = (c) => `${c.key}|${c.fecha}|${c.rival}`;
+  async function prepararItem(c, cambio, fichas) {
+    const k = cambio || {};
+    const base = Object.assign({}, c, {
+      rival: k.rival != null ? k.rival : c.rival, home: k.home != null ? k.home : c.home,
+      campo: k.campo != null ? k.campo : c.campo, fecha: k.fecha || c.fecha, hora: k.hora != null ? k.hora : c.hora });
+    const p = await prepararPartido(base, fichas);
+    p.id = idDe(c);   // el id no cambia aunque se edite el partido (fotos, resultados a mano, reel)
+    p.idReel = `${c.key}|${c.fecha}|${apos(c.rival)}`;
+    const club = p.nvaLocal ? p.local : p.visit;
+    p.nvaOrig = club.nombre;
+    if (k.nva) club.nombre = String(k.nva).toUpperCase();
+    return p;
+  }
+
   /* =====================================================================
      Dibujo
      ===================================================================== */
@@ -1179,7 +1196,8 @@
         <input type="checkbox" data-sel="${i}" ${it.sel && !off ? "checked" : ""} ${off ? "disabled" : ""} style="width:20px; height:20px; flex:none; accent-color:#2563eb;">
         ${it.fotoUrl ? `<img src="${it.fotoUrl}" alt="" style="width:40px; height:40px; object-fit:cover; border-radius:6px; flex:none;">` : ""}
         <div style="flex:1; min-width:0; font-size:0.76rem; color:#1e293b;"><b>${esc(p.local.nombre)}</b> ${p.res ? esc(marcador(p)) : "vs"} <b>${esc(p.visit.nombre)}</b><br>
-          <small style="color:#64748b;">${esc(p.dia)}${p.hora ? " · " + esc(p.hora) : ""} · ${esc(p.cat)}${off ? " · sin resultado" : it.manual ? " · resultado a mano" : ""}</small></div>
+          <small style="color:#64748b;">${esc(p.dia)}${p.hora ? " · " + esc(p.hora) : ""} · ${esc(p.cat)}${p.campo ? " · " + esc(p.campo) : ""}${off ? " · sin resultado" : it.manual ? " · resultado a mano" : ""}${it.cambio ? " · editado" : ""}</small></div>
+        <button type="button" data-editar="${i}" title="Editar partido" aria-label="Editar partido" class="btn-save-session" style="width:auto; flex:none; margin:0; padding:6px 8px; font-size:0.75rem; cursor:pointer; background:${it.cambio ? "#d97706" : "#475569"};">📝</button>
         ${aMano(it)}
         ${estado.dividir && it.sel && !off ? `<select data-pag="${i}" class="app-input" style="width:auto; flex:none; padding:4px 6px; font-size:.75rem;">
           ${Array.from({ length: estado.paginas }, (_, k) => `<option value="${k + 1}" ${it.pag === k + 1 ? "selected" : ""}>Story ${k + 1}</option>`).join("")}</select>` : ""}
@@ -1200,9 +1218,9 @@
       const previos = new Map(estado.items.map(it => [it.p.id, it]));
       const nuevos = [];
       for (const c of crudos) {
-        const p = await prepararPartido(c, fichas), v = previos.get(p.id);
+        const v = previos.get(idDe(c)), p = await prepararItem(c, v && v.cambio, fichas);
         if (v && v.manual) { if (p.res) v.manual = null; else ponerResultado(p, v.manual); }
-        nuevos.push(v ? Object.assign(v, { p }) : { p, sel: true, pag: 1, foto: null, fotoUrl: "" });
+        nuevos.push(v ? Object.assign(v, { p, crudo: c }) : { p, crudo: c, cambio: null, sel: true, pag: 1, foto: null, fotoUrl: "" });
       }
       if (estado.carga !== tok) return;
       estado.items = nuevos;
@@ -1349,6 +1367,59 @@
     }
   }
 
+  // ✏️ Editar un partido: equipos, casa o fuera, campo, día y hora (solo para esta story o este reel)
+  function editarPartido(it) {
+    const c = it.crudo, orig = { nva: String(it.p.nvaOrig || "").toUpperCase(), rival: limpiarClub(c.rival), home: !!c.home, campo: apos(c.campo || "").toUpperCase(), fecha: c.fecha, hora: c.hora || "" };
+    const k = Object.assign({}, orig, it.cambio || {});
+    const campoCss = "width:100%; box-sizing:border-box; margin-top:3px; padding:9px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:#0a1538; color:#fff; font:inherit; font-size:.95rem;";
+    const btnCss = "flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-weight:700; cursor:pointer;";
+    return new Promise((resolver) => {
+      const capa = document.createElement("div");
+      capa.setAttribute("role", "dialog"); capa.setAttribute("aria-modal", "true");
+      capa.style.cssText = "position:fixed; inset:0; z-index:100010; background:rgba(5,12,35,.88); display:flex; align-items:center; justify-content:center; padding:12px;";
+      capa.innerHTML = `
+        <form style="background:#0f1d4a; color:#e9eefa; border:1px solid rgba(255,255,255,.15); border-radius:14px; width:100%; max-width:380px; max-height:100%; overflow:auto; padding:14px; display:flex; flex-direction:column; gap:10px; font-family:inherit; font-size:.85rem;">
+          <div style="font-weight:800; font-size:1.05rem; color:#fff;">📝 Editar partido</div>
+          <label>Equipo del club<input data-k="nva" type="text" maxlength="40" style="${campoCss}" value="${esc(k.nva)}"></label>
+          <label>Rival<input data-k="rival" type="text" maxlength="50" style="${campoCss}" value="${esc(k.rival)}"></label>
+          <label>El club juega<select data-k="home" style="${campoCss}">
+            <option value="1" ${k.home ? "selected" : ""}>🏠 En casa (local)</option>
+            <option value="0" ${k.home ? "" : "selected"}>🚌 Fuera (visitante)</option></select></label>
+          <label>Campo<input data-k="campo" type="text" maxlength="60" style="${campoCss}" value="${esc(k.campo)}"></label>
+          <div style="display:flex; gap:8px;">
+            <label style="flex:1.4;">Día<input data-k="fecha" type="date" style="${campoCss}" value="${esc(k.fecha)}"></label>
+            <label style="flex:1;">Hora<input data-k="hora" type="time" style="${campoCss}" value="${esc(k.hora)}"></label>
+          </div>
+          <small style="opacity:.8;">Los cambios solo se usan en esta ${estado.reel ? "petición de reel" : "story"}; el calendario no se toca.</small>
+          <div style="display:flex; gap:8px;">
+            <button type="button" data-e="reset" style="${btnCss}" ${it.cambio ? "" : "hidden"}>↺ Original</button>
+            <button type="button" data-e="no" style="${btnCss}">Cancelar</button>
+            <button type="submit" style="${btnCss} flex:1.4; border:0; background:#16a34a;">✅ Guardar</button>
+          </div>
+        </form>`;
+      document.body.appendChild(capa);
+      const val = (n) => capa.querySelector(`[data-k="${n}"]`).value.trim();
+      const aplicar = async (cambio) => {
+        try { it.cambio = cambio; it.p = await prepararItem(c, cambio, await cargarFichas()); if (it.manual) ponerResultado(it.p, it.manual); }
+        catch (e) { console.warn(e); }
+        capa.remove(); resolver(true);
+      };
+      capa.addEventListener("click", (e) => { if (e.target === capa) { capa.remove(); resolver(false); } });
+      capa.querySelector('[data-e="no"]').onclick = () => { capa.remove(); resolver(false); };
+      capa.querySelector('[data-e="reset"]').onclick = () => aplicar(null);
+      capa.querySelector("form").onsubmit = (e) => {
+        e.preventDefault();
+        const nuevo = { nva: val("nva").toUpperCase(), rival: val("rival").toUpperCase(), home: val("home") === "1", campo: val("campo").toUpperCase(), fecha: val("fecha"), hora: val("hora") };
+        if (!nuevo.rival) { alert("Escribe el nombre del rival."); return; }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(nuevo.fecha)) { alert("Elige el día del partido."); return; }
+        if (!nuevo.nva) nuevo.nva = orig.nva;
+        const cambio = {};
+        ["nva", "rival", "home", "campo", "fecha", "hora"].forEach(f => { if (nuevo[f] !== orig[f]) cambio[f] = nuevo[f]; });
+        aplicar(Object.keys(cambio).length ? cambio : null);
+      };
+    });
+  }
+
   // Editor: la story donde va la foto, arrastrar para moverla y barra (o rueda / pellizco) para el zoom
   function ajustarFoto(it) {
     const pag = paginas().find(pg => pg.partidos.some(p => p.id === it.p.id));
@@ -1462,8 +1533,9 @@
     const verPaso = (n) => { $(m, "paso1").hidden = n !== 1; $(m, "paso2").hidden = n !== 2; };
     m.addEventListener("click", async (ev) => {
       if (ev.target === m) return m.remove();
-      const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar],[data-mano]");
+      const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar],[data-mano],[data-editar]");
       if (!b) return;
+      if (b.dataset.editar != null) { if (await editarPartido(estado.items[+b.dataset.editar])) pintarLista(m); return; }
       if (b.dataset.mano != null) { if (resultadoAMano(estado.items[+b.dataset.mano])) { if (estado.dividir) repartir(); pintarLista(m); } return; }
       if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; reencajar(); marcarEstilo(m); return; }
       if (b.dataset.ajustar != null) { if (await ajustarFoto(estado.items[+b.dataset.ajustar])) marcarEstilo(m); return; }
@@ -1475,10 +1547,11 @@
       else if (a === "siguiente") {
         if (!elegidos().length) { alert("Marca al menos un partido."); return; }
         if (reel) {
-          const partidos = elegidos().map(it => it.p.idReel);
+          const partidos = elegidos().map(it => it.p.idReel), cambios = {};
+          elegidos().forEach(it => { if (it.cambio) cambios[it.p.idReel] = it.cambio; });
           m.style.display = "none";
           let hecho = false;
-          try { hecho = (await reel({ desde: estado.desde, hasta: estado.hasta, partidos })) !== false; }
+          try { hecho = (await reel({ desde: estado.desde, hasta: estado.hasta, partidos, cambios })) !== false; }
           finally { if (hecho) m.remove(); else m.style.display = ""; }
           return;
         }

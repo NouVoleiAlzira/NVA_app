@@ -177,7 +177,11 @@
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
     const r = await fetch(api(path), { method: "PUT", headers: hdr({ "Content-Type": "application/json" }),
       body: JSON.stringify({ message: msg, content, ...(sha && { sha }) }) });
-    if (!r.ok) throw new Error(`No se ha podido guardar (${r.status}).`);
+    if (!r.ok) {
+      let detalle = "";
+      try { detalle = (await r.json()).message || ""; } catch (e) { /* sin detalle */ }
+      throw new Error(detalle && r.status === 502 ? detalle : `No se ha podido guardar (${r.status}).`);
+    }
   }
 
   async function blobUrl(path) {
@@ -301,6 +305,9 @@
           <button class="btn-save-session ig-reintentar" style="width:100%;">🔁 Reintentar publicación</button>`);
         det.querySelector(".ig-reintentar").onclick = () => { meta.estado = "borrador"; confirmar(id, meta); };
       }
+      if (meta.estado === "confirmado") botonesPendiente(det, meta,
+        () => relanzar({ id, texto: meta.texto, confirmadoPor: meta.confirmadoPor || "" }, `Publicar reel ${id}`, cargar),
+        () => cambiarEstado(id, meta, "borrador", { confirmadoPor: "", confirmadoEn: "" }));
       if (!editable) return;
       det.querySelector(".ig-descartar").onclick = () => cambiarEstado(id, meta, "descartado");
       det.querySelector(".ig-estilo").onclick = async () => {
@@ -405,6 +412,34 @@
     } finally {
       cargar();
     }
+  }
+
+  // Confirmado pero sin publicar: la tarea no llegó a arrancar o se quedó a medias.
+  // Volver a pedirla es seguro: el Action solo publica si sigue «confirmado».
+  function botonesPendiente(det, meta, alRelanzar, alCancelar) {
+    const desde = meta.confirmadoEn ? Math.round((Date.now() - new Date(meta.confirmadoEn)) / 60000) : null;
+    det.insertAdjacentHTML("beforeend", `
+      <p class="ig-info">${desde !== null && desde < 10 ? "Se está publicando (tarda unos minutos). Pulsa 🔄 para actualizar." : "Si lleva más de 10 minutos así, la publicación no ha llegado a arrancar: vuelve a lanzarla."}</p>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button type="button" class="btn-save-session ig-cancelar-pub" style="flex:1; background:#64748b;">↩️ Volver a borrador</button>
+        <button type="button" class="btn-save-session ig-relanzar" style="flex:2;">🚀 Publicar ahora</button></div>`);
+    det.querySelector(".ig-relanzar").onclick = async (e) => {
+      if (!confirm("¿Lanzar ahora la publicación en el Instagram del club?")) return;
+      e.target.disabled = true;
+      await alRelanzar();
+      e.target.disabled = false;
+    };
+    det.querySelector(".ig-cancelar-pub").onclick = () => {
+      if (confirm("¿Quitar la confirmación? No se publicará hasta que lo vuelvas a confirmar.")) alCancelar();
+    };
+  }
+
+  async function relanzar(pedido, msg, recargar) {
+    try {
+      await putJson("Reels/publicar.json", Object.assign({}, pedido, { pedido: new Date().toISOString() }), msg);
+      alert("Lanzado. Se publicará en Instagram en unos minutos (pulsa 🔄 para actualizar).");
+    } catch (e) { alert(e.message); }
+    recargar();
   }
 
   async function confirmar(id, meta) {
@@ -1505,6 +1540,9 @@
           <button class="btn-save-session ig-reintentar" style="width:100%;">🔁 Reintentar publicación</button>`);
         det.querySelector(".ig-reintentar").onclick = () => confirmarHistoria(id, meta);
       }
+      if (meta.estado === "confirmado") botonesPendiente(det, meta,
+        () => relanzar({ tipo: "historia", id, confirmadoPor: meta.confirmadoPor || "" }, `Publicar stories ${id}`, cargarHistorias),
+        () => estadoHistoria(id, meta, "borrador", { confirmadoPor: "", confirmadoEn: "" }));
       if (!puedeAjustar) return;
       det.querySelectorAll("[data-h]").forEach(im => im.onclick = () => ajustarEnBorrador(id, meta, im.dataset.h, im));
       det.querySelector(".ig-descartar").onclick = () => estadoHistoria(id, meta, "descartado");

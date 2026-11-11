@@ -268,7 +268,8 @@
       }
       revisar(res.error);
       if (res.error) return esRls(res.error) ? sinPermiso() : json(422, { message: res.error.message });
-      lanzarTarea(ruta);
+      const fallo = await lanzarTarea(ruta);
+      if (fallo) return json(502, { message: `Guardado, pero no se ha podido lanzar la tarea automática (${fallo}). Vuelve a intentarlo en un momento.` });
       const sha = shaTexto(ruta, res.data.version, res.data.actualizado);
       return json(cuerpo.sha ? 200 : 201, {
         content: { type: "file", name: nombreDe(ruta), path: ruta, sha },
@@ -312,11 +313,26 @@
     return json(200, data.actualizado !== data.creado ? [c(data.actualizado), c(data.creado)] : [c(data.creado)]);
   }
 
-  function lanzarTarea(ruta) {
-    if (!TAREAS.includes(ruta)) return;
-    sb.functions.invoke("lanzar-tarea", { body: { ruta } }).then(({ error }) => {
-      if (error) console.warn("No se pudo lanzar la tarea automática:", error);
-    });
+  // Arranca el workflow de un archivo «solicitud». Devuelve "" si ha ido bien o el motivo del
+  // fallo: antes solo se avisaba en la consola y la app daba la tarea por lanzada aunque no lo
+  // estuviera (p. ej. reels confirmados que se quedaban «pendiente de publicar» para siempre).
+  async function lanzarTarea(ruta) {
+    if (!TAREAS.includes(ruta)) return "";
+    for (let intento = 1; intento <= 2; intento++) {
+      try {
+        const { error } = await sb.functions.invoke("lanzar-tarea", { body: { ruta } });
+        if (!error) return "";
+        let motivo = error.message || String(error);
+        try { const d = await error.context.json(); motivo = d.error || motivo; } catch (e) { /* sin detalle */ }
+        console.warn("No se pudo lanzar la tarea automática:", motivo, error);
+        if (intento === 2) return motivo;
+      } catch (e) {
+        console.warn("No se pudo lanzar la tarea automática:", e);
+        if (intento === 2) return e.message || String(e);
+      }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    return "";
   }
 
   async function atender(url, init) {

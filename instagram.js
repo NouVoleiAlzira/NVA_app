@@ -1329,7 +1329,16 @@
   function generar(tipo) {
     crearMenu();
     destino = "reel";
-    if (tipo === "proximos") { pedirPartidos("proximos"); return; }
+    if (tipo === "proximos") {   // la misma ventana de elegir partidos que las stories (historia-semana.js)
+      if (!window.nvaSemana) { pedirPartidos("proximos"); return; }
+      window.nvaSemana.abrir("proximos", { reel: async (sel) => {
+        const estilo = await elegirEstilo();
+        if (!estilo) return false;
+        await pedirPartidos("proximos", sel, estilo);
+        return true;
+      } });
+      return;
+    }
     if (tipo === "resultados") { prepararResultados(); return; }
     verPaso("evento");
     document.getElementById("modalIgGenerar").classList.add("active");

@@ -167,6 +167,7 @@
     const nvaSets = res ? (p.home ? res.setsL : res.setsV) : null, rivSets = res ? (p.home ? res.setsV : res.setsL) : null;
     return {
       id: `${p.key}|${p.fecha}|${p.rival}`,
+      idReel: `${p.key}|${p.fecha}|${apos(p.rival)}`,   // como id_partido() de generar_reel.py
       cat: ((nva && nva.categoria) || p.team.category || "").toUpperCase().replace(/DIVISION/, "DIV."),
       color, local: p.home ? club : otro, visit: p.home ? otro : club, nvaLocal: !!p.home,
       fecha: p.fecha, dia: fechaCorta(p.fecha), hora: p.hora || "", campo: apos(p.campo || "").toUpperCase(),
@@ -1083,7 +1084,7 @@
         </div>
         <p class="ig-info" data-s="info"></p>
         <div data-s="lista" style="display:flex; flex-direction:column; gap:6px; max-height:44vh; overflow:auto;"></div>
-        <label style="display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-size:0.8rem; color:#1e293b; cursor:pointer;">
+        <label data-s="dividirFila" style="display:flex; align-items:center; gap:8px; margin:10px 0 4px; font-size:0.8rem; color:#1e293b; cursor:pointer;">
           <input type="checkbox" data-s="dividir" style="width:20px; height:20px; flex:none; accent-color:#2563eb;">📄 Dividir en varias stories</label>
         <div data-s="paginasFila" hidden style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#1e293b;">
           Número de stories <select data-s="paginas" class="app-input" style="width:auto; padding:4px 8px;">${[2, 3, 4, 5].map(n => `<option value="${n}">${n}</option>`).join("")}</select>
@@ -1171,7 +1172,7 @@
     const sinRes = t === "resultados" ? estado.items.filter(it => !it.p.res).length : 0;
     const aMano = (it) => t === "resultados" && (it.manual || !it.p.res) ? `<button type="button" data-mano="${estado.items.indexOf(it)}" class="btn-save-session" style="width:auto; flex:none; white-space:nowrap; margin:0; padding:6px 8px; font-size:0.7rem; cursor:pointer; background:${it.manual ? "#64748b" : "#2563eb"};">${it.manual ? "✏️" : "✏️ Resultado"}</button>` : "";
     $(m, "info").textContent = !estado.items.length ? "No hay partidos de los equipos del club entre esas fechas en «Calendario de partidos»."
-      : `${sel.length} de ${estado.items.length - sinRes} partidos en la story${sinRes ? ` (${sinRes} todavía sin resultado: con ✏️ Resultado lo puedes escribir a mano)` : ""}.` + (t === "resultados" ? " Las fotos solo salen en los estilos con fotos." : "");
+      : `${sel.length} de ${estado.items.length - sinRes} partidos en ${estado.reel ? "el reel" : "la story"}${sinRes ? ` (${sinRes} todavía sin resultado: con ✏️ Resultado lo puedes escribir a mano)` : ""}.` + (t === "resultados" ? " Las fotos solo salen en los estilos con fotos." : "");
     $(m, "lista").innerHTML = estado.items.map((it, i) => {
       const p = it.p, off = t === "resultados" && !p.res;
       return `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:10px;${it.sel && !off ? "" : " opacity:.5;"}">
@@ -1444,14 +1445,19 @@
     }
   }
 
-  async function abrir(tipo) {
+  // opciones.reel: la misma ventana de elegir partidos, pero para un reel (Redes Sociales › Reels).
+  // Al pulsar «Elegir estilo» llama a reel({ desde, hasta, partidos }) con los id de los partidos
+  // marcados (los mismos que usa generar_reel.py); si devuelve false (estilo cancelado) la ventana vuelve.
+  async function abrir(tipo, opciones) {
     tipo = tipo === "resultados" ? "resultados" : "proximos";
+    const reel = opciones && typeof opciones.reel === "function" ? opciones.reel : null;
     const r = tipo === "resultados" ? rangoResultados() : rangoProximos();
-    estado = { tipo, desde: r.desde, hasta: r.hasta, items: [], dividir: false, paginas: 2, estilo: estiloGuardado() };
+    estado = { tipo, desde: r.desde, hasta: r.hasta, items: [], dividir: false, paginas: 2, estilo: estiloGuardado(), reel: !!reel };
     const valido = ESTILOS.find(e => e.id === estado.estilo);
     if (!valido || (valido.foto && tipo !== "resultados") || (valido.solo && valido.solo !== tipo)) estado.estilo = "marco";
     const m = modal();
-    $(m, "titulo").textContent = tipo === "resultados" ? "🏆 Story · Resultados de la semana" : "📅 Story · Partidos de la semana";
+    $(m, "titulo").textContent = (reel ? "🎬 Reel · " : tipo === "resultados" ? "🏆 Story · " : "📅 Story · ") + (tipo === "resultados" ? "Resultados de la semana" : "Partidos de la semana");
+    if (reel) $(m, "dividirFila").style.display = "none";
     $(m, "desde").value = estado.desde; $(m, "hasta").value = estado.hasta;
     const verPaso = (n) => { $(m, "paso1").hidden = n !== 1; $(m, "paso2").hidden = n !== 2; };
     m.addEventListener("click", async (ev) => {
@@ -1468,6 +1474,14 @@
       else if (a === "encajarTodas") encajarTodas(m, b);
       else if (a === "siguiente") {
         if (!elegidos().length) { alert("Marca al menos un partido."); return; }
+        if (reel) {
+          const partidos = elegidos().map(it => it.p.idReel);
+          m.style.display = "none";
+          let hecho = false;
+          try { hecho = (await reel({ desde: estado.desde, hasta: estado.hasta, partidos })) !== false; }
+          finally { if (hecho) m.remove(); else m.style.display = ""; }
+          return;
+        }
         b.disabled = true;
         try { await fuentes(); await prepararLogo(); verPaso(2); await pintarEstilos(m); }
         finally { b.disabled = false; }

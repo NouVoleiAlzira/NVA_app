@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   const { data: puede } = await comoUsuario.rpc("puede_escribir", { p_ruta: ruta, p_equipo: null });
   if (!usuario?.user || !puede) return respuesta(403, { error: "Sin permiso para lanzar esta tarea" });
 
-  const repo = Deno.env.get("TAREAS_REPO") ?? "NouVoleiAlzira/Registro_Entrenamientos";
+  const repo = Deno.env.get("TAREAS_REPO") ?? "NouVoleiAlzira/NVA_app_Data";
   const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
     method: "POST",
     headers: {

@@ -51,7 +51,7 @@ Los equipos de cada entrenador no se eligen al invitar: son los que tenga en **O
 
 ## Tareas automáticas (reels, stories, música y PDF de la federación)
 
-Los workflows siguen en el repositorio privado `Registro_Entrenamientos` (allí no se ven los logs públicamente).
+Los workflows siguen en el repositorio privado `NVA_app_Data` (allí no se ven los logs públicamente).
 Cuando la app guarda un archivo de solicitud (`Reels/solicitud.json`, `Reels/solicitud_historia.json`, `Reels/publicar.json` o `Reels/musica/solicitud.json`), llama a la Edge Function `lanzar-tarea`. Esta comprueba que el usuario tiene permiso de escritura en ese menú y arranca el workflow. El workflow baja los datos de Supabase, hace su trabajo y sube el resultado.
 
 Los PDF de la federación (botón «Actualizar automáticamente») no pasan por GitHub: los baja la Edge Function `descargar-calendarios` y los guarda en `Calendarios/`.
@@ -59,7 +59,7 @@ Los PDF de la federación (botón «Actualizar automáticamente») no pasan por 
 Configuración:
 
 1. En Supabase (**Edge Functions › Secrets**, o `supabase secrets set`):
-   - `GITHUB_TOKEN`: un token *fine-grained* de GitHub con permiso **Actions: Read and write** solo sobre `Registro_Entrenamientos`.
-   - `TAREAS_REPO` (opcional): `NouVoleiAlzira/Registro_Entrenamientos`.
-2. En GitHub, en `Registro_Entrenamientos` › Settings › Secrets and variables › Actions:
+   - `GITHUB_TOKEN`: un token *fine-grained* de GitHub con permiso **Actions: Read and write** solo sobre `NVA_app_Data`.
+   - `TAREAS_REPO` (opcional): `NouVoleiAlzira/NVA_app_Data`.
+2. En GitHub, en `NVA_app_Data` › Settings › Secrets and variables › Actions:
    - secretos `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `IG_TOKEN`, `GH_SECRETS_PAT` (guarda el token renovado de Instagram) y `ANTHROPIC_API_KEY` (opcional).

@@ -1,0 +1,43 @@
+<!--
+  Plantilla del email de invitación (Supabase > Authentication > Email Templates > Invite user).
+  Asunto: Te invitamos a la app de Nou Volei Alzira
+  Copiar todo este archivo en el campo "Message body".
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#E9EEFA;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td align="center" style="background:#0D1B45;padding:24px;border-bottom:4px solid #F5C518;">
+            <img src="https://nouvoleialzira.github.io/NVA_app/LOGO-NVA.png" alt="Nou Volei Alzira" width="96" style="display:block;width:96px;height:auto;border:0;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 28px 8px;color:#1e293b;font-size:16px;line-height:1.5;">
+            <h1 style="margin:0 0 16px;font-size:22px;color:#0D1B45;">
+              {{ if .Data.nombre }}¡Hola, {{ .Data.nombre }}!{{ else }}¡Hola!{{ end }}
+            </h1>
+            <p style="margin:0 0 12px;">Te damos la bienvenida a la app de <strong>Nou Volei Alzira</strong>, donde llevamos los entrenamientos, la asistencia, los partidos y los avisos del club.</p>
+            <p style="margin:0 0 24px;">Pulsa el botón para aceptar la invitación y crear tu contraseña:</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:0 28px 24px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#D62839;color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 28px;border-radius:8px;">Aceptar invitación</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 28px;color:#475569;font-size:13px;line-height:1.5;">
+            <p style="margin:0 0 8px;">Por seguridad, el enlace solo funciona una vez y caduca al cabo de un tiempo. Si no te funciona, pide a Vic que te envíe otra invitación.</p>
+            <p style="margin:0;">Si no esperabas este correo, puedes ignorarlo.</p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="background:#0D1B45;color:#93A3CF;font-size:12px;padding:16px;">
+            Nou Volei Alzira · <a href="https://nouvoleialzira.github.io/NVA_app/" style="color:#F5C518;text-decoration:none;">Abrir la app</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

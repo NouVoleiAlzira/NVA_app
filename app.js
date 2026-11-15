@@ -2996,7 +2996,6 @@
     renderConfigTab1();
     renderConfigTab2Select();
     document.getElementById("modalOptions").classList.add("active");
-    if (document.getElementById("tabContent3").classList.contains("active")) await renderLeaguesTab();
   }
 
   function closeOptionsModal() {
@@ -3005,10 +3004,12 @@
   }
 
   function switchTab(num) {
-    document.querySelectorAll(".tab-btn").forEach((b, i) => b.classList.toggle("active", i + 1 === num));
-    document.querySelectorAll(".tab-content").forEach((c, i) => c.classList.toggle("active", i + 1 === num));
+    // Cada botón y su contenido se emparejan por número (switchTab(N) ↔ #tabContentN)
+    document.querySelectorAll("#modalOptions .tab-btn").forEach(b =>
+      b.classList.toggle("active", (b.getAttribute("onclick") || "").includes(`switchTab(${num})`)));
+    document.querySelectorAll("#modalOptions .tab-content").forEach(c =>
+      c.classList.toggle("active", c.id === `tabContent${num}`));
     if (num === 2) renderPlayerManagement();
-    if (num === 3) withLoading(renderLeaguesTab, 'Cargando equipos de la liga...');
   }
 
   function renderConfigTab1() {
@@ -4037,13 +4038,9 @@
   // ---------------------------------------------------------------------
   //  MARCADOR DEL PARTIDO
   // ---------------------------------------------------------------------
-  const LEAGUES_FOLDER = "Ligas";
   const MATCH_SETS_COUNT = 5;
 
   let matchScore = { local: "", visitante: "", sets: [] };
-  let leagueTeamsList = [];
-  let leaguePickSide = "home";
-  const leagueFileNames = {}; // teamKey -> nombre real del .txt en Ligas/ (si ya existe)
 
   function resetMatchScore() {
     matchScore = { local: "", visitante: "", sets: [] };
@@ -4283,205 +4280,8 @@
     });
   }
 
-  // --- Lista de equipos de la liga: carpeta "Ligas/", un .txt por equipo del club ---
-  // El fichero se localiza por el nombre del equipo del club (sin distinguir
-  // mayúsculas, acentos, espacios ni signos), p.ej. "NVA A (Infantil).txt".
-  // Cada línea del .txt es un equipo de la liga. Se cachea para uso sin conexión.
-  // Localiza en la carpeta "Ligas/" el .txt del equipo del club indicado.
-  // Devuelve el elemento del listado de GitHub, o null si no existe / no hay conexión.
-  async function findLeagueFile(teamKey) {
-    if (!(ghSettings.user && ghSettings.repo && navigator.onLine)) return null;
-    const norm = s => sanitizeFileName(s).replace(/_/g, "").toLowerCase();
-    const stripTxt = n => n.replace(/\.txt$/i, "");
-
-    const files = await listGitHubFolder(LEAGUES_FOLDER);
-    if (!files) return null;
-    const txts = files.filter(f => f.name && /\.txt$/i.test(f.name));
-    const simpleName = teamKey.split(" (")[0];
-    return txts.find(f => norm(stripTxt(f.name)) === norm(teamKey))
-        || txts.find(f => norm(stripTxt(f.name)) === norm(simpleName))
-        || null;
-  }
-
-  async function fetchLeagueTeamsForTeam(teamKey) {
-    const cacheKey = `NVA_LEAGUE_${sanitizeFileName(teamKey)}`;
-
-    const file = await findLeagueFile(teamKey);
-    if (file) {
-      leagueFileNames[teamKey] = file.name;
-      try {
-        const headers = {};
-        if (ghSettings.token) headers["Authorization"] = `token ${ghSettings.token}`;
-        const res = await fetch(file.url, { headers, cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          const text = b64_to_utf8(json.content).replace(/^\uFEFF/, "");
-          const list = [];
-          text.split(/\r?\n/).forEach(line => {
-            const name = line.trim();
-            if (name && !list.includes(name)) list.push(name);
-          });
-          localStorage.setItem(cacheKey, JSON.stringify(list));
-          return list;
-        }
-      } catch (e) {
-        console.error("Error al leer el fichero de la liga:", e);
-      }
-    }
-
-    try {
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-      if (Array.isArray(cached)) return cached;
-    } catch (e) {}
-    return [];
-  }
-
-  async function fetchLeagueTeamsForCurrentTeam() {
-    return fetchLeagueTeamsForTeam(currentTeam);
-  }
-
-  async function openLeagueTeamsModal(side) {
-    leaguePickSide = side;
-    leagueTeamsList = await fetchLeagueTeamsForCurrentTeam();
-
-    document.getElementById("leagueModalTitle").innerText =
-      side === "home" ? "Equipo HOME (local)" : "Equipo VISIT (visitante)";
-
-    const container = document.getElementById("leagueTeamsContainer");
-    container.innerHTML = "";
-
-    if (leagueTeamsList.length === 0) {
-      container.innerHTML = `<p style="text-align:center; font-size:0.85rem; color:#64748b; padding:20px;">No se encontró la lista de equipos de la liga para ${escapeHtml(currentTeam)} (carpeta "${LEAGUES_FOLDER}"). Comprueba la conexión y que exista el archivo .txt con el nombre del equipo.</p>`;
-    } else {
-      leagueTeamsList.forEach((name, i) => {
-        const btn = document.createElement("button");
-        btn.className = "app-input";
-        btn.style.textAlign = "left";
-        btn.style.cursor = "pointer";
-        btn.textContent = name;
-        btn.onclick = () => selectLeagueTeam(i);
-        container.appendChild(btn);
-      });
-    }
-    document.getElementById("modalLeagueTeams").classList.add("active");
-  }
-
-  function closeLeagueTeamsModal() {
-    document.getElementById("modalLeagueTeams").classList.remove("active");
-  }
-
-  // Cancela la selección: los dos lados vuelven al predeterminado (HOME / VISIT).
-  function resetLeagueTeams() {
-    matchScore.local = "";
-    matchScore.visitante = "";
-    closeLeagueTeamsModal();
-    renderMatchScoreboard();
-  }
-
-  // Elegido un rival en un lado, el otro lado se rellena con el equipo del club.
-  function selectLeagueTeam(index) {
-    const name = leagueTeamsList[index];
-    if (name === undefined) return;
-    if (leaguePickSide === "home") {
-      matchScore.local = name;
-      matchScore.visitante = currentTeam;
-    } else {
-      matchScore.visitante = name;
-      matchScore.local = currentTeam;
-    }
-    closeLeagueTeamsModal();
-    renderMatchScoreboard();
-  }
-
-  // ---------------------------------------------------------------------
-  //  CONFIGURACIÓN DEL CLUB > PESTAÑA "LIGAS"
-  //  Igual que la pestaña de jugadores/as, pero para los equipos de la liga
-  //  de cada equipo del club. Se guarda un .txt por equipo en la carpeta
-  //  "Ligas/", con un equipo por fila (mismo formato que lee la pantalla Partido).
-  // ---------------------------------------------------------------------
-  let leagueEdit = { key: "", list: [] };
-  let leagueWriteChain = Promise.resolve();
-
-  async function renderLeaguesTab() {
-    const select = document.getElementById("selectTeamLeagues");
-    const prev = select.value;
-    select.innerHTML = "";
-    appData.teams.forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = getTeamKey(t);
-      opt.innerText = `${t.name} (${t.category})`;
-      select.appendChild(opt);
-    });
-    if (prev && Array.from(select.options).some(o => o.value === prev)) select.value = prev;
-    await loadLeagueEditList();
-  }
-
-  async function loadLeagueEditList() {
-    const key = document.getElementById("selectTeamLeagues").value;
-    // Antes de leer, se termina de enviar lo pendiente para no traer datos desactualizados.
-    await leagueWriteChain;
-    if (navigator.onLine && offlineQueue.length > 0) await processOfflineQueue();
-    leagueEdit = { key: key, list: key ? await fetchLeagueTeamsForTeam(key) : [] };
-    renderLeagueManagement();
-  }
-
-  function renderLeagueManagement() {
-    const container = document.getElementById("draggableLeagueList");
-    container.innerHTML = "";
-    document.getElementById("leagueCountBadge").innerText = leagueEdit.list.length;
-
-    leagueEdit.list.forEach((name, index) => {
-      const item = document.createElement("div");
-      item.className = "item-row";
-      item.style.marginBottom = "4px";
-      item.innerHTML = `
-        <span style="font-weight:600;">${escapeHtml(name)}</span>
-        <div style="display:flex; gap:4px; align-items:center;">
-          <button style="border:none; background:#e2e8f0; border-radius:4px; padding:2px 5px; font-size:0.7rem;" onclick="moveLeagueTeam(${index}, -1)">▲</button>
-          <button style="border:none; background:#e2e8f0; border-radius:4px; padding:2px 5px; font-size:0.7rem;" onclick="moveLeagueTeam(${index}, 1)">▼</button>
-          <button class="btn-del" onclick="deleteLeagueTeam(${index})">✕</button>
-        </div>
-      `;
-      container.appendChild(item);
-    });
-  }
-
-  function addLeagueTeam() {
-    if (!leagueEdit.key) return;
-    const input = document.getElementById("newLeagueTeamName");
-    const name = input.value.trim();
-    if (!name) return;
-    if (leagueEdit.list.some(n => n.toLowerCase() === name.toLowerCase())) {
-      alert("Ese equipo ya está en la lista de la liga.");
-      return;
-    }
-    leagueEdit.list.push(name);
-    input.value = "";
-    saveLeagueEditList();
-    renderLeagueManagement();
-  }
-
-  function deleteLeagueTeam(index) {
-    if (leagueEdit.list[index] === undefined) return;
-    leagueEdit.list.splice(index, 1);
-    saveLeagueEditList();
-    renderLeagueManagement();
-  }
-
-  function moveLeagueTeam(index, direction) {
-    const list = leagueEdit.list;
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= list.length) return;
-    const temp = list[index];
-    list[index] = list[newIndex];
-    list[newIndex] = temp;
-    saveLeagueEditList();
-    renderLeagueManagement();
-  }
-
-  // --- Cargar la liga desde el PDF de la federación (tabla CLASIFICACION) ---
-  // Lee el PDF en el propio dispositivo (pdf.js, se descarga solo la primera vez),
-  // toma los equipos de la última tabla y quita el equipo del club seleccionado.
+  // --- Lector de PDF (pdf.js), lo usan Calendario de partidos y el PDF de resultados ---
+  // Se descarga solo la primera vez.
   const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js?v=8";
   const PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
@@ -4497,129 +4297,6 @@
   function normalizeTeamName(n) {
     return (n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
-  }
-
-  // Devuelve [{pos, name}] con las filas de la tabla CLASIFICACION del PDF.
-  async function extractStandingsTeamsFromPdf(file) {
-    await ensurePdfJs();
-    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const rows = [];
-    let seenHeading = false;
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page = await pdf.getPage(p);
-      const content = await page.getTextContent();
-      // Agrupar los textos por línea (misma coordenada Y) y ordenarlos de izquierda a derecha
-      const lines = [];
-      content.items.forEach(it => {
-        if (!it.str || !it.str.trim()) return;
-        const y = it.transform[5], x = it.transform[4];
-        let line = lines.find(l => Math.abs(l.y - y) < 2.5);
-        if (!line) { line = { y: y, items: [] }; lines.push(line); }
-        line.items.push({ x: x, str: it.str.trim() });
-      });
-      lines.sort((a, b) => b.y - a.y);
-      lines.forEach(l => {
-        const text = l.items.sort((a, b) => a.x - b.x).map(i => i.str).join(" ").replace(/\s+/g, " ");
-        if (/CLASIFICACI[OÓ]N/i.test(text)) { seenHeading = true; rows.length = 0; return; }
-        // Pos + Equipo + 11 columnas numéricas (Pj PG3 PG2 PP1 PP0 SA SF SC PF PC Ptos)
-        const m = text.match(/^(\d{1,2})\s+(.+?)((?:\s+\d+){11})$/);
-        if (m && /[A-Za-zÀ-ÿ]/.test(m[2])) rows.push({ pos: parseInt(m[1], 10), name: m[2].trim() });
-      });
-    }
-    return rows;
-  }
-
-  function findOwnTeamRow(rows, teamName) {
-    const target = normalizeTeamName(teamName);
-    if (!target) return -1;
-    let i = rows.findIndex(r => normalizeTeamName(r.name) === target);
-    if (i >= 0) return i;
-    const cands = rows.map((r, idx) => ({ idx, n: normalizeTeamName(r.name) }))
-      .filter(c => c.n.includes(target) || target.includes(c.n));
-    return cands.length === 1 ? cands[0].idx : -1;
-  }
-
-  async function handleLeaguePdfSelected(input) {
-    const file = input.files && input.files[0];
-    input.value = ""; // permite volver a elegir el mismo archivo
-    if (!file) return;
-    if (!leagueEdit.key) { alert("Selecciona primero un equipo."); return; }
-
-    let rows;
-    mostrarCargando("Leyendo el PDF...");
-    try {
-      rows = await extractStandingsTeamsFromPdf(file);
-    } catch (e) {
-      console.error("Error al leer el PDF:", e);
-      ocultarCargando();
-      alert("No se pudo leer el PDF. Comprueba que es el calendario de la federación y que hay conexión la primera vez (se descarga el lector de PDF).");
-      return;
-    }
-    ocultarCargando();
-
-    if (rows.length < 2) {
-      alert("No he encontrado la tabla de CLASIFICACIÓN en este PDF.");
-      return;
-    }
-
-    const teamObj = appData.teams.find(t => getTeamKey(t) === leagueEdit.key);
-    const ownName = teamObj ? teamObj.name : leagueEdit.key;
-    let ownIdx = findOwnTeamRow(rows, ownName);
-
-    if (ownIdx < 0) {
-      const menu = rows.map((r, i) => `${i + 1}. ${r.name}`).join("\n");
-      const ans = await nvaPreguntar(`No encuentro "${ownName}" en la tabla.\nEscribe el número de TU equipo para excluirlo (o deja vacío para no excluir ninguno):\n\n${menu}`);
-      if (ans === null) return;
-      const n = parseInt(ans, 10);
-      if (n >= 1 && n <= rows.length) ownIdx = n - 1;
-    }
-
-    const rivals = rows.filter((_, i) => i !== ownIdx).map(r => r.name);
-    if (!rivals.length) { alert("No se han encontrado rivales."); return; }
-
-    let finalList;
-    if (leagueEdit.list.length > 0) {
-      const replace = await nvaConfirmar(`Se han encontrado ${rivals.length} rivales.\n\n«Reemplazar» cambia la lista actual (${leagueEdit.list.length} equipos).\n«Añadir» solo suma los que falten.`, { si: "Reemplazar", no: "Añadir", peligro: false });
-      if (replace) finalList = rivals;
-      else {
-        const have = new Set(leagueEdit.list.map(normalizeTeamName));
-        finalList = leagueEdit.list.concat(rivals.filter(r => !have.has(normalizeTeamName(r))));
-      }
-    } else {
-      finalList = rivals;
-    }
-
-    leagueEdit.list = finalList;
-    saveLeagueEditList();
-    renderLeagueManagement();
-  }
-
-  // Guarda en local (caché que también usa la pantalla Partido) y envía a GitHub.
-  // Los envíos se encadenan para que lleguen en orden y no se pisen entre sí.
-  function saveLeagueEditList() {
-    const key = leagueEdit.key;
-    if (!key) return;
-    const snapshot = leagueEdit.list.slice();
-    localStorage.setItem(`NVA_LEAGUE_${sanitizeFileName(key)}`, JSON.stringify(snapshot));
-
-    if (ghSettings.user && ghSettings.repo && ghSettings.token) {
-      leagueWriteChain = leagueWriteChain
-        .then(() => saveLeagueTeamsToGitHub(key, snapshot))
-        .catch(e => console.error("Error al guardar la liga:", e));
-    }
-  }
-
-  async function saveLeagueTeamsToGitHub(teamKey, list) {
-    // Si ya existe un .txt de ese equipo en Ligas/ (aunque se llame distinto), se reutiliza
-    // para no duplicarlo; si no, se crea con el nombre del equipo.
-    let fileName = leagueFileNames[teamKey];
-    if (!fileName) {
-      const file = await findLeagueFile(teamKey);
-      if (file) { fileName = file.name; leagueFileNames[teamKey] = fileName; }
-    }
-    const path = `${LEAGUES_FOLDER}/${fileName ? encodeURIComponent(fileName) : sanitizeFileName(teamKey) + ".txt"}`;
-    const text = list.join("\n") + "\n"; // un equipo por fila
-    await writeGitHubFile(path, text, `Actualizar liga de ${teamKey}`);
   }
 
   // =====================================================================

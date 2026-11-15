@@ -635,17 +635,6 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="modalLeagueTeams">
-    <div class="modal-box" style="max-width: 380px;">
-      <div class="modal-header">
-        <div class="modal-title" id="leagueModalTitle">Equipos de la liga</div>
-        <button class="btn-close-modal" onclick="closeLeagueTeamsModal()">✕</button>
-      </div>
-      <button type="button" class="app-input" style="text-align:left; cursor:pointer; margin-bottom:8px; font-weight:700; color:#b91c1c; border-color:#fca5a5; background:#fef2f2;" onclick="resetLeagueTeams()">↩ Cancelar selección (volver a HOME / VISIT)</button>
-      <div id="leagueTeamsContainer" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; max-height:60vh;"></div>
-    </div>
-  </div>
-
   <!-- MODAL: DESELECCIÓN DE PARTIDOS (anulaciones.js) -->
   <div class="modal-backdrop" id="modalDeselPartidos" onclick="if(event.target===this)closeDeselPartidos()">
     <div class="modal-box hist-box">
@@ -793,7 +782,6 @@
       <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab(1)">Entrenadores y equipos</button>
         <button class="tab-btn" onclick="switchTab(2)">Jugadores/as y Equipos</button>
-        <button class="tab-btn" onclick="switchTab(3)">Ligas</button>
         <button class="tab-btn" data-nva-tab="usuarios" onclick="switchTab(4); nvaPintarPanelUsuarios()">Usuarios y permisos</button>
         <button class="tab-btn" onclick="switchTab(5)" hidden>Insta&shy;gram</button>
       </div>
@@ -852,28 +840,6 @@
           <div class="item-list" id="configTeamsList"></div>
         </div>
 
-      </div>
-
-      <div class="tab-content" id="tabContent3">
-        <div class="config-section">
-          <button type="button" class="btn-save-session imp-btn" onclick="impLeaguesFromPdfs()">📄 Cargar ligas desde PDF de fvbcv.com</button>
-        </div>
-
-        <div class="config-section">
-          <div class="config-subtitle">Selecciona Equipo</div>
-          <select id="selectTeamLeagues" class="app-select" onchange="withLoading(loadLeagueEditList, 'Cargando equipos de la liga...')"></select>
-        </div>
-
-        <div class="config-section">
-          <div class="config-subtitle">Equipos de la liga <span class="badge" id="leagueCountBadge">0</span></div>
-          <div class="input-group">
-            <input type="text" id="newLeagueTeamName" class="app-input" placeholder="Nombre Equipo de la liga">
-            <button class="btn-add" onclick="addLeagueTeam()">+</button>
-            <button class="btn-add btn-add-pdf" title="Cargar PDF de la federación" onclick="document.getElementById('leaguePdfInput').click()">📄 PDF</button>
-            <input type="file" id="leaguePdfInput" accept="application/pdf,.pdf" style="display:none" onchange="handleLeaguePdfSelected(this)">
-          </div>
-          <div id="draggableLeagueList"></div>
-        </div>
       </div>
 
       <div class="tab-content" id="tabContent4">

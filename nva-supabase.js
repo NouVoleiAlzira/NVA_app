@@ -61,8 +61,7 @@
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
     "instagram.eventos": ["#igSubHead_eventos", "#igSub_eventos"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
-    "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"],
-    "opciones.ligas": [".tab-btn[onclick=\"switchTab(3)\"]", "#tabContent3"]
+    "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"]
   };
 
   const origFetch = window.fetch.bind(window);
@@ -787,7 +786,8 @@
       sb.from("permisos_rol").select("*")
     ]);
     if (u.error || r.error || m.error || p.error) { caja.innerHTML = "<p>No se pudo cargar (¿sin conexión?).</p>"; return; }
-    const roles = r.data, menus = m.data;
+    // «Pestaña Ligas» ya no existe en la app: no se muestra aunque siga en la tabla de menús
+    const roles = r.data, menus = m.data.filter(x => x.id !== "opciones.ligas");
     const principales = menus.filter(x => !x.padre);
     const hijos = id => menus.filter(x => x.padre === id);
 

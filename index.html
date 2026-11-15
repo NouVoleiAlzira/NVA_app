@@ -1034,7 +1034,7 @@
 <script src="eventos-cartel.js" defer></script>
 
 
-<!-- Botón ATRÁS: vuelve a la pantalla principal y, ya en ella, pregunta antes de salir -->
+<!-- Botón ATRÁS: vuelve a la pantalla principal y, ya en ella, dos pulsaciones seguidas mandan la app a segundo plano -->
 <script>
 (function () {
   var st = history.state || {};
@@ -1050,57 +1050,32 @@
     return a ? a.id : "screenCoachTeam";
   }
 
-  function salirDeLaApp() {
-    // Una web no puede minimizarse ni cerrarse por código. Lo que sí se puede es
-    // quitar el control de ATRÁS: así la siguiente pulsación de ATRÁS la gestiona
-    // el sistema y manda la app a segundo plano. Si no se pulsa, se vuelve a activar.
-    window.removeEventListener("popstate", onPop);
-    history.back();                                   // de la entrada de control a la inicial
-
-    var m = document.createElement("div");
-    m.style.cssText = "position:fixed;left:16px;right:16px;bottom:24px;z-index:100001;background:#15296A;border:1px solid rgba(233,238,250,.13);color:#fff;padding:14px 16px;border-radius:14px;font-size:15px;font-weight:600;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4);";
-    m.textContent = "Pulsa ATRÁS una vez más para enviar la app a segundo plano";
-    document.body.appendChild(m);
-
-    setTimeout(function () {
-      m.remove();
-      history.pushState({ nva: "guard" }, "");        // se vuelve a activar el control de ATRÁS
-      window.addEventListener("popstate", onPop);
-    }, 5000);
-  }
-
-  function mostrarAvisoSalir() {
-    if (document.getElementById("nvaSalirOverlay")) return;
-    var o = document.createElement("div");
-    o.id = "nvaSalirOverlay";
-    o.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;";
-    o.innerHTML =
-      '<div class="cp-modal-box" style="max-width:320px;text-align:center;">' +
-      '<div class="cp-modal-title">¿Salir de la app?</div>' +
-      '<div class="cp-modal-txt" style="color:var(--txt-2);margin-bottom:6px;">Pulsa SALIR y, después, ATRÁS una vez más para enviarla a segundo plano.</div>' +
-      '<div class="cp-modal-row">' +
-      '<button id="nvaSalirNo" class="cp-modal-btn cp-modal-main">Quedarme</button>' +
-      '<button id="nvaSalirSi" class="cp-modal-btn">Salir</button>' +
-      '</div></div>';
-    document.body.appendChild(o);
-    document.getElementById("nvaSalirNo").onclick = function () { o.remove(); };
-    document.getElementById("nvaSalirSi").onclick = function () {
-      o.remove();
-      salirDeLaApp();
-    };
+  // Una web no puede cerrarse ni minimizarse por código. En la pantalla principal,
+  // la primera pulsación de ATRÁS quita (sin mostrar nada) el control de ATRÁS durante
+  // unos segundos: si se vuelve a pulsar, la gestiona el sistema y manda la app a
+  // segundo plano. Si no se pulsa, el control se vuelve a activar.
+  var VENTANA_SALIR_MS = 2500, temporizador = null;
+  function rearmar() {
+    temporizador = null;
+    var st = history.state || {};
+    if (st.nva === "root") history.pushState({ nva: "guard" }, "");
+    window.addEventListener("popstate", onPop);
   }
 
   function onPop(e) {
     if (!e.state || e.state.nva !== "root") return;
-    history.pushState({ nva: "guard" }, "");
 
     var modal = document.querySelector(".modal-backdrop.active");
-    if (modal) { modal.classList.remove("active"); return; }
+    if (modal) { history.pushState({ nva: "guard" }, ""); modal.classList.remove("active"); return; }
     if (pantallaActiva() !== "screenCoachTeam") {
+      history.pushState({ nva: "guard" }, "");
       if (typeof goBack === "function") goBack();
       return;
     }
-    mostrarAvisoSalir();
+    // Pantalla principal: primera pulsación. Se queda en la entrada inicial sin control.
+    window.removeEventListener("popstate", onPop);
+    if (temporizador) clearTimeout(temporizador);
+    temporizador = setTimeout(rearmar, VENTANA_SALIR_MS);
   }
   window.addEventListener("popstate", onPop);
 })();

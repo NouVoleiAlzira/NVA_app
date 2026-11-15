@@ -215,6 +215,30 @@
 
   function box() { return document.getElementById("igReelsList"); }
 
+  // «sáb 14/11 10:32» en hora de Madrid
+  const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  function fechaPub(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const p = Object.fromEntries(new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit",
+      day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map(x => [x.type, x.value]));
+    const dia = DIAS[new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay()];
+    return `${dia} ${p.day}/${p.month} ${p.hour}:${p.minute}`;
+  }
+
+  // Añade la fecha y hora de publicación a las tarjetas publicadas (está en meta.json de cada una)
+  function ponerFechas(cont, dir) {
+    cont.querySelectorAll(".ig-reel").forEach(async card => {
+      const est = card.querySelector(".ig-estado.ig-publicado");
+      if (!est) return;
+      try {
+        const meta = await getJson(`${dir}/${card.dataset.id}/meta.json`);
+        const f = meta && fechaPub(meta.publicadoEn || meta.confirmadoEn || "");
+        if (f) est.textContent = `${ESTADOS.publicado} · ${f}`;
+      } catch (e) { /* sin fecha */ }
+    });
+  }
+
   const OCULTOS = ["descartado", "eliminado"];
 
   // Tarjeta de un reel o de unas stories. papelera: solo en los publicados
@@ -267,6 +291,7 @@
         cont.querySelectorAll(".ig-abrir").forEach(btn => btn.onclick = () => abrir(btn.closest(".ig-reel")));
         cont.querySelectorAll(".ig-papelera").forEach(btn => btn.onclick = () => eliminar(DIR, "borradores", btn.closest(".ig-reel").dataset.id, cargar));
       });
+      if (pub) ponerFechas(pub, DIR);
     } catch (e) {
       console.error(e);
       el.innerHTML = `<p class="ig-info">No se han podido leer los borradores (${esc(e.message)}).</p>`;
@@ -1496,6 +1521,7 @@
         cont.querySelectorAll(".ig-abrir").forEach(btn => btn.onclick = () => abrirHistoria(btn.closest(".ig-reel")));
         cont.querySelectorAll(".ig-papelera").forEach(btn => btn.onclick = () => eliminar(DIR_H, "historias", btn.closest(".ig-reel").dataset.id, cargarHistorias));
       });
+      if (pub) ponerFechas(pub, DIR_H);
     } catch (e) {
       console.error(e);
       el.innerHTML = `<p class="ig-info">No se han podido leer los borradores (${esc(e.message)}).</p>`;

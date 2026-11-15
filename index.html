@@ -121,27 +121,34 @@
     <div class="section-title section-toggle" id="secHead_trainings" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_trainings" onclick="toggleSection('trainings')" onkeydown="sectionKey(event,'trainings')">Entrenamientos y Partidos <span class="sec-arrow">▾</span></div>
     <div class="section-body" id="secBody_trainings">
       <div data-nva-menu="informes.entrenadores">
-      <div class="section-subtitle" style="margin-top:4px;">Entrenadores/Equipos</div>
+      <div class="cp-sub-head" id="nvSubHead_entrenadores" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('entrenadores')" onkeydown="nvaSubKey(event,'entrenadores')">🧑‍🏫 Entrenadores/Equipos <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="nvSub_entrenadores">
       <div id="coachTeamList"></div>
       </div>
+      </div>
 
+      <!-- Informes Entrenadores: el desplegable agrupa dos permisos
+           (informes.pdf y informes.kilometraje). Se oculta si no se ve ninguno. -->
+      <div id="grpInformes">
+      <div class="cp-sub-head" id="nvSubHead_informes" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('informes')" onkeydown="nvaSubKey(event,'informes')">📊 Informes Entrenadores <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="nvSub_informes">
       <div data-nva-menu="informes.pdf">
-      <div class="section-subtitle" style="margin-top:14px;">Informes Entrenadores</div>
       <div style="display:flex; gap:6px;">
         <button class="btn-pdf-mode" id="btnPdfMode" onclick="togglePdfMode()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">📊 por Equipo</button>
         <button class="btn-pdf-mode" id="btnPdfJugadora" onclick="openPlayerPdfModal()" style="flex:1; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🧑 por Deportista</button>
         <button class="btn-pdf-mode" id="btnPdfCuadrante" onclick="togglePdfCuadranteMode()" style="flex:1.6; min-width:0; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🏆 Partidos y Resultados</button>
       </div>
       </div>
-      <!-- Reporte Kilometraje: va dentro de «Informes Entrenadores», pero conserva
-           su propio permiso (informes.kilometraje) -->
       <div data-nva-menu="informes.kilometraje">
       <button class="btn-pdf-mode" id="btnKilometraje" onclick="openKilometrajeModal()" style="width:100%; margin-bottom:0; font-size:0.7rem; padding:8px 4px;">🚗 Reporte Kilometraje</button>
       </div>
+      </div>
+      </div>
       <!-- Federación: dos botones con permisos propios (informes.fichas e
-           informes.autorizaciones). El título se oculta si no se ve ninguno. -->
+           informes.autorizaciones). El desplegable se oculta si no se ve ninguno. -->
       <div data-nva-menu="informes.federacion" id="grpFederacion">
-      <div class="section-subtitle" style="margin-top:14px;">Federación</div>
+      <div class="cp-sub-head" id="nvSubHead_federacion" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('federacion')" onkeydown="nvaSubKey(event,'federacion')">🏛️ Federación <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="nvSub_federacion">
       <div style="display:flex; gap:8px;">
         <div id="fedFichas" style="flex:1; min-width:0;">
         <button class="btn-pdf-mode2" style="width:100%; margin-bottom:0;" onclick="openFichasFederacion()">📇 Fichas</button>
@@ -153,13 +160,16 @@
         </div>
       </div>
       </div>
+      </div>
       <div data-nva-menu="informes.drive">
-      <div class="section-subtitle" style="margin-top:14px;">PDFs Resultados en Drive</div>
+      <div class="cp-sub-head" id="nvSubHead_drive" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('drive')" onkeydown="nvaSubKey(event,'drive')">📁 PDFs Resultados en Drive <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="nvSub_drive">
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="actualizarVinculosDrive()">🔄 Actualizar vínculos</button>
         <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="verVinculosDrive()">🔗 Ver vínculos</button>
       </div>
       <div id="drvProg" class="drv-prog"></div>
+      </div>
       </div>
     </div>
 
@@ -212,27 +222,33 @@
     <div id="direccionTeamsContainer" class="teams-container" style="display: none;"></div>
 
     <div data-nva-menu="direccion.consultas">
-    <div class="section-subtitle">CONSULTAS</div>
+    <div class="cp-sub-head" id="nvSubHead_consultas" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('consultas')" onkeydown="nvaSubKey(event,'consultas')">📨 Consultas <span class="sec-arrow">▾</span></div>
+    <div class="cp-sub-body" id="nvSub_consultas">
     <div style="display:flex; gap:8px;">
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="openCreateQueryModal()">📨 Nueva CONSULTA</button>
       <button class="btn-pdf-mode" style="flex:1; min-width:0; margin-bottom:0;" onclick="openSelectQueryPdfModal()">📝 Ver CONSULTAS</button>
     </div>
-
     </div>
+    </div>
+
     <div data-nva-menu="direccion.horarios">
-    <div class="section-subtitle">Horarios de entrenamiento</div>
-    <button class="btn-pdf-mode2" style="margin-bottom:20px;" onclick="openHorarios()">🗓️ Horarios</button>
+    <div class="cp-sub-head" id="nvSubHead_horarios" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('horarios')" onkeydown="nvaSubKey(event,'horarios')">🗓️ Horarios de entrenamiento <span class="sec-arrow">▾</span></div>
+    <div class="cp-sub-body" id="nvSub_horarios">
+    <button class="btn-pdf-mode2" style="margin-bottom:0;" onclick="openHorarios()">🗓️ Horarios</button>
+    </div>
     </div>
 
     <div id="histSeccion" data-nva-menu="direccion.registros">
-    <div class="section-subtitle">Control de registros</div>
+    <div class="cp-sub-head" id="nvSubHead_registros" role="button" tabindex="0" aria-expanded="true" onclick="nvaToggleSub('registros')" onkeydown="nvaSubKey(event,'registros')">📜 Control de registros <span class="sec-arrow">▾</span></div>
+    <div class="cp-sub-body" id="nvSub_registros">
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openHistorial()">📜 Historial de cambios</button>
     <button class="btn-pdf-mode2" style="margin-bottom:10px;" onclick="openAvisos()">⚠️ Mensaje de aviso</button>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       <button class="btn-pdf-mode2" id="btnDeselEntrenos" style="flex:1; min-width:0; margin-bottom:0;" onclick="nvaDeselEntrenos()">🚫 Deselección entrenamientos</button>
       <button class="btn-pdf-mode2" style="flex:1; min-width:0; margin-bottom:0;" onclick="openDeselPartidos()">🚫 Deselección partidos</button>
     </div>
-    <button class="btn-pdf-mode2" style="margin-bottom:20px;" onclick="openDeselEquipos()">🚫 Deselección equipos</button>
+    <button class="btn-pdf-mode2" style="margin-bottom:0;" onclick="openDeselEquipos()">🚫 Deselección equipos</button>
+    </div>
     </div>
     </div>
 

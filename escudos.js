@@ -36,7 +36,7 @@
   let urls = {};                  // ruta de imagen -> URL firmada para verla
   let abiertos = {};              // clubes desplegados
   let editando = null;            // equipo del club que se está editando (lápiz)
-  let secciones = { club: true, otros: true };   // secciones desplegadas
+  let secciones = { club: true, patro: true, otros: true };   // secciones desplegadas
   try { Object.assign(secciones, JSON.parse(localStorage.getItem("NVA_ESC_SECC")) || {}); } catch (e) {}
   let filtro = "";
   let estado = "";
@@ -49,12 +49,15 @@
   function guardarLocal() { try { localStorage.setItem(ESC_LOCAL, JSON.stringify(datos)); } catch (e) {} }
 
   function normalizar(d) {
-    const out = { version: 1, actualizado: String(d.actualizado || ""), club: {}, clubes: [] };
+    const out = { version: 1, actualizado: String(d.actualizado || ""), club: {}, clubes: [], patrocinadores: null };
     Object.keys(d.club || {}).forEach(k => {
       const c = d.club[k] || {};
       out.club[k] = { nombre: String(c.nombre || ""), categoria: String(c.categoria || ""), escudo: String(c.escudo || ""),
-        color: /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "" };
+        color: /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "", patrocinador: String(c.patrocinador || "") };
     });
+    // null = aún no se han importado (se ofrece importarlos de la carpeta Patrocinadores)
+    if (Array.isArray(d.patrocinadores)) out.patrocinadores = d.patrocinadores.filter(x => x && x.nombre)
+      .map(x => ({ id: String(x.id || uid()), nombre: String(x.nombre), tipo: x.tipo === "global" ? "global" : "equipo", logo: String(x.logo || "") }));
     (Array.isArray(d.clubes) ? d.clubes : []).forEach(c => {
       if (!c) return;
       out.clubes.push({ id: String(c.id || uid()), nombre: String(c.nombre || "Club"), escudo: String(c.escudo || ""),
@@ -426,6 +429,78 @@
     return Array.from(s).sort((a, b) => a.localeCompare(b, "es"));
   }
 
+  // ---------- Patrocinadores ----------
+  const patros = () => (datos && datos.patrocinadores) || [];
+  const patroDe = (id) => patros().find(x => x.id === id);
+
+  // Primera vez: los de la carpeta Patrocinadores de la app (los que usan los carteles de Eventos)
+  async function importarPatrocinadores() {
+    if (!puedeEditar()) return;
+    mostrarCargando("Importando patrocinadores...");
+    try {
+      const j = await (await fetch("Patrocinadores/patrocinadores.json", { cache: "no-cache" })).json();
+      const lista = [];
+      const copiar = async (archivo, nombre, tipo) => {
+        let logo = "";
+        try {
+          const r = await fetch("Patrocinadores/" + encodeURIComponent(archivo));
+          if (r.ok) {
+            const u = URL.createObjectURL(await r.blob());
+            const ruta = `${IMG_DIR}/patro-${slug(nombre)}.png`;
+            await subirImagen(ruta, await aPng(u));
+            URL.revokeObjectURL(u);
+            logo = ruta;
+          }
+        } catch (e) { console.warn("Patrocinador", archivo, e); }
+        lista.push({ id: uid(), nombre, tipo, logo });
+      };
+      for (const e of (j.equipos || [])) await copiar(e.archivo, e.nombre, "equipo");
+      let n = 0;
+      for (const a of (j.comunes || [])) await copiar(a, "Global " + (++n), "global");
+      datos.patrocinadores = lista;
+      // Patrocinador de cada equipo del club: el que sale en su nombre (p. ej. «Enova NVA» → Enova)
+      (appData.teams || []).forEach(t => {
+        const k = getTeamKey(t);
+        const p = lista.find(x => x.tipo === "equipo" && esDelClub(t.name, x.nombre));
+        if (p) datos.club[k] = Object.assign({ nombre: t.name, categoria: t.category, escudo: "", color: "" }, datos.club[k], { patrocinador: p.id });
+      });
+      guardar("Importar patrocinadores");
+      await leerImagenes();
+      ocultarCargando();
+      pintar();
+      nvaAviso(`Importados ${lista.length} patrocinadores. Revisa sus nombres y el tipo de cada uno.`);
+    } catch (e) {
+      ocultarCargando();
+      nvaAviso("No se pudieron importar los patrocinadores: " + (e.message || e), { tipo: "error" });
+    }
+  }
+
+  function pintarPatrocinadores(ed, dis) {
+    if (!Array.isArray(datos.patrocinadores)) {
+      return `<p class="esc-nota">Aún no hay patrocinadores.</p>` +
+        (ed ? `<button type="button" class="btn-save-session" data-esc="patro-importar">📥 Importar de la carpeta Patrocinadores</button>` : "");
+    }
+    let h = `<p class="esc-nota">Toca el logo para cambiarlo. «Equipo»: patrocina a un equipo (se elige al editar el equipo). «Global»: patrocina a todo el club.</p>`;
+    const orden = patros().slice().sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === "global" ? 1 : -1) || a.nombre.localeCompare(b.nombre, "es"));
+    orden.forEach(p => {
+      h += `<div class="esc-patro" data-patro="${esc(p.id)}">
+          <label class="esc-escudo${ed ? " esc-escudo-ed" : ""}" title="Cambiar logo">${imgHtml(p.logo, p.nombre)}${ed ? `<input type="file" accept="image/*" data-esc="patro-img" hidden>` : ""}</label>
+          <input type="text" class="app-input" data-esc="patro-nombre" value="${esc(p.nombre)}" placeholder="Nombre"${dis}>
+          <div class="esc-tipo" role="group" aria-label="Tipo">
+            <button type="button" class="${p.tipo === "equipo" ? "on" : ""}" data-esc="patro-tipo" data-tipo="equipo"${dis}>Equipo</button>
+            <button type="button" class="${p.tipo === "global" ? "on" : ""}" data-esc="patro-tipo" data-tipo="global"${dis}>Global</button>
+          </div>
+          ${ed ? `<button type="button" class="btn-del" data-esc="patro-borrar" title="Borrar patrocinador">🗑</button>` : ""}
+        </div>`;
+    });
+    if (!orden.length) h += `<p class="esc-nota">No hay patrocinadores.</p>`;
+    if (ed) h += `<div class="esc-fila esc-nuevo">
+        <input type="text" class="app-input" data-esc="patro-nuevo" placeholder="Nombre del nuevo patrocinador">
+        <button type="button" class="btn-add" data-esc="patro-anadir">+</button>
+      </div>`;
+    return h;
+  }
+
   function pintar() {
     const box = caja();
     if (!box) return;
@@ -452,6 +527,14 @@
             <input type="text" class="app-input" data-esc="club-nombre" value="${esc(d.nombre || t.name)}" placeholder="Nombre en carteles">
             <span class="hz-label">Categoría y división</span>
             <input type="text" class="app-input" data-esc="club-cat" list="escCats" value="${esc(d.categoria || "")}" placeholder="Ej.: INFANTIL 2ª DIVISION">
+            <span class="hz-label">Patrocinador</span>
+            <select class="app-select" data-esc="club-patro">
+              <option value="">— Sin patrocinador —</option>
+              ${["equipo", "global"].map(tp => {
+                const l = patros().filter(x => x.tipo === tp);
+                return l.length ? `<optgroup label="${tp === "equipo" ? "De equipo" : "Globales"}">${l.map(x => `<option value="${esc(x.id)}"${x.id === d.patrocinador ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</optgroup>` : "";
+              }).join("")}
+            </select>
           </div>
           <label class="esc-muestra esc-muestra-ed" style="background:${esc(colorDe(key))}" title="Cambiar color (el mismo que en Horarios)"><input type="color" data-esc="color" value="${esc(colorDe(key))}"></label>
           <button type="button" class="esc-lapiz esc-hecho" data-esc="editar" title="Terminar">✓</button>
@@ -463,6 +546,7 @@
             <div class="esc-titulo">${esc(d.nombre || t.name)}</div>
             <div class="esc-sub"><small class="badge">${esc(t.category)}</small> ${esc(d.categoria || "")}</div>
           </div>
+          ${(() => { const p = patroDe(d.patrocinador); return p ? `<span class="esc-patro-mini" title="Patrocinador: ${esc(p.nombre)}">${imgHtml(p.logo, p.nombre)}</span>` : ""; })()}
           <span class="esc-muestra" style="background:${esc(colorDe(key))}" title="Color (el mismo que en Horarios)"></span>
           ${ed ? `<button type="button" class="esc-lapiz" data-esc="editar" title="Modificar">✏️</button>` : ""}
         </div>`;
@@ -518,6 +602,7 @@
       ${seccion("club", "🏐 Equipos del club", teams.length, `
         <p class="esc-nota">Pulsa ✏️ para editar: toca el escudo para cambiarlo y el círculo para cambiar el color. El color es el mismo que el de Horarios: si lo cambias aquí, cambia allí.</p>
         ${club}`)}
+      ${seccion("patro", "🤝 Patrocinadores", patros().length, pintarPatrocinadores(ed, dis))}
       ${seccion("otros", "🛡️ Resto de equipos", datos.clubes.length, `
         ${ed ? `<button type="button" class="btn-save-session esc-actualizar" data-esc="actualizar">🔄 Actualizar desde los PDF de los calendarios</button>
         <p class="esc-nota">Añade los rivales de los calendarios de partidos que aún no estén, cada uno en su club.</p>` : ""}
@@ -573,6 +658,25 @@
       const a = b.dataset.esc, c = datos && clubDe(b);
       if (a === "crear") return crearDesdeDatos();
       if (a === "actualizar") return actualizarDesdePdf();
+      if (a === "patro-importar") return importarPatrocinadores();
+      if (a === "patro-tipo") {
+        const p = patroDe(b.closest(".esc-patro").dataset.patro);
+        if (!p || p.tipo === b.dataset.tipo) return;
+        p.tipo = b.dataset.tipo; guardar("Tipo de patrocinador"); return pintar();
+      }
+      if (a === "patro-borrar") {
+        const p = patroDe(b.closest(".esc-patro").dataset.patro);
+        if (!p || !await nvaConfirmar(`¿Borrar el patrocinador «${p.nombre}»?`)) return;
+        datos.patrocinadores = patros().filter(x => x !== p);
+        Object.values(datos.club).forEach(c => { if (c.patrocinador === p.id) c.patrocinador = ""; });
+        guardar("Borrar patrocinador"); return pintar();
+      }
+      if (a === "patro-anadir") {
+        const i = box.querySelector("[data-esc=patro-nuevo]"), nombre = i.value.trim();
+        if (!nombre) return;
+        datos.patrocinadores = patros().concat([{ id: uid(), nombre, tipo: "equipo", logo: "" }]);
+        guardar("Añadir patrocinador"); return pintar();
+      }
       if (a === "seccion") {
         secciones[b.dataset.sec] = !secciones[b.dataset.sec];
         try { localStorage.setItem("NVA_ESC_SECC", JSON.stringify(secciones)); } catch (e) {}
@@ -634,6 +738,18 @@
         datos.club[key] = Object.assign({ nombre: "", categoria: "", escudo: "", color: "" }, datos.club[key]);
         datos.club[key][a === "club-nombre" ? "nombre" : "categoria"] = v;
         return guardar("Equipo del club");
+      }
+      if (a === "club-patro") {
+        const key = keyDe(n);
+        datos.club[key] = Object.assign({ nombre: "", categoria: "", escudo: "", color: "" }, datos.club[key], { patrocinador: n.value });
+        return guardar("Patrocinador de equipo");
+      }
+      if (a === "patro-nombre" || a === "patro-img") {
+        const p = patroDe(n.closest(".esc-patro").dataset.patro);
+        if (!p) return;
+        if (a === "patro-img") return cambiarImagen(n, `${IMG_DIR}/patro-${slug(p.nombre)}-${p.id}.png`, (ruta) => { p.logo = ruta; });
+        if (!v) { n.value = p.nombre; return; }
+        p.nombre = v; return guardar("Nombre de patrocinador");
       }
       if (a === "img-club") {
         const key = keyDe(n);

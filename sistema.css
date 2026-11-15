@@ -818,3 +818,13 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .esc-muestra-ed { position: relative; cursor: pointer; width: 34px; height: 34px; margin-top: 4px; outline: 2px dashed rgba(245, 197, 24, 0.7); outline-offset: 3px; }
 .esc-muestra-ed input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 .esc-escudo-ed .esc-img { outline: 2px dashed rgba(245, 197, 24, 0.7); outline-offset: 3px; }
+.esc-patro { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--borde); }
+.esc-patro:first-of-type { border-top: 0; }
+.esc-patro .app-input { margin: 0; flex: 1; min-width: 0; }
+.esc-patro .esc-img { width: 44px; height: 44px; }
+.esc-tipo { flex: none; display: inline-flex; border: 1px solid var(--borde); border-radius: 10px; overflow: hidden; }
+.esc-tipo button { border: 0; background: transparent; color: var(--txt-2); font-size: 0.72rem; font-weight: 700; padding: 8px 8px; cursor: pointer; }
+.esc-tipo button.on { background: rgba(245, 197, 24, 0.18); color: var(--balon); }
+.esc-patro-mini { flex: none; display: inline-flex; }
+.esc-patro-mini .esc-img { width: 34px; height: 34px; border-radius: 8px; padding: 2px; }
+.esc-editando .app-select { margin: 0; }

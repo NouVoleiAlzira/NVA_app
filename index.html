@@ -782,6 +782,7 @@
       <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab(1)">Entrenadores y equipos</button>
         <button class="tab-btn" onclick="switchTab(2)">Jugadores/as y Equipos</button>
+        <button class="tab-btn" onclick="switchTab(6)">Escudos</button>
         <button class="tab-btn" data-nva-tab="usuarios" onclick="switchTab(4); nvaPintarPanelUsuarios()">Usuarios y permisos</button>
         <button class="tab-btn" onclick="switchTab(5)" hidden>Insta&shy;gram</button>
       </div>
@@ -840,6 +841,10 @@
           <div class="item-list" id="configTeamsList"></div>
         </div>
 
+      </div>
+
+      <div class="tab-content" id="tabContent6">
+        <div id="escPanel"></div>
       </div>
 
       <div class="tab-content" id="tabContent4">
@@ -1000,6 +1005,7 @@
 <script src="supabase/functions/_shared/lectura-calendarios.js" defer></script>
 <script src="supabase/functions/_shared/pdf-resultados.js" defer></script>
 <script src="calendario-partidos.js" defer></script>
+<script src="escudos.js" defer></script>
 <script src="importar-datos.js" defer></script>
 <script src="partidos-semana.js" defer></script>
 <script src="calendario-ics.js" defer></script>

@@ -445,18 +445,15 @@
       const key = getTeamKey(t), d = datos.club[key] || {};
       if (ed && editando === key) {
         club += `<div class="esc-equipo esc-editando" data-key="${esc(key)}">
-          <label class="esc-escudo" title="Cambiar escudo">${imgHtml(d.escudo, t.name)}<input type="file" accept="image/*" data-esc="img-club" hidden></label>
+          <label class="esc-escudo esc-escudo-ed" title="Cambiar escudo">${imgHtml(d.escudo, t.name)}<input type="file" accept="image/*" data-esc="img-club" hidden></label>
           <div class="esc-datos">
             <div class="esc-titulo">${esc(t.name)} <small class="badge">${esc(t.category)}</small></div>
             <span class="hz-label">Nombre</span>
             <input type="text" class="app-input" data-esc="club-nombre" value="${esc(d.nombre || t.name)}" placeholder="Nombre en carteles">
             <span class="hz-label">Categoría y división</span>
             <input type="text" class="app-input" data-esc="club-cat" list="escCats" value="${esc(d.categoria || "")}" placeholder="Ej.: INFANTIL 2ª DIVISION">
-            <div class="esc-acciones">
-              <button type="button" class="hz-mini-btn" data-esc="elegir-img-club">🖼️ ${d.escudo ? "Cambiar" : "Subir"} escudo</button>
-              <label class="hz-mini-btn esc-color-btn">🎨 Color <input type="color" class="esc-color" data-esc="color" value="${esc(colorDe(key))}" title="Color (el mismo que en Horarios)"></label>
-            </div>
           </div>
+          <label class="esc-muestra esc-muestra-ed" style="background:${esc(colorDe(key))}" title="Cambiar color (el mismo que en Horarios)"><input type="color" data-esc="color" value="${esc(colorDe(key))}"></label>
           <button type="button" class="esc-lapiz esc-hecho" data-esc="editar" title="Terminar">✓</button>
         </div>`;
       } else {
@@ -519,7 +516,7 @@
     box.innerHTML = `
       <datalist id="escCats">${categorias().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
       ${seccion("club", "🏐 Equipos del club", teams.length, `
-        <p class="esc-nota">Pulsa ✏️ para cambiar el escudo, el nombre, la división o el color. El color es el mismo que el de Horarios: si lo cambias aquí, cambia allí.</p>
+        <p class="esc-nota">Pulsa ✏️ para editar: toca el escudo para cambiarlo y el círculo para cambiar el color. El color es el mismo que el de Horarios: si lo cambias aquí, cambia allí.</p>
         ${club}`)}
       ${seccion("otros", "🛡️ Resto de equipos", datos.clubes.length, `
         ${ed ? `<button type="button" class="btn-save-session esc-actualizar" data-esc="actualizar">🔄 Actualizar desde los PDF de los calendarios</button>
@@ -627,6 +624,7 @@
       if (a === "color") {
         const key = keyDe(n);
         datos.club[key] = Object.assign({ nombre: "", categoria: "", escudo: "" }, datos.club[key], { color: n.value });
+        const m = n.closest(".esc-muestra"); if (m) m.style.background = n.value;
         guardar("Color de equipo");
         guardarColorEnHorarios(key, n.value);
         return;

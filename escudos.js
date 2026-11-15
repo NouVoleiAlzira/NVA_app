@@ -132,10 +132,23 @@
   async function leerImagenes() {
     const r = await fetch(api(IMG_DIR), { cache: "no-store" });
     if (!r.ok) return;
-    const lista = await r.json();
-    urls = {};
-    (Array.isArray(lista) ? lista : []).forEach(f => { if (f.type === "file" && f.download_url) urls[f.path] = f.download_url; });
+    const lista = (await r.json() || []).filter(f => f && f.type === "file" && f.download_url);
+    // La política de seguridad de la página (CSP) no deja poner en <img> una URL de
+    // Supabase: se descarga cada imagen (connect-src sí lo permite) y se usa como blob:
+    const nuevas = {};
+    await Promise.all(lista.map(async f => {
+      const clave = f.path + "|" + f.sha;
+      if (blobs[clave]) { nuevas[f.path] = blobs[clave]; return; }
+      try {
+        const b = await fetch(f.download_url);
+        if (!b.ok) return;
+        blobs[clave] = URL.createObjectURL(await b.blob());
+        nuevas[f.path] = blobs[clave];
+      } catch (e) { console.warn("Escudo", f.path, e); }
+    }));
+    urls = nuevas;
   }
+  const blobs = {};   // «ruta|sha» -> URL blob: ya descargada
 
   let temporizador = null;
   function guardar(msg) {

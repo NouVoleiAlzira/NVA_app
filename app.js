@@ -3010,6 +3010,7 @@
     document.querySelectorAll("#modalOptions .tab-content").forEach(c =>
       c.classList.toggle("active", c.id === `tabContent${num}`));
     if (num === 2) renderPlayerManagement();
+    if (num === 6 && typeof escAbrir === "function") escAbrir();
   }
 
   function renderConfigTab1() {
@@ -6166,6 +6167,8 @@
     hz.updated = new Date().toISOString();
     hzPersistLocal();
     const ok = await writeGitHubFile(HZ_FILE, hz, "Actualizar horarios de entrenamiento");
+    // El color de cada equipo es el mismo en ⚙️ › Escudos
+    if (ok && typeof escSincronizarColores === "function") escSincronizarColores(hz.teamColors);
     // Si no hubo conexión, writeGitHubFile lo deja en la cola offline y se enviará al reconectar.
     hzSetDirty(false);
     alert(ok ? "¡Horarios guardados y sincronizados!"

@@ -61,7 +61,8 @@
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
     "instagram.eventos": ["#igSubHead_eventos", "#igSub_eventos"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
-    "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"]
+    "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"],
+    "opciones.escudos": [".tab-btn[onclick=\"switchTab(6)\"]", "#tabContent6"]
   };
 
   const origFetch = window.fetch.bind(window);

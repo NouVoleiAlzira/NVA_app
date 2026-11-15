@@ -70,19 +70,51 @@
   }
 
   // ---------- Pintado ----------
-  function render() { renderMatches(); renderTeams(); renderProg(); }
+  function render() { renderMatches(); renderTeams(); renderProg(); renderPrem(); }
 
   // =====================================================================
   //  PLANIFICACIÓN: línea temporal, avisos y encaje de partidos sin hora
-  //  Premisas en casa (Palau): una franja por fin de semana (sáb/dom mañana/tarde),
-  //  2 pistas, infantil/cadete preferiblemente por la mañana, juvenil/senior nunca
-  //  sábado por la mañana, y un entrenador no puede tener 2 partidos a la vez (2 h).
+  //  Las premisas se configuran en la subsección «Premisas de los avisos»
+  //  (CalendarioPremisas.json, comunes para todos). Por defecto: en casa (Palau)
+  //  una franja por fin de semana, 2 pistas, infantil/cadete por la mañana el
+  //  fin de semana, juvenil/senior nunca sábado por la mañana, y un entrenador
+  //  no puede tener 2 partidos a la vez ni menos de 2 h entre campos distintos.
   // =====================================================================
-  const DUR = 120;                 // duración de un partido (min)
   const SEG = 4;                   // px que se solapan los partidos de un bloque alevín (diagonal)
-  const TARDE = 15 * 60;           // a partir de las 15:00 es «tarde»
-  const PISTAS = 2;
+  // Días: índice de getDay() (0 = domingo). Cada día: "M" mañana, "T" tarde.
+  const PREM_DEF = {
+    franja:   { on: true, nivel: "alta" },
+    pistas:   { on: true, nivel: "alta", n: 2 },
+    base:     { on: true, nivel: "media", dias: ["M", "T", "T", "T", "T", "T", "M"] },
+    mayor:    { on: true, nivel: "alta",  dias: ["MT", "T", "T", "T", "T", "T", "T"] },
+    alevines: { on: true },
+    solape:   { on: true, nivel: "alta" },
+    margen:   { on: true, nivel: "alta", min: 120 },
+    general:  { dur: 120, tarde: 15 * 60, casa: "PALAU", findeIni: 9 * 60, findeFin: 20 * 60, labIni: 17 * 60, labFin: 20 * 60 }
+  };
+  const PREM_FILE = "CalendarioPremisas.json";
+  const PREM_LOCAL = "NVA_CP_PREMISAS";
+  const clonar = (o) => JSON.parse(JSON.stringify(o));
+  // Mezcla lo guardado con los valores por defecto (así una premisa nueva siempre tiene valor)
+  function mezclarPrem(g) {
+    const r = clonar(PREM_DEF);
+    if (g && typeof g === "object") Object.keys(r).forEach(k => { if (g[k] && typeof g[k] === "object") Object.assign(r[k], g[k]); });
+    ["base", "mayor"].forEach(k => { if (!Array.isArray(r[k].dias) || r[k].dias.length !== 7) r[k].dias = PREM_DEF[k].dias.slice(); });
+    r._por = g && g._por || ""; r._cuando = g && g._cuando || "";
+    return r;
+  }
+  let PREM = mezclarPrem((() => { try { return JSON.parse(localStorage.getItem(PREM_LOCAL)); } catch (e) { return null; } })());
+  let DUR, TARDE, PISTAS, CASA_RE;
+  function aplicarPrem() {
+    DUR = +PREM.general.dur || 120;                  // duración de un partido (min)
+    TARDE = +PREM.general.tarde || 15 * 60;          // a partir de esta hora es «tarde»
+    PISTAS = +PREM.pistas.n || 2;
+    const casa = String(PREM.general.casa || "PALAU").trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    CASA_RE = new RegExp(casa || "PALAU", "i");
+  }
+  aplicarPrem();
   const FRANJA_TXT = { "6M": "sábado mañana", "6T": "sábado tarde", "0M": "domingo mañana", "0T": "domingo tarde" };
+  const DIA_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const toHHMM = (n) => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
   const dow = (iso) => new Date(iso + "T12:00:00").getDay();
@@ -108,12 +140,12 @@
   }
   // Local/visitante: manda el cambio hecho a mano; si no, el pabellón del PDF (un equipo puede
   // salir como local y jugar en otro campo); solo si no hay pabellón, el orden de los equipos.
-  const isHome = (m) => m.forced ? m.home === true : (m.venue ? /PALAU/i.test(m.venue) : m.home === true);
+  const isHome = (m) => m.forced ? m.home === true : (m.venue ? CASA_RE.test(m.venue) : m.home === true);
   // Alevines: un día al mes, varios partidos seguidos en un mismo pabellón (local o visitante da igual).
   // No ocupan la franja del Palau ni siguen sus premisas; solo cuenta que un entrenador no esté en dos sitios.
   const isAlevin = (key) => { const t = teamObj(key); return /ALEVIN/.test(normalizeTeamName((t && t.category) || key)); };
   window.cpIsAlevin = isAlevin;
-  const enPalau = (m) => isHome(m) && !m.alevin;
+  const enPalau = (m) => isHome(m) && !(m.alevin && PREM.alevines.on);
   const placeOf = (m) => isHome(m) ? "Palau" : (m.forced || !m.venue ? `campo de ${m.rival || "rival"}` : m.venue);
   const isWeekend = (iso) => { const d = dow(iso); return d === 6 || d === 0; };
   const franja = (m) => isWeekend(m.date) ? `${dow(m.date)}${m.start < TARDE ? "M" : "T"}` : "";
@@ -121,42 +153,50 @@
   const overlap = (a, b) => a.date === b.date && a.start < b.start + DUR && b.start < a.start + DUR;
   const short = (key) => { const t = teamObj(key); return t ? `${t.name} ${String(t.category || "").slice(0, 3)}.` : key; };
 
+  // ¿Puede jugar ese grupo de categorías en ese día y momento? (premisa por días)
+  const momento = (start) => start < TARDE ? "M" : "T";
+  const permitido = (g, iso, start) => !PREM[g] || !PREM[g].on || (PREM[g].dias[dow(iso)] || "").includes(momento(start));
+  const NOMBRE_GRUPO = { base: "infantil y cadete", mayor: "juvenil y senior" };
+
   // Avisos de un conjunto de partidos (con .start en minutos). Devuelve [{level, text, ids:[...] }]
   function checkRules(ms) {
     const out = [];
     const add = (level, text, list) => out.push({ level, text, ids: list.map(m => m.id) });
     const home = ms.filter(enPalau);
     // 1. Una sola franja por fin de semana
-    const byWk = {};
-    home.filter(m => isWeekend(m.date)).forEach(m => { (byWk[weekendKey(m.date)] = byWk[weekendKey(m.date)] || []).push(m); });
-    Object.keys(byWk).forEach(wk => {
-      const cnt = {};
-      byWk[wk].forEach(m => { const f = franja(m); cnt[f] = (cnt[f] || 0) + 1; });
-      const fr = Object.keys(cnt);
-      if (fr.length > 1) {
-        const main = fr.sort((a, b) => cnt[b] - cnt[a])[0];
-        add("alta", `Fin de semana ${fmtDay(wk).slice(0, 5)}: se usan ${fr.length} franjas en el Palau (${fr.map(f => FRANJA_TXT[f]).join(", ")}). Solo se puede pedir una.`, byWk[wk].filter(m => franja(m) !== main));
-      }
-    });
-    // 2. Máximo 2 pistas a la vez
-    const seenCourt = new Set();
+    if (PREM.franja.on) {
+      const byWk = {};
+      home.filter(m => isWeekend(m.date)).forEach(m => { (byWk[weekendKey(m.date)] = byWk[weekendKey(m.date)] || []).push(m); });
+      Object.keys(byWk).forEach(wk => {
+        const cnt = {};
+        byWk[wk].forEach(m => { const f = franja(m); cnt[f] = (cnt[f] || 0) + 1; });
+        const fr = Object.keys(cnt);
+        if (fr.length > 1) {
+          const main = fr.sort((a, b) => cnt[b] - cnt[a])[0];
+          add(PREM.franja.nivel, `Fin de semana ${fmtDay(wk).slice(0, 5)}: se usan ${fr.length} franjas en el Palau (${fr.map(f => FRANJA_TXT[f]).join(", ")}). Solo se puede pedir una.`, byWk[wk].filter(m => franja(m) !== main));
+        }
+      });
+    }
+    // 2. Máximo de pistas a la vez
+    if (PREM.pistas.on) {
+      const seenCourt = new Set();
+      home.forEach(m => {
+        const at = home.filter(o => o.date === m.date && o.start <= m.start && m.start < o.start + DUR);
+        if (at.length > PISTAS) {
+          const k = at.map(o => o.id).sort().join(",");
+          if (!seenCourt.has(k)) { seenCourt.add(k); add(PREM.pistas.nivel, `${fmtDay(m.date).slice(0, 5)} ${toHHMM(m.start)}: ${at.length} partidos a la vez en el Palau y solo hay ${PISTAS} pista${PISTAS === 1 ? "" : "s"}.`, at); }
+        }
+      });
+    }
+    // 3 y 4. Días y franjas en que puede jugar en casa cada grupo de categorías
     home.forEach(m => {
-      const at = home.filter(o => o.date === m.date && o.start <= m.start && m.start < o.start + DUR);
-      if (at.length > PISTAS) {
-        const k = at.map(o => o.id).sort().join(",");
-        if (!seenCourt.has(k)) { seenCourt.add(k); add("alta", `${fmtDay(m.date).slice(0, 5)} ${toHHMM(m.start)}: ${at.length} partidos a la vez en el Palau y solo hay ${PISTAS} pistas.`, at); }
-      }
+      const g = teamGroup(m.team);
+      if (!g || permitido(g, m.date, m.start)) return;
+      add(PREM[g].nivel, `${short(m.team)} juega en casa el ${DIA_LARGO[dow(m.date)]} por la ${momento(m.start) === "M" ? "mañana" : "tarde"}; no está marcado para ${NOMBRE_GRUPO[g]} en las premisas.`, [m]);
     });
-    home.forEach(m => {
-      if (!isWeekend(m.date)) return;
-      const g = teamGroup(m.team), f = franja(m);
-      // 3. Infantil y cadete, preferiblemente por la mañana
-      if (g === "base" && f.endsWith("T")) add("media", `${short(m.team)} juega en casa por la tarde (${FRANJA_TXT[f]}); infantil y cadete preferiblemente por la mañana.`, [m]);
-      // 4. Juvenil y senior, nunca sábado por la mañana
-      if (g === "mayor" && f === "6M") add("alta", `${short(m.team)} juega en casa el sábado por la mañana; juvenil y senior no pueden.`, [m]);
-    });
-    // 5 y aviso 2. Mismo entrenador: no puede jugar a la vez (2 h) y, si son campos distintos,
-    //    necesita al menos 2 h entre el final de uno y el inicio del otro.
+    // 5 y 6. Mismo entrenador: no puede jugar a la vez y, si son campos distintos,
+    //    necesita un margen entre el final de uno y el inicio del otro.
+    const margen = +PREM.margen.min || 0;
     for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) {
       const a = ms[i], b = ms[j];
       if (a.team === b.team || a.date !== b.date) continue;
@@ -166,11 +206,12 @@
       const gap = q.start - (p.start + DUR);          // minutos entre el fin del 1º y el inicio del 2º
       const lugares = placeOf(a) !== placeOf(b);
       const who = `${common.join(", ")}: ${short(p.team)} (${toHHMM(p.start)}, ${placeOf(p)}) y ${short(q.team)} (${toHHMM(q.start)}, ${placeOf(q)})`;
-      if (gap < 0) add("alta", `${who} se solapan${lugares ? " y en lugares distintos" : ""}.`, [a, b]);
-      else if (lugares && gap < DUR) add("alta", `${who}: en campos distintos solo hay ${Math.floor(gap / 60)}h${pad(gap % 60)} entre el fin de uno y el inicio del otro (mínimo 2h).`, [a, b]);
+      if (gap < 0) { if (PREM.solape.on) add(PREM.solape.nivel, `${who} se solapan${lugares ? " y en lugares distintos" : ""}.`, [a, b]); }
+      else if (PREM.margen.on && lugares && gap < margen) add(PREM.margen.nivel, `${who}: en campos distintos solo hay ${Math.floor(gap / 60)}h${pad(gap % 60)} entre el fin de uno y el inicio del otro (mínimo ${durTxt(margen)}).`, [a, b]);
     }
     return out;
   }
+  const durTxt = (min) => `${Math.floor(min / 60)}h${min % 60 ? pad(min % 60) : ""}`;
   const cost = (warns) => warns.reduce((s, w) => s + (w.level === "alta" ? 10 : 3), 0);
 
   // Encaja los partidos sin hora en la mejor hora posible (voraz: primero los más restringidos)
@@ -186,15 +227,15 @@
     free.forEach(m => {
       const wk = isWeekend(m.date);
       const cands = [];
-      for (let t = wk ? 9 * 60 : 17 * 60; t <= 20 * 60; t += 30) cands.push(t);
+      const g0 = PREM.general, ini = +(wk ? g0.findeIni : g0.labIni), fin = +(wk ? g0.findeFin : g0.labFin);
+      for (let t = ini; t <= Math.max(ini, fin); t += 30) cands.push(t);
       let best = null, bestCost = Infinity;
       cands.forEach(t => {
         const trial = Object.assign({}, m, { start: t });
         const sameDay = placed.filter(o => o.date === m.date || (enPalau(trial) && wk && weekendKey(o.date) === weekendKey(m.date)));
         let c = cost(checkRules(sameDay.concat([trial]))) * 100;
         const g = teamGroup(m.team);
-        if (wk && g === "base" && !m.alevin && t >= TARDE) c += 50;                    // preferencia de mañana
-        if (wk && g === "mayor" && t < TARDE && dow(m.date) === 6) c += 50;
+        if (g && !m.alevin && !permitido(g, m.date, t)) c += 50;                       // fuera de sus días/franjas
         // En casa: pegarse a los partidos ya fijados (bloques seguidos en las pistas)
         const homeSame = placed.filter(o => enPalau(o) && o.date === m.date);
         if (enPalau(m) && homeSame.length) c += Math.min(...homeSame.map(o => Math.abs(o.start - t))) / 60;
@@ -219,6 +260,7 @@
     applySub(id, open);
     if (open && id === "teams") renderTeams();
     if (open && id === "prog") { renderProg(); loadProg(); }
+    if (open && id === "prem") { renderPrem(); loadPrem(); }
   };
   function applySub(id, open) {
     const head = document.getElementById("cpSubHead_" + id), body = document.getElementById("cpSub_" + id);
@@ -228,7 +270,7 @@
   }
   function initSubs() {
     const st = subState();
-    const def = { tl: true, warn: true, list: false, teams: false, prog: false };
+    const def = { tl: true, warn: true, prem: false, list: false, teams: false, prog: false };
     Object.keys(def).forEach(id => applySub(id, st[id] === undefined ? def[id] : st[id]));
   }
 
@@ -847,6 +889,108 @@
   let updating = false;
 
   // ---------- Actualización programada (función de Supabase actualizar-calendarios) ----------
+  // =====================================================================
+  //  PREMISAS DE LOS AVISOS (subsección): se editan aquí y se guardan en
+  //  CalendarioPremisas.json. Hace falta «Editar» en calendario.premisas.
+  // =====================================================================
+  let premEdit = null;     // copia en edición (null = sin cambios pendientes)
+  const puedeEditarPrem = () => !window.nva || !window.nva.acceso || window.nva.acceso("calendario.premisas") === "escritura";
+  async function loadPrem() {
+    if (typeof ghSettings === "undefined" || !ghSettings.user || !ghSettings.repo || !navigator.onLine) return;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${PREM_FILE}`, { headers: { "Authorization": `token ${ghSettings.token}` }, cache: "no-store" });
+      if (!res.ok && res.status !== 404) return;
+      const g = res.ok ? JSON.parse(b64_to_utf8((await res.json()).content)) : null;
+      const nuevo = mezclarPrem(g);
+      if (JSON.stringify(nuevo) === JSON.stringify(PREM)) return;
+      PREM = nuevo; aplicarPrem();
+      try { localStorage.setItem(PREM_LOCAL, JSON.stringify(PREM)); } catch (e) {}
+      renderMatches();
+      if (!premEdit) renderPrem();
+    } catch (e) { console.error(`Error al cargar ${PREM_FILE}:`, e); }
+  }
+  const hhmm = (min) => toHHMM(+min);
+  const optsHoras = (sel, desde, hasta, paso) => {
+    let o = "";
+    for (let t = desde; t <= hasta; t += paso) o += `<option value="${t}"${t === +sel ? " selected" : ""}>${hhmm(t)}</option>`;
+    return o;
+  };
+  const optsDur = (sel, lista) => lista.map(t => `<option value="${t}"${t === +sel ? " selected" : ""}>${durTxt(t).replace("h", " h ").trim()}</option>`).join("");
+  function renderPrem() {
+    const box = document.getElementById("cpPrem");
+    if (!box || box.closest(".collapsed")) return;
+    const P = premEdit || PREM, ed = puedeEditarPrem(), dis = ed ? "" : " disabled";
+    const sw = (k) => `<button type="button" class="cp-prem-sw${P[k].on ? " on" : ""}" role="switch" aria-checked="${P[k].on}" aria-label="Activar"${dis} onclick="cpPremSet('${k}','on',${!P[k].on})"></button>`;
+    const niv = (k) => `<span class="cp-prem-niv" role="radiogroup" aria-label="Nivel del aviso">${[["alta", "Grave"], ["media", "Leve"]].map(([v, t]) =>
+      `<button type="button" class="${v}${P[k].nivel === v ? " sel" : ""}" role="radio" aria-checked="${P[k].nivel === v}"${dis} onclick="cpPremSet('${k}','nivel','${v}')">${t}</button>`).join("")}</span>`;
+    const item = (k, tit, desc, ctl) => `<div class="cp-prem-item${P[k].on === false ? " off" : ""}"><div class="cp-prem-top">${sw(k)}<div class="cp-prem-txt">
+        <div class="cp-prem-tit">${tit}</div>${desc ? `<div class="cp-prem-desc">${desc}</div>` : ""}</div></div>${ctl || ""}</div>`;
+    const ORDEN = [1, 2, 3, 4, 5, 6, 0], LETRA = ["D", "L", "M", "X", "J", "V", "S"];
+    const dias = (k) => `<div class="cp-dias">${ORDEN.map(d => {
+      const v = P[k].dias[d] || "";
+      return `<div class="cp-dia"><div class="cp-dia-btn">
+        <button type="button" class="m${v.includes("M") ? " on" : ""}"${dis} aria-pressed="${v.includes("M")}" aria-label="${DIA_LARGO[d]} por la mañana" onclick="cpPremDia('${k}',${d},'M')">M</button>
+        <button type="button" class="t${v.includes("T") ? " on" : ""}"${dis} aria-pressed="${v.includes("T")}" aria-label="${DIA_LARGO[d]} por la tarde" onclick="cpPremDia('${k}',${d},'T')">T</button></div><span>${LETRA[d]}</span></div>`;
+    }).join("")}</div>`;
+    const G = P.general;
+    const sel = (campo, opts) => `<select${dis} onchange="cpPremSet('general','${campo}',+this.value)">${opts}</select>`;
+    box.innerHTML = `
+      <div class="cp-prem-intro">Reglas con las que se generan los avisos y se proponen horas a los partidos que aún no tienen. Son comunes para todos. <b class="cp-prem-grave">Grave</b> = aviso rojo · <b class="cp-prem-leve">Leve</b> = aviso amarillo.${ed ? "" : "<br>Solo puedes verlas: para cambiarlas hace falta permiso de edición."}</div>
+      <div class="cp-prem-grupo">🏠 Partidos en casa (Palau)</div>
+      ${item("franja", "Una sola franja por fin de semana", "Sábado o domingo, mañana o tarde: solo se puede pedir una.", `<div class="cp-prem-ctl">${niv("franja")}</div>`)}
+      ${item("pistas", "Pistas disponibles a la vez", "Avisa si hay más partidos simultáneos que pistas.", `<div class="cp-prem-ctl">Pistas <select${dis} onchange="cpPremSet('pistas','n',+this.value)">${[1, 2, 3, 4].map(n => `<option${n === +P.pistas.n ? " selected" : ""}>${n}</option>`).join("")}</select>${niv("pistas")}</div>`)}
+      ${item("base", "Infantil y cadete · cuándo pueden jugar", "Toca el triángulo de arriba para la mañana y el de abajo para la tarde.", dias("base") + `<div class="cp-prem-ctl">Fuera de esto, aviso${niv("base")}</div>`)}
+      ${item("mayor", "Juvenil y senior · cuándo pueden jugar", "", dias("mayor") + `<div class="cp-prem-ctl">Fuera de esto, aviso${niv("mayor")}</div>`)}
+      ${item("alevines", "Alevines fuera de las premisas del Palau", "Juegan un día al mes en bloque; solo se les aplican las de entrenadores.", "")}
+      <div class="cp-prem-grupo">🧑‍🏫 Entrenadores</div>
+      ${item("solape", "No puede tener dos partidos a la vez", "", `<div class="cp-prem-ctl">${niv("solape")}</div>`)}
+      ${item("margen", "Margen entre partidos en campos distintos", "Tiempo mínimo entre el final de uno y el inicio del otro.", `<div class="cp-prem-ctl">Mínimo <select${dis} onchange="cpPremSet('margen','min',+this.value)">${optsDur(P.margen.min, [30, 60, 90, 120, 150, 180])}</select>${niv("margen")}</div>`)}
+      <div class="cp-prem-grupo">⏱️ Datos generales</div>
+      <div class="cp-prem-item cp-prem-gen">
+        <div class="cp-prem-ctl">Duración de un partido ${sel("dur", optsDur(G.dur, [60, 90, 120, 150, 180]))}</div>
+        <div class="cp-prem-ctl">La tarde empieza a las ${sel("tarde", optsHoras(G.tarde, 12 * 60, 17 * 60, 30))}</div>
+        <div class="cp-prem-ctl">Pabellón de casa contiene <input type="text" value="${esc(G.casa)}" maxlength="40"${dis} onchange="cpPremSet('general','casa',this.value.trim().toUpperCase())"></div>
+        <div class="cp-prem-ctl">Proponer horas · finde ${sel("findeIni", optsHoras(G.findeIni, 8 * 60, 22 * 60, 30))}–${sel("findeFin", optsHoras(G.findeFin, 8 * 60, 22 * 60, 30))}</div>
+        <div class="cp-prem-ctl">Proponer horas · L-V ${sel("labIni", optsHoras(G.labIni, 8 * 60, 22 * 60, 30))}–${sel("labFin", optsHoras(G.labFin, 8 * 60, 22 * 60, 30))}</div>
+      </div>
+      ${ed ? `<div class="cp-prem-pie">
+        <button type="button" class="btn-save-session cp-prem-def" style="background: var(--btn-fondoAmarillo);" onclick="cpPremDefecto()">↺ Valores por defecto</button>
+        <button type="button" class="btn-save-session" onclick="cpPremGuardar()"${premEdit ? "" : " disabled"}>💾 Guardar premisas</button>
+      </div>` : ""}
+      <div class="cp-prem-last">${premEdit ? "Hay cambios sin guardar." : P._cuando ? `Último cambio: ${P._por ? esc(P._por) + ", " : ""}${fmtDay(P._cuando.slice(0, 10)).slice(0, 5)} a las ${horaEs(P._cuando)}` : "Valores por defecto."}</div>`;
+  }
+  window.cpPremSet = function (k, campo, valor) {
+    if (!puedeEditarPrem()) return;
+    premEdit = premEdit || clonar(PREM);
+    premEdit[k][campo] = valor;
+    renderPrem();
+  };
+  window.cpPremDia = function (k, d, mt) {
+    if (!puedeEditarPrem()) return;
+    premEdit = premEdit || clonar(PREM);
+    const v = premEdit[k].dias[d] || "";
+    premEdit[k].dias[d] = v.includes(mt) ? v.replace(mt, "") : ["M", "T"].filter(x => x === mt || v.includes(x)).join("");
+    renderPrem();
+  };
+  window.cpPremDefecto = function () {
+    if (!puedeEditarPrem()) return;
+    premEdit = Object.assign(clonar(PREM_DEF), { _por: PREM._por, _cuando: PREM._cuando });
+    renderPrem();
+  };
+  window.cpPremGuardar = async function () {
+    if (!premEdit || !puedeEditarPrem()) return;
+    if (!navigator.onLine) { alert("Sin conexión: no se pueden guardar las premisas ahora."); return; }
+    const G = premEdit.general;
+    if (+G.findeFin < +G.findeIni || +G.labFin < +G.labIni) { alert("En «Proponer horas», la hora final no puede ser anterior a la inicial."); return; }
+    if (!String(G.casa || "").trim()) { alert("Escribe el texto que identifica el pabellón de casa (p. ej. PALAU)."); return; }
+    const datos = Object.assign(clonar(premEdit), { _por: quienSoy(), _cuando: new Date().toISOString() });
+    const ok = await writeGitHubFile(PREM_FILE, datos, "Premisas de los avisos del calendario de partidos");
+    if (!ok) { alert("No se pudieron guardar las premisas. Revisa la conexión o los permisos."); return; }
+    PREM = mezclarPrem(datos); premEdit = null; aplicarPrem();
+    try { localStorage.setItem(PREM_LOCAL, JSON.stringify(PREM)); } catch (e) {}
+    renderMatches(); renderPrem();
+  };
+
   // Cada hora en punto el servidor mira si está activada y si es la hora elegida (hora de España);
   // entonces baja y revisa los PDF sin preguntar nada: si un registro de partido ya tiene otro
   // resultado no se toca (se pregunta al pulsar «Actualizar ahora»). Lo elegido y el resumen van en su propio archivo
@@ -974,8 +1118,9 @@
     renderMatches();
     fetchFromGitHub();
     loadProg();
+    loadPrem();
     // Al volver a la app (p. ej. por la mañana) se recogen los cambios de la actualización programada
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { fetchFromGitHub(); loadProg(); } });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { fetchFromGitHub(); loadProg(); loadPrem(); } });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

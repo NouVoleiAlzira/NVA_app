@@ -119,6 +119,10 @@
   const toHHMM = (n) => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
   const dow = (iso) => new Date(iso + "T12:00:00").getDay();
   const hasTime = (m) => !!m.time && m.time !== "00:00";
+  // Jornada: la del PDF, o el número de la primera columna («J.») de la fila del partido
+  const jorOf = (m) => m.jornada || (((m.raw || "").match(/^\s*(\d{1,2})\s+\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/) || [])[1] || "");
+  // Pabellón: el PDF escribe «D,ESPORTS» por «D'ESPORTS»
+  const venueTxt = (v) => String(v || "").replace(/([A-Za-zÀ-ÿ]),(?=[A-Za-zÀ-ÿ])/g, "$1'");
   const isRest = (m) => /DESCANS/i.test(m.rival || "") || /\bDESCANSA\b/i.test(m.raw || "");
   const moveKey = L.moveKey;
 
@@ -327,7 +331,7 @@
         <div class="cp-time">${m.placed ? "≈" : ""}${toHHMM(m.start)}</div>
         <div class="cp-info">
           <div class="cp-vs">${vs}${w ? ' <span class="cp-warn-ico" title="Tiene avisos">⚠️</span>' : ""}</div>
-          <div class="cp-meta">${isHome(m) ? "🏠 Local" : "🚌 Visitante"}${m.forced ? " (cambiado)" : ""}${m.venue && !m.forced ? " · " + esc(m.venue) : ""}${m.jornada ? " · J" + esc(m.jornada) : ""}${m.coaches.length ? " · " + esc(m.coaches.join(", ")) : ""}</div>
+          <div class="cp-meta">${isHome(m) ? "🏠 Local" : "🚌 Visitante"}${m.forced ? " (cambiado)" : ""}${m.venue && !m.forced ? " · " + esc(venueTxt(m.venue)) : ""}${jorOf(m) ? " · J" + esc(jorOf(m)) : ""}${m.coaches.length ? " · " + esc(m.coaches.join(", ")) : ""}</div>
           ${m.placed ? '<div class="cp-meta cp-placed-note">Sin hora oficial: hora propuesta</div>' : ""}
         </div>
         <button type="button" class="cp-swap" data-mk="${esc(m.mk)}" data-home="${isHome(m) ? "0" : "1"}" onclick="cpSwapHome(this)" title="Cambiar campo">${isHome(m) ? "🚌 Pasar a visitante" : "🏠 Pasar a local"}</button>
@@ -374,13 +378,13 @@
           const cls = ["cp-tl-blk", m.alevin ? "alevin" : isHome(m) ? "home" : "away", m.seg ? "seg" + (m.seg.first ? "" : " seg-l") + (m.seg.last ? "" : " seg-r") : "", m.placed ? "placed" : "", m.moved ? "moved" : "", w ? "warn" : ""].join(" ");
           // Primero el equipo de casa y después el visitante
           const vsTxt = (nom) => isHome(m) ? `${nom} vs ${m.rival || "?"}` : `${m.rival || "?"} vs ${nom}`;
-          const campo = m.venue && !m.forced ? m.venue : (isHome(m) ? "Local" : "Visitante") + (m.forced ? " (cambiado)" : "");
-          const tip = `${toHHMM(m.start)}${m.placed ? " (propuesta)" : ""}${m.moved ? " (movido)" : ""} · ${vsTxt(m.team)}\nCampo: ${campo}${m.jornada ? "\nJornada " + m.jornada : ""}${m.coaches.length ? "\nEntrenadores: " + m.coaches.join(", ") : ""}${w ? "\n⚠ " + w.map(x => x.text).join("\n⚠ ") : ""}`;
+          const campo = m.venue && !m.forced ? venueTxt(m.venue) : (isHome(m) ? "Local" : "Visitante") + (m.forced ? " (cambiado)" : "");
+          const tip = `${toHHMM(m.start)}${m.placed ? " (propuesta)" : ""}${m.moved ? " (movido)" : ""} · ${vsTxt(m.team)}\nCampo: ${campo}${jorOf(m) ? "\nJornada " + jorOf(m) : ""}${m.coaches.length ? "\nEntrenadores: " + m.coaches.join(", ") : ""}${w ? "\n⚠ " + w.map(x => x.text).join("\n⚠ ") : ""}`;
           const pos = m.seg
             ? `left:calc(${pct(m.start)} - ${SEG}px);width:calc(${pct(minH * 60 + Math.max(15, m.seg.end - m.start))} + ${2 * SEG}px)`
             : `left:${pct(m.start)};width:${pct(minH * 60 + DUR)}`;
           t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
-            <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}${tlFull && m.jornada ? ` · J${esc(m.jornada)}` : ""}</span><span class="cp-tl-n">${esc(tlFull ? vsTxt(short(m.team)) : short(m.team))}</span>${tlFull ? `<span class="cp-tl-v">📍 ${esc(campo)}</span>` : ""}</div>`;
+            <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}${tlFull && jorOf(m) ? ` · J${esc(jorOf(m))}` : ""}</span><span class="cp-tl-n">${esc(tlFull ? vsTxt(short(m.team)) : short(m.team))}</span>${tlFull ? `<span class="cp-tl-v">📍 ${esc(campo)}</span>` : ""}</div>`;
         });
         t += `</div></div>`;
       });

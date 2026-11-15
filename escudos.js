@@ -35,6 +35,9 @@
   let datos = cargarLocal();      // null = aún no existe la carpeta Escudos
   let urls = {};                  // ruta de imagen -> URL firmada para verla
   let abiertos = {};              // clubes desplegados
+  let editando = null;            // equipo del club que se está editando (lápiz)
+  let secciones = { club: true, otros: true };   // secciones desplegadas
+  try { Object.assign(secciones, JSON.parse(localStorage.getItem("NVA_ESC_SECC")) || {}); } catch (e) {}
   let filtro = "";
   let estado = "";
   let leido = false;
@@ -440,15 +443,33 @@
     let club = "";
     teams.forEach(t => {
       const key = getTeamKey(t), d = datos.club[key] || {};
-      club += `<div class="esc-equipo" data-key="${esc(key)}">
-          <label class="esc-escudo" title="Cambiar escudo">${imgHtml(d.escudo, t.name)}${ed ? `<input type="file" accept="image/*" data-esc="img-club" hidden>` : ""}</label>
+      if (ed && editando === key) {
+        club += `<div class="esc-equipo esc-editando" data-key="${esc(key)}">
+          <label class="esc-escudo" title="Cambiar escudo">${imgHtml(d.escudo, t.name)}<input type="file" accept="image/*" data-esc="img-club" hidden></label>
           <div class="esc-datos">
             <div class="esc-titulo">${esc(t.name)} <small class="badge">${esc(t.category)}</small></div>
-            <input type="text" class="app-input" data-esc="club-nombre" value="${esc(d.nombre || t.name)}" placeholder="Nombre en carteles"${dis}>
-            <input type="text" class="app-input" data-esc="club-cat" list="escCats" value="${esc(d.categoria || "")}" placeholder="Categoría (como en la federación)"${dis}>
+            <span class="hz-label">Nombre</span>
+            <input type="text" class="app-input" data-esc="club-nombre" value="${esc(d.nombre || t.name)}" placeholder="Nombre en carteles">
+            <span class="hz-label">Categoría y división</span>
+            <input type="text" class="app-input" data-esc="club-cat" list="escCats" value="${esc(d.categoria || "")}" placeholder="Ej.: INFANTIL 2ª DIVISION">
+            <div class="esc-acciones">
+              <button type="button" class="hz-mini-btn" data-esc="elegir-img-club">🖼️ ${d.escudo ? "Cambiar" : "Subir"} escudo</button>
+              <label class="hz-mini-btn esc-color-btn">🎨 Color <input type="color" class="esc-color" data-esc="color" value="${esc(colorDe(key))}" title="Color (el mismo que en Horarios)"></label>
+            </div>
           </div>
-          <input type="color" class="esc-color" data-esc="color" value="${esc(colorDe(key))}" title="Color (el mismo que en Horarios)"${dis}>
+          <button type="button" class="esc-lapiz esc-hecho" data-esc="editar" title="Terminar">✓</button>
         </div>`;
+      } else {
+        club += `<div class="esc-equipo" data-key="${esc(key)}">
+          ${imgHtml(d.escudo, t.name)}
+          <div class="esc-datos">
+            <div class="esc-titulo">${esc(d.nombre || t.name)}</div>
+            <div class="esc-sub"><small class="badge">${esc(t.category)}</small> ${esc(d.categoria || "")}</div>
+          </div>
+          <span class="esc-muestra" style="background:${esc(colorDe(key))}" title="Color (el mismo que en Horarios)"></span>
+          ${ed ? `<button type="button" class="esc-lapiz" data-esc="editar" title="Modificar">✏️</button>` : ""}
+        </div>`;
+      }
     });
     if (!teams.length) club = `<p class="esc-nota">No hay equipos del club. Créalos en la pestaña «Jugadores/as y Equipos».</p>`;
 
@@ -497,13 +518,10 @@
 
     box.innerHTML = `
       <datalist id="escCats">${categorias().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
-      <div class="config-section">
-        <div class="config-subtitle">Equipos del club <span class="badge">${teams.length}</span></div>
-        <p class="esc-nota">Toca el escudo para cambiarlo. El color es el mismo que el de Horarios: si lo cambias aquí, cambia allí.</p>
-        ${club}
-      </div>
-      <div class="config-section">
-        <div class="config-subtitle">Otros clubes <span class="badge">${datos.clubes.length}</span></div>
+      ${seccion("club", "🏐 Equipos del club", teams.length, `
+        <p class="esc-nota">Pulsa ✏️ para cambiar el escudo, el nombre, la división o el color. El color es el mismo que el de Horarios: si lo cambias aquí, cambia allí.</p>
+        ${club}`)}
+      ${seccion("otros", "🛡️ Resto de equipos", datos.clubes.length, `
         ${ed ? `<button type="button" class="btn-save-session esc-actualizar" data-esc="actualizar">🔄 Actualizar desde los PDF de los calendarios</button>
         <p class="esc-nota">Añade los rivales de los calendarios de partidos que aún no estén, cada uno en su club.</p>` : ""}
         <input type="search" class="app-input esc-buscar" data-esc="buscar" value="${esc(filtro)}" placeholder="🔎 Buscar club o equipo">
@@ -511,9 +529,18 @@
         ${ed ? `<div class="input-group esc-nuevo-club">
           <input type="text" class="app-input" data-esc="nuevo-club" placeholder="Nombre del nuevo club">
           <button type="button" class="btn-add" data-esc="club-anadir">+</button>
-        </div>` : ""}
-      </div>
+        </div>` : ""}`)}
       <p class="esc-estado" id="escEstado">${esc(estado)}</p>`;
+  }
+
+  function seccion(id, titulo, n, cuerpo) {
+    const abierta = !!secciones[id];
+    return `<div class="config-section esc-seccion">
+        <button type="button" class="hz-sub-btn esc-sec-btn${abierta ? " open" : ""}" data-esc="seccion" data-sec="${id}" aria-expanded="${abierta}">
+          <span>${titulo} <small class="badge">${n}</small></span><span>${abierta ? "🔻" : "➤"}</span>
+        </button>
+        ${abierta ? `<div class="esc-sec-body">${cuerpo}</div>` : ""}
+      </div>`;
   }
 
   // ---------- Eventos ----------
@@ -549,6 +576,13 @@
       const a = b.dataset.esc, c = datos && clubDe(b);
       if (a === "crear") return crearDesdeDatos();
       if (a === "actualizar") return actualizarDesdePdf();
+      if (a === "seccion") {
+        secciones[b.dataset.sec] = !secciones[b.dataset.sec];
+        try { localStorage.setItem("NVA_ESC_SECC", JSON.stringify(secciones)); } catch (e) {}
+        return pintar();
+      }
+      if (a === "editar") { const k = keyDe(b); editando = editando === k ? null : k; return pintar(); }
+      if (a === "elegir-img-club") { const i = b.closest(".esc-equipo").querySelector("[data-esc=img-club]"); if (i) i.click(); return; }
       if (a === "plegar") { abiertos[c.id] = !abiertos[c.id]; return pintar(); }
       if (a === "elegir-img") { const i = b.closest(".esc-panel-club").querySelector("[data-esc=img-rival]"); if (i) i.click(); return; }
       if (a === "quitar-img") { c.escudo = ""; guardar("Quitar escudo"); return pintar(); }

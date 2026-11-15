@@ -804,3 +804,14 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .esc-actualizar { margin-bottom: 4px; }
 .esc-buscar { margin-bottom: 10px; }
 .esc-nuevo-club { margin-top: 10px; }
+.esc-seccion { padding: 8px; }
+.esc-sec-btn { margin-bottom: 0; }
+.esc-sec-body { padding: 10px 4px 2px; }
+.esc-sub { font-size: 0.74rem; color: var(--txt-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.esc-muestra { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.7); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+.esc-lapiz { flex: none; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borde); background: var(--sf-fila); color: var(--txt-1); font-size: 1rem; cursor: pointer; padding: 0; }
+.esc-hecho { background: rgba(34, 197, 94, 0.18); border-color: rgba(34, 197, 94, 0.55); font-weight: 800; }
+.esc-editando { align-items: flex-start; }
+.esc-editando .hz-label { margin: 2px 0 0; }
+.esc-color-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; }
+.esc-color-btn .esc-color { width: 26px; height: 22px; border-radius: 6px; }

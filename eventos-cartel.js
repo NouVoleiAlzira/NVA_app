@@ -543,6 +543,9 @@
       .ev-estado { font-size: .8rem; color: var(--ev-gris); }
       .ev-acc { display: flex; gap: 6px; flex-wrap: wrap; margin-left: 34px; }
       .ev-acc > * { flex: 1 1 140px; }
+      .ev-servicio { display: flex; align-items: center; gap: 8px; white-space: nowrap; min-width: 0; font-size: .8rem; color: var(--ev-gris); }
+      .ev-servicio select { flex: 1 1 0; min-width: 0; min-height: 32px; border-radius: 10px; border: 1px solid var(--ev-linea); background: rgba(233,238,250,.05); color: var(--ev-tiza); font: 500 .82rem Barlow, sans-serif; padding: 4px 8px; }
+      .ev-servicio select option { background: #101a3d; color: #e9eefa; }
       .ev-boton { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--ev-linea); background: rgba(233,238,250,.06); color: var(--ev-tiza); font: 700 .86rem Barlow, sans-serif; cursor: pointer; }
       .ev-boton.prim { background: var(--ev-naranja); border-color: var(--ev-naranja); color: #fff; }
       .ev-panel { flex: none; border-radius: 16px; background: var(--ev-pista); border: 1px solid var(--ev-linea); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -842,6 +845,7 @@
         <button type="button" class="ev-op" data-generar="${p.capa}">✨ Generarla desde la app</button>
         ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">La subo luego</button>` : ""}
       </div>
+      ${servicioHtml()}
       <div class="ev-estado" data-estado="${p.capa}" style="margin-left:34px"></div>`;
     if (!esFondo && tiene) {
       h += `<div class="ev-fila" style="font-size:.84rem"><label><input type="checkbox" data-qf ${quitarFondo.activo ? "checked" : ""}> Quitar el fondo de color</label></div>
@@ -869,6 +873,7 @@
         <button type="button" class="ev-op" data-generar="fondo">✨ Generarlo desde la app</button>
         ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">Lo subo luego</button>` : ""}
       </div>
+      ${servicioHtml()}
       <div class="ev-estado" data-estado="fondo" style="margin-left:34px"></div>`;
   }
 
@@ -1405,6 +1410,11 @@
     });
     c.querySelectorAll("[data-omitir]").forEach(b => b.onclick = () => responder(b.dataset.omitir, "omitir"));
     c.querySelectorAll("[data-generar]").forEach(b => b.onclick = () => generar(b));
+    c.querySelectorAll("[data-servicio]").forEach(s => s.onchange = () => {
+      try { localStorage.setItem("NVA_EV_SERVICIO", s.value); } catch (e) { /* nada */ }
+      c.querySelectorAll("[data-servicio]").forEach(o => { o.value = s.value; });
+    });
+    cargarServicios(c);
     const qf = c.querySelector("[data-qf]");
     if (qf) qf.onchange = () => { quitarFondo.activo = qf.checked; procesarPersonaje(); pintar(); };
     const qft = c.querySelector("[data-qftol]");
@@ -1474,6 +1484,51 @@
   }
 
   /* ---------- Generar desde la app (si la función está configurada) ---------- */
+  // Servicios de imágenes de la función generar-cartel. «auto» deja que elija la función.
+  const SERVICIOS = [
+    { v: "auto", t: "Automático" },
+    { v: "cloudflare", t: "Cloudflare · FLUX.2 (gratis, cupo diario)" },
+    { v: "gemini", t: "Google Gemini (de pago, copia la camiseta)" },
+    { v: "huggingface", t: "Hugging Face · FLUX.1 schnell" },
+    { v: "horde", t: "Stable Horde (gratis, puede tardar)" },
+  ];
+  let serviciosListos = null;       // los que tienen secretos en Supabase (null = sin saber)
+  const servicioGuardado = () => { try { return localStorage.getItem("NVA_EV_SERVICIO") || "auto"; } catch (e) { return "auto"; } };
+  function servicioHtml() {
+    const g = servicioGuardado();
+    return `<div class="ev-acc"><label class="ev-servicio">Pintar con <select data-servicio>${SERVICIOS.map(x => {
+      const off = serviciosListos && x.v !== "auto" && !serviciosListos.includes(x.v);
+      return `<option value="${x.v}"${x.v === g ? " selected" : ""}${off ? " disabled" : ""}>${esc(x.t)}${off ? " · sin configurar" : ""}</option>`;
+    }).join("")}</select></label></div>`;
+  }
+  async function cargarServicios(c) {
+    if (serviciosListos || cargarServicios.pend) return;
+    const sb = window.nva && window.nva.cliente;
+    if (!sb || !c.querySelector("[data-servicio]")) return;
+    cargarServicios.pend = true;
+    try {
+      const { data } = await sb.functions.invoke("generar-cartel", { body: { accion: "proveedores" } });
+      if (data && Array.isArray(data.proveedores)) serviciosListos = data.proveedores;
+    } catch (e) { /* sin función: se queda la lista entera */ }
+    cargarServicios.pend = false;
+    if (!serviciosListos || !capa) return;
+    capa.querySelectorAll("[data-servicio]").forEach(s => {
+      s.querySelectorAll("option").forEach(o => {
+        const x = SERVICIOS.find(y => y.v === o.value), off = o.value !== "auto" && !serviciosListos.includes(o.value);
+        o.disabled = off; o.textContent = x.t + (off ? " · sin configurar" : "");
+      });
+      if (s.selectedOptions[0] && s.selectedOptions[0].disabled) s.value = "auto";
+    });
+  }
+  async function llamarFuncion(sb, body) {
+    const { data, error } = await sb.functions.invoke("generar-cartel", { body });
+    if (error) {
+      let msg = error.message;
+      try { msg = (await error.context.json()).error || msg; } catch (e) { /* sin detalle */ }
+      throw new Error(msg);
+    }
+    return data;
+  }
   async function referenciasEq() {
     if (!esPersona() || r.equip === "otro") return {};
     const eq = equipaciones.find(e => e.id === r.equip) || {};
@@ -1492,7 +1547,8 @@
     if (!sb) { est.textContent = "No hay conexión con Supabase."; return; }
     btn.disabled = true;
     const t0 = Date.now();
-    const reloj = setInterval(() => { est.textContent = `🎨 Pintando… ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);
+    let cola = "";
+    const reloj = setInterval(() => { est.textContent = `🎨 Pintando… ${Math.round((Date.now() - t0) / 1000)} s${cola}`; }, 500);
     try {
       const F = formato();
       const body = modo === "ia"
@@ -1500,11 +1556,15 @@
         : capaId === "fondo"
         ? { prompt: promptFondo(), aspecto: F.ar }
         : Object.assign({ prompt: promptPersonaje(), aspecto: nPers() <= 1 || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
-      const { data, error } = await sb.functions.invoke("generar-cartel", { body });
-      if (error) {
-        let msg = error.message;
-        try { msg = (await error.context.json()).error || msg; } catch (e) { /* sin detalle */ }
-        throw new Error(msg);
+      const servicio = (capa.querySelector("[data-servicio]") || {}).value || servicioGuardado();
+      if (servicio !== "auto") body.proveedor = servicio;
+      let data = await llamarFuncion(sb, body);
+      // Stable Horde es asíncrono: se pregunta cada 5 s hasta que lo pinten (máx. 10 min)
+      while (data && data.pendiente && data.id) {
+        if (Date.now() - t0 > 600000) throw new Error("Stable Horde tarda demasiado; prueba otra vez más tarde");
+        cola = data.cola != null ? ` · en cola: ${data.cola}${data.espera ? `, unos ${data.espera} s` : ""}` : "";
+        await new Promise(ok => setTimeout(ok, 5000));
+        data = await llamarFuncion(sb, { accion: "horde_estado", id: data.id });
       }
       if (!data || !data.imagen) throw new Error((data && data.error) || "La IA no devolvió ninguna imagen");
       const i = new Image();

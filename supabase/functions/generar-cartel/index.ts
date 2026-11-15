@@ -12,7 +12,21 @@
 //       CF_MODELO opcional (por defecto @cf/black-forest-labs/flux-2-dev)
 //   · Google Gemini (de pago, el que mejor copia la equipación)
 //       GEMINI_API_KEY, GEMINI_MODELO opcional (gemini-2.5-flash-image)
-//   IMAGEN_PROVEEDOR = "cloudflare" | "gemini" fuerza uno de los dos.
+//   · Hugging Face Inference (FLUX.1-schnell, crédito gratuito mensual pequeño)
+//       HF_TOKEN (token «fine-grained» con «Make calls to Inference Providers»)
+//       HF_MODELO opcional (por defecto black-forest-labs/FLUX.1-schnell)
+//   · Stable Horde / AI Horde (gratis, voluntarios; puede tardar minutos)
+//       HORDE_API_KEY opcional (sin ella se usa la anónima 0000000000, más lenta)
+//       HORDE_MODELO opcional (por defecto «AlbedoBase XL (SDXL)»)
+//   IMAGEN_PROVEEDOR = "cloudflare" | "gemini" | "huggingface" | "horde" fuerza uno
+//   cuando la app no elige. La app puede pedir uno concreto con «proveedor».
+//
+// Acciones (campo «accion» del cuerpo):
+//   (ninguna)         genera y devuelve { imagen, mime, proveedor }
+//   "proveedores"     devuelve { proveedores: [...], defecto } los que están listos
+//   "horde_estado"    con «id»: Horde es asíncrono; la primera llamada devuelve
+//                     { pendiente: true, id } y la app pregunta cada pocos segundos
+//                     hasta recibir la imagen (así no se pasa el límite de tiempo).
 //   APP_URL opcional: de dónde leer Equipacion/ (por defecto la app publicada).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
@@ -105,6 +119,98 @@ async function conGemini(prompt: string, aspecto: string, refs: Referencia[]) {
   return { imagen: d.data, mime: d.mimeType ?? d.mime_type ?? "image/png" };
 }
 
+// Hugging Face: el router de Inference Providers devuelve la imagen en bruto
+// Tamaños múltiplos de 64 y como mucho ~1 megapíxel (Horde no deja más sin kudos)
+const TAMANOS_SD: Record<string, [number, number]> = {
+  "9:16": [576, 1024],
+  "4:5": [832, 1024],
+  "1:1": [1024, 1024],
+  "3:4": [768, 1024],
+  "16:9": [1024, 576],
+};
+
+async function conHuggingFace(prompt: string, aspecto: string) {
+  const modelo = Deno.env.get("HF_MODELO") ?? "black-forest-labs/FLUX.1-schnell";
+  const [w, h] = TAMANOS_SD[aspecto] ?? TAMANOS_SD["4:5"];
+  const r = await fetch(`https://router.huggingface.co/hf-inference/models/${modelo}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${Deno.env.get("HF_TOKEN") ?? ""}`,
+      "Content-Type": "application/json",
+      Accept: "image/png",
+      "x-wait-for-model": "true",
+    },
+    body: JSON.stringify({ inputs: prompt, parameters: { width: w, height: h, num_inference_steps: 4 } }),
+  });
+  const tipo = r.headers.get("content-type") || "";
+  if (r.status === 402) throw new Error("Hugging Face: se ha gastado el crédito gratuito de este mes");
+  if (!r.ok) throw new Error(`Hugging Face respondió ${r.status}: ${(await r.text()).slice(0, 400)}`);
+  if (tipo.startsWith("image/")) return { imagen: aBase64(await r.arrayBuffer()), mime: tipo };
+  const j = await r.json().catch(() => null);
+  throw new Error(`Hugging Face no devolvió ninguna imagen${j?.error ? ": " + j.error : ""}`);
+}
+
+// Stable Horde (AI Horde): se encarga, y se pregunta luego por el resultado
+const HORDE = "https://aihorde.net/api/v2";
+const hordeCabeceras = () => ({
+  apikey: Deno.env.get("HORDE_API_KEY") || "0000000000",
+  "Client-Agent": "NVA_app:1.0:github.com/NouVoleiAlzira",
+  "Content-Type": "application/json",
+});
+
+async function hordeEncargar(prompt: string, aspecto: string) {
+  const [w, h] = TAMANOS_SD[aspecto] ?? TAMANOS_SD["4:5"];
+  const modelo = Deno.env.get("HORDE_MODELO") ?? "AlbedoBase XL (SDXL)";
+  const negativo = "text, letters, words, watermark, logo, signature, blurry, deformed hands, extra fingers";
+  const r = await fetch(`${HORDE}/generate/async`, {
+    method: "POST",
+    headers: hordeCabeceras(),
+    body: JSON.stringify({
+      prompt: `${prompt.slice(0, 1800)} ### ${negativo}`,
+      params: { width: w, height: h, steps: 25, cfg_scale: 6, sampler_name: "k_euler_a", n: 1, karras: true },
+      models: [modelo],
+      nsfw: false,
+      censor_nsfw: true,
+      r2: true,
+      shared: false,
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.id) throw new Error(`Stable Horde no aceptó el encargo (${r.status}): ${j.message ?? ""}`);
+  return j.id as string;
+}
+
+async function hordeEstado(id: string) {
+  const c = await fetch(`${HORDE}/generate/check/${encodeURIComponent(id)}`, { headers: hordeCabeceras() });
+  const e = await c.json().catch(() => ({}));
+  if (!c.ok) throw new Error(`Stable Horde: ${e.message ?? c.status}`);
+  if (e.faulted) throw new Error("Stable Horde: el encargo ha fallado; prueba otra vez");
+  if (!e.is_possible) throw new Error("Stable Horde: ahora no hay nadie que pueda pintar este modelo; prueba más tarde u otro servicio");
+  if (!e.done) {
+    return { pendiente: true, id, cola: e.queue_position ?? null, espera: e.wait_time ?? null };
+  }
+  const s = await fetch(`${HORDE}/generate/status/${encodeURIComponent(id)}`, { headers: hordeCabeceras() });
+  const st = await s.json().catch(() => ({}));
+  const g = st?.generations?.[0];
+  if (!g?.img) throw new Error("Stable Horde no devolvió ninguna imagen");
+  if (g.censored) throw new Error("Stable Horde ha censurado la imagen; cambia el encargo");
+  if (/^https?:/.test(g.img)) {
+    const im = await fetch(g.img);
+    if (!im.ok) throw new Error("No se pudo descargar la imagen de Stable Horde");
+    return { imagen: aBase64(await im.arrayBuffer()), mime: im.headers.get("content-type") || "image/webp" };
+  }
+  return { imagen: g.img, mime: "image/webp" };
+}
+
+function proveedoresListos() {
+  const lista: string[] = [];
+  if (Deno.env.get("CF_ACCOUNT_ID") && Deno.env.get("CF_API_TOKEN")) lista.push("cloudflare");
+  if (Deno.env.get("GEMINI_API_KEY")) lista.push("gemini");
+  if (Deno.env.get("HF_TOKEN")) lista.push("huggingface");
+  lista.push("horde"); // siempre disponible: sin clave usa la anónima
+  return lista;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -116,15 +222,29 @@ Deno.serve(async (req) => {
   if (!usuario?.user || nivel !== "escritura") return respuesta(403, { error: "Sin permiso para crear carteles de eventos" });
 
   const cuerpo = await req.json().catch(() => ({}));
+  const listos = proveedoresListos();
+  const forzado = Deno.env.get("IMAGEN_PROVEEDOR") ?? "";
+  const defecto = listos.includes(forzado) ? forzado : listos[0];
+  if (cuerpo.accion === "proveedores") return respuesta(200, { proveedores: listos, defecto });
+  if (cuerpo.accion === "horde_estado") {
+    try {
+      return respuesta(200, { ...(await hordeEstado(String(cuerpo.id || ""))), proveedor: "horde" });
+    } catch (e) {
+      return respuesta(502, { error: (e as Error).message });
+    }
+  }
+
   const prompt = String(cuerpo.prompt || "").slice(0, 4000);
   const aspecto = TAMANOS[cuerpo.aspecto] ? cuerpo.aspecto : "4:5";
   if (!prompt) return respuesta(400, { error: "Falta el encargo (prompt)" });
 
-  const forzado = Deno.env.get("IMAGEN_PROVEEDOR");
-  const hayCf = !!(Deno.env.get("CF_ACCOUNT_ID") && Deno.env.get("CF_API_TOKEN"));
-  const hayGemini = !!Deno.env.get("GEMINI_API_KEY");
-  const proveedor = forzado || (hayCf ? "cloudflare" : hayGemini ? "gemini" : "");
-  if (!proveedor) return respuesta(503, { error: "Falta configurar el servicio de imágenes (secretos de Cloudflare o Gemini en Supabase)" });
+  const pedido = String(cuerpo.proveedor || "");
+  if (pedido && !listos.includes(pedido)) {
+    return respuesta(503, { error: `El servicio «${pedido}» no está configurado (faltan sus secretos en Supabase)` });
+  }
+  const proveedor = pedido || defecto;
+  // Solo Cloudflare y Gemini saben usar fotos de referencia
+  const usaRefs = proveedor === "cloudflare" || proveedor === "gemini";
 
   let texto = prompt;
   let refs: Referencia[] = [];
@@ -143,7 +263,7 @@ Deno.serve(async (req) => {
         descripcion: String(cuerpo.descripcionEq ?? "").slice(0, 500),
       }
       : await referenciasEquipacion(String(cuerpo.equipacion));
-    refs = eq.refs;
+    refs = usaRefs ? eq.refs : [];
     if (refs.length) {
       texto += `\n\nThe player must wear EXACTLY the volleyball kit shown in the reference image${refs.length > 1 ? "s" : ""} (same colours, cut, pattern and details), but with the shirt number ${cuerpo.dorsal ?? ""} and no player name. Do not copy the background of the reference.${eq.descripcion ? ` Kit description: ${eq.descripcion}.` : ""}`;
     } else if (eq.descripcion) {
@@ -152,7 +272,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const r = proveedor === "gemini" ? await conGemini(texto, aspecto, refs) : await conCloudflare(texto, aspecto, refs);
+    if (proveedor === "horde") {
+      const id = await hordeEncargar(texto, aspecto);
+      return respuesta(200, { pendiente: true, id, proveedor });
+    }
+    const r = proveedor === "gemini"
+      ? await conGemini(texto, aspecto, refs)
+      : proveedor === "huggingface"
+      ? await conHuggingFace(texto, aspecto)
+      : await conCloudflare(texto, aspecto, refs);
     return respuesta(200, { ...r, proveedor, referencias: refs.length });
   } catch (e) {
     return respuesta(502, { error: (e as Error).message });

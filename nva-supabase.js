@@ -726,6 +726,12 @@
       const algun = acceso("informes.fichas") !== "ninguno" || acceso("informes.autorizaciones") !== "ninguno";
       if (algun) fed.removeAttribute("data-nva-oculto"); else fed.setAttribute("data-nva-oculto", "");
     }
+    // Desplegable «Informes Entrenadores»: solo si se ve alguno de sus permisos
+    const inf = document.getElementById("grpInformes");
+    if (inf) {
+      const algun = acceso("informes.pdf") !== "ninguno" || acceso("informes.kilometraje") !== "ninguno";
+      if (algun) inf.removeAttribute("data-nva-oculto"); else inf.setAttribute("data-nva-oculto", "");
+    }
     const igVisible = acceso("instagram") !== "ninguno";
     ["#secHead_instagram", "#secBody_instagram"].forEach(sel => {
       const n = document.querySelector(sel);

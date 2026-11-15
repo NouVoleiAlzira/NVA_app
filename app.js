@@ -4840,6 +4840,30 @@
   }
   initSections();
 
+  // --- Desplegables dentro de las secciones (Entrenadores/Equipos, Federación,
+  //     Consultas...). Mismo aspecto que los de «Calendario de partidos»;
+  //     empiezan abiertos y se recuerda lo que plegó cada persona. ---
+  const SUBS_KEY = "NVA_SUBS";
+  const SUB_IDS = ["entrenadores", "informes", "federacion", "drive", "consultas", "horarios", "registros"];
+  function loadSubsState() { try { return JSON.parse(localStorage.getItem(SUBS_KEY)) || {}; } catch (e) { return {}; } }
+  function applySubState(id, open) {
+    const head = document.getElementById("nvSubHead_" + id), body = document.getElementById("nvSub_" + id);
+    if (!head || !body) return;
+    head.classList.toggle("collapsed", !open); body.classList.toggle("collapsed", !open);
+    head.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function nvaToggleSub(id) {
+    const st = loadSubsState();
+    const open = st[id] === false;
+    st[id] = open;
+    try { localStorage.setItem(SUBS_KEY, JSON.stringify(st)); } catch (e) { /* sin almacenamiento */ }
+    applySubState(id, open);
+  }
+  function nvaSubKey(ev, id) {
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); nvaToggleSub(id); }
+  }
+  (function () { const st = loadSubsState(); SUB_IDS.forEach(id => applySubState(id, st[id] !== false)); })();
+
   // Primer pintado con los datos locales; GitHub lo repinta al terminar de sincronizar
   window.addEventListener("load", () => setTimeout(() => { try { renderWeekCalendar(); } catch (e) { console.error(e); } }, 0));
 

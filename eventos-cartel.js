@@ -1061,6 +1061,10 @@
     return limpiar(partes.filter(Boolean).join("\n\n"));
   }
   const promptDe = capaId => modo === "ia" ? promptCartel() : capaId === "fondo" ? promptFondo() : promptPersonaje();
+  // Para pegar en Gemini o ChatGPT: si hay imagen de referencia, que la IA espere a recibirla antes de pintar
+  const ESPERA_REF = "IMPORTANT: do NOT generate any image yet. I will attach a reference image in my next message. " +
+    "For now, reply only with: «OK, waiting for the reference image». Start generating only after the reference image has been added, using it as described below.\n\n";
+  const promptCopiar = capaId => (capa && capa.querySelector("[data-copiareq]") ? ESPERA_REF : "") + promptDe(capaId);
 
   /* ---------- Los encargos ---------- */
   function orientacion(F) { return F.w > F.h ? "horizontal" : F.w < F.h ? "vertical" : "square"; }
@@ -1369,7 +1373,7 @@
 
     // Imágenes
     c.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => {
-      const txt = promptDe(b.dataset.copiar);
+      const txt = promptCopiar(b.dataset.copiar);
       try { await navigator.clipboard.writeText(txt); b.textContent = "✅ Copiado"; }
       catch (e) {
         const caja = c.querySelector(`[data-prompt="${b.dataset.copiar}"]`), rg = document.createRange();
@@ -1515,7 +1519,7 @@
   // Copia el encargo y abre la web elegida en otra pestaña
   async function abrirWeb(btn, servicio) {
     const capaId = btn.dataset.generar, est = capa.querySelector(`[data-estado="${capaId}"]`);
-    const w = WEBS[servicio], txt = promptDe(capaId);
+    const w = WEBS[servicio], txt = w.fotos ? promptCopiar(capaId) : promptDe(capaId);
     let copiado = true;
     try { await navigator.clipboard.writeText(txt); } catch (e) { copiado = false; }
     const vent = window.open(w.url(txt), "_blank");   // sin «noopener»: así se sabe si se ha abierto
@@ -1526,7 +1530,7 @@
     if (w.escrito) pasos.push("El encargo ya va escrito en ChatGPT.");
     else if (copiado) pasos.push("📋 Encargo copiado: en la pestaña nueva, pégalo con Ctrl+V (en el móvil, mantén pulsado › Pegar).");
     else pasos.push("No he podido copiar el encargo: cópialo con «📋 Copiar el encargo» y pégalo allí.");
-    if (hayRef) pasos.push(w.fotos ? "Vuelve, pulsa «🖼️ Copiar la imagen de referencia» y pégala también." : "Esta web no admite fotos: la camiseta saldrá a partir del texto.");
+    if (hayRef) pasos.push(w.fotos ? "La IA esperará a la imagen: vuelve, pulsa «🖼️ Copiar la imagen de referencia» y pégala allí." : "Esta web no admite fotos: la camiseta saldrá a partir del texto.");
     pasos.push("Cuando la tengas, descárgala y súbela aquí con el botón naranja.");
     est.innerHTML = pasos.join("<br>");
   }

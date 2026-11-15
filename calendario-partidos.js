@@ -165,7 +165,7 @@
   // Avisos de un conjunto de partidos (con .start en minutos). Devuelve [{level, text, ids:[...] }]
   function checkRules(ms) {
     const out = [];
-    const add = (level, text, list) => out.push({ level, text, ids: list.map(m => m.id) });
+    const add = (level, text, list, motivo) => out.push({ level, text, motivo, ids: list.map(m => m.id) });
     const home = ms.filter(enPalau);
     // 1. Una sola franja por fin de semana
     if (PREM.franja.on) {
@@ -210,8 +210,8 @@
       const gap = q.start - (p.start + DUR);          // minutos entre el fin del 1º y el inicio del 2º
       const lugares = placeOf(a) !== placeOf(b);
       const who = `${common.join(", ")}: ${short(p.team)} (${toHHMM(p.start)}, ${placeOf(p)}) y ${short(q.team)} (${toHHMM(q.start)}, ${placeOf(q)})`;
-      if (gap < 0) { if (PREM.solape.on) add(PREM.solape.nivel, `${who} se solapan${lugares ? " y en lugares distintos" : ""}.`, [a, b]); }
-      else if (PREM.margen.on && lugares && gap < margen) add(PREM.margen.nivel, `${who}: en campos distintos solo hay ${Math.floor(gap / 60)}h${pad(gap % 60)} entre el fin de uno y el inicio del otro (mínimo ${durTxt(margen)}).`, [a, b]);
+      if (gap < 0) { if (PREM.solape.on) add(PREM.solape.nivel, `${who} se solapan${lugares ? " y en lugares distintos" : ""}.`, [a, b], `${common.join(", ")}: se solapan${lugares ? " y en lugares distintos" : ""}.`); }
+      else if (PREM.margen.on && lugares && gap < margen) add(PREM.margen.nivel, `${who}: en campos distintos solo hay ${Math.floor(gap / 60)}h${pad(gap % 60)} entre el fin de uno y el inicio del otro (mínimo ${durTxt(margen)}).`, [a, b], `${common.join(", ")}: en campos distintos solo hay ${Math.floor(gap / 60)}h${pad(gap % 60)} entre un partido y otro (mínimo ${durTxt(margen)}).`);
     }
     return out;
   }
@@ -309,6 +309,12 @@
     const warnOf = {};
     shownWarns.forEach(w => w.ids.forEach(i => { (warnOf[i] = warnOf[i] || []).push(w); }));
 
+    // Datos de la tarjeta de detalle de cada partido
+    const ficha = (m) => ({
+      hora: toHHMM(m.start) + (m.placed ? " (propuesta)" : "") + (m.moved ? " (movido)" : ""), jor: jorOf(m), ent: m.coaches.join(", "),
+      local: isHome(m) ? m.team : (m.rival || "?"), visit: isHome(m) ? (m.rival || "?") : m.team,
+      campo: m.venue && !m.forced ? venueTxt(m.venue) : (isHome(m) ? "Local" : "Visitante") + (m.forced ? " (cambiado)" : "") });
+    const porId = {}; rows.forEach(m => { porId[m.id] = m; });
     const tl = document.getElementById("cpTimeline"), wb = document.getElementById("cpWarnings");
     const wc = document.getElementById("cpWarnCount"), lc = document.getElementById("cpListCount");
     if (lc) lc.textContent = rows.length ? `(${rows.length})` : "";
@@ -383,9 +389,8 @@
           const pos = m.seg
             ? `left:calc(${pct(m.start)} - ${SEG}px);width:calc(${pct(minH * 60 + Math.max(15, m.seg.end - m.start))} + ${2 * SEG}px)`
             : `left:${pct(m.start)};width:${pct(minH * 60 + DUR)}`;
-          t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-info="${esc(JSON.stringify({
-            hora: toHHMM(m.start) + (m.placed ? " (propuesta)" : "") + (m.moved ? " (movido)" : ""), jor: jorOf(m), ent: m.coaches.join(", "),
-            local: isHome(m) ? m.team : (m.rival || "?"), visit: isHome(m) ? (m.rival || "?") : m.team, campo, avisos: w ? w.map(x => x.text) : [] }))}" data-mk="${esc(m.mk)}" data-start="${m.start}">
+          t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-info="${esc(JSON.stringify(Object.assign(ficha(m), {
+            avisos: (w || []).map(x => ({ t: x.motivo || x.text, lvl: x.level, otros: x.ids.filter(i => i !== m.id && porId[i]).map(i => ficha(porId[i])) })) })))}" data-mk="${esc(m.mk)}" data-start="${m.start}">
             <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}${tlFull && jorOf(m) ? ` · J${esc(jorOf(m))}` : ""}</span><span class="cp-tl-n">${esc(tlFull ? vsTxt(short(m.team)) : short(m.team))}</span>${tlFull ? `<span class="cp-tl-v">📍 ${esc(campo)}</span>` : ""}</div>`;
         });
         t += `</div></div>`;
@@ -422,15 +427,24 @@
     const c = document.createElement("div");
     c.className = "cp-ficha";
     const fila = (cls, txt) => { const x = document.createElement("div"); x.className = cls; x.textContent = txt; c.appendChild(x); return x; };
-    const cab = fila("cp-ficha-cab", "");
-    const izq = document.createElement("span"); izq.className = "cp-ficha-hora"; izq.textContent = d.hora + (d.jor ? " - Jornada " + d.jor : "");
-    const der = document.createElement("span"); der.className = "cp-ficha-ent"; der.textContent = d.ent || "";
-    cab.append(izq, der);
-    fila("cp-ficha-eq cp-ficha-local", d.local);
-    fila("cp-ficha-vs", "VS");
-    fila("cp-ficha-eq", d.visit);
-    fila("cp-ficha-campo", "📍 " + d.campo);
-    (d.avisos || []).forEach(a => fila("cp-ficha-aviso", "⚠ " + a));
+    const tarjeta = (f) => {
+      const cab = fila("cp-ficha-cab", "");
+      const izq = document.createElement("span"); izq.className = "cp-ficha-hora"; izq.textContent = f.hora + (f.jor ? " - Jornada " + f.jor : "");
+      const der = document.createElement("span"); der.className = "cp-ficha-ent"; der.textContent = f.ent || "";
+      cab.append(izq, der);
+      fila("cp-ficha-eq cp-ficha-local", f.local);
+      fila("cp-ficha-vs", "VS");
+      fila("cp-ficha-eq", f.visit);
+      fila("cp-ficha-campo", "📍 " + f.campo);
+    };
+    tarjeta(d);
+    // Cada aviso: línea divisoria, el motivo y el otro partido con el mismo formato de tarjeta
+    (d.avisos || []).forEach(a => {
+      if (typeof a === "string") a = { t: a, otros: [] };
+      fila("cp-ficha-sep", "");
+      fila("cp-ficha-aviso" + (a.lvl === "media" ? " media" : ""), "⚠ " + a.t);
+      (a.otros || []).forEach((o, i) => { if (i) fila("cp-ficha-sep", ""); tarjeta(o); });
+    });
     nvaAviso("", { nodo: c });
   };
 

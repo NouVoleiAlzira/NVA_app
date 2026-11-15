@@ -842,7 +842,7 @@
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar la imagen" : (esFondo ? "Subir el fondo" : "Subir el personaje")}<input type="file" accept="image/*" data-subir="${p.capa}" hidden></label>
       </div>
       <div class="ev-acc">
-        <button type="button" class="ev-op" data-generar="${p.capa}">✨ Generarla desde la app</button>
+        <button type="button" class="ev-op" data-generar="${p.capa}">✨ Generarla con IA</button>
         ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">La subo luego</button>` : ""}
       </div>
       ${servicioHtml()}
@@ -870,7 +870,7 @@
         <label class="ev-boton prim" style="cursor:pointer">📥 ${tiene ? "Cambiar el cartel" : "Subir el cartel creado"}<input type="file" accept="image/*" data-subir="fondo" hidden></label>
       </div>
       <div class="ev-acc">
-        <button type="button" class="ev-op" data-generar="fondo">✨ Generarlo desde la app</button>
+        <button type="button" class="ev-op" data-generar="fondo">✨ Generarlo con IA</button>
         ${!tiene && r[p.id] !== "omitir" ? `<button type="button" class="ev-op" data-omitir="${p.id}">Lo subo luego</button>` : ""}
       </div>
       ${servicioHtml()}
@@ -1061,6 +1061,10 @@
     return limpiar(partes.filter(Boolean).join("\n\n"));
   }
   const promptDe = capaId => modo === "ia" ? promptCartel() : capaId === "fondo" ? promptFondo() : promptPersonaje();
+  // Para pegar en Gemini o ChatGPT: si hay imagen de referencia, que la IA espere a recibirla antes de pintar
+  const ESPERA_REF = "IMPORTANT: do NOT generate any image yet. I will attach a reference image in my next message. " +
+    "For now, reply only with: «OK, waiting for the reference image». Start generating only after the reference image has been added, using it as described below.\n\n";
+  const promptCopiar = capaId => (capa && capa.querySelector("[data-copiareq]") ? ESPERA_REF : "") + promptDe(capaId);
 
   /* ---------- Los encargos ---------- */
   function orientacion(F) { return F.w > F.h ? "horizontal" : F.w < F.h ? "vertical" : "square"; }
@@ -1369,7 +1373,7 @@
 
     // Imágenes
     c.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => {
-      const txt = promptDe(b.dataset.copiar);
+      const txt = promptCopiar(b.dataset.copiar);
       try { await navigator.clipboard.writeText(txt); b.textContent = "✅ Copiado"; }
       catch (e) {
         const caja = c.querySelector(`[data-prompt="${b.dataset.copiar}"]`), rg = document.createRange();
@@ -1483,8 +1487,15 @@
     };
   }
 
-  /* ---------- Generar desde la app (si la función está configurada) ---------- */
-  // Servicios de imágenes de la función generar-cartel. «auto» deja que elija la función.
+  /* ---------- Generar con IA: abrir la web elegida con el encargo, o pintarlo dentro de la app ---------- */
+  // «web:…» copia el encargo y abre esa web (ChatGPT lo recibe ya escrito en la dirección).
+  // El resto son los servicios de la función generar-cartel («auto» deja que elija la función).
+  const WEBS = {
+    "web:chatgpt": { t: "ChatGPT (el encargo va ya escrito)", url: txt => `https://chatgpt.com/?q=${encodeURIComponent(txt)}`, fotos: true, escrito: true },
+    "web:gemini": { t: "Google Gemini", url: () => "https://gemini.google.com/app", fotos: true },
+    "web:hf": { t: "Hugging Face · FLUX.1 schnell", url: () => "https://huggingface.co/spaces/black-forest-labs/FLUX.1-schnell" },
+    "web:horde": { t: "Stable Horde · ArtBot", url: () => "https://tinybots.net/artbot/create" },
+  };
   const SERVICIOS = [
     { v: "auto", t: "Automático" },
     { v: "cloudflare", t: "Cloudflare · FLUX.2 (gratis, cupo diario)" },
@@ -1493,13 +1504,35 @@
     { v: "horde", t: "Stable Horde (gratis, puede tardar)" },
   ];
   let serviciosListos = null;       // los que tienen secretos en Supabase (null = sin saber)
-  const servicioGuardado = () => { try { return localStorage.getItem("NVA_EV_SERVICIO") || "auto"; } catch (e) { return "auto"; } };
+  const servicioGuardado = () => { try { return localStorage.getItem("NVA_EV_SERVICIO") || "web:gemini"; } catch (e) { return "web:gemini"; } };
   function servicioHtml() {
     const g = servicioGuardado();
-    return `<div class="ev-acc"><label class="ev-servicio">Pintar con <select data-servicio>${SERVICIOS.map(x => {
+    const webs = Object.entries(WEBS).map(([v, x]) => `<option value="${v}"${v === g ? " selected" : ""}>${esc(x.t)}</option>`).join("");
+    const api = SERVICIOS.map(x => {
       const off = serviciosListos && x.v !== "auto" && !serviciosListos.includes(x.v);
       return `<option value="${x.v}"${x.v === g ? " selected" : ""}${off ? " disabled" : ""}>${esc(x.t)}${off ? " · sin configurar" : ""}</option>`;
-    }).join("")}</select></label></div>`;
+    }).join("");
+    return `<div class="ev-acc"><label class="ev-servicio">Con <select data-servicio>
+      <optgroup label="Abrir la web y pegar el encargo">${webs}</optgroup>
+      <optgroup label="Dentro de la app (claves en Supabase)">${api}</optgroup></select></label></div>`;
+  }
+  // Copia el encargo y abre la web elegida en otra pestaña
+  async function abrirWeb(btn, servicio) {
+    const capaId = btn.dataset.generar, est = capa.querySelector(`[data-estado="${capaId}"]`);
+    const w = WEBS[servicio], txt = w.fotos ? promptCopiar(capaId) : promptDe(capaId);
+    let copiado = true;
+    try { await navigator.clipboard.writeText(txt); } catch (e) { copiado = false; }
+    const vent = window.open(w.url(txt), "_blank");   // sin «noopener»: así se sabe si se ha abierto
+    if (vent) { try { vent.opener = null; } catch (e) { /* nada */ } }
+    const hayRef = !!capa.querySelector("[data-copiareq]");
+    const pasos = [];
+    if (!vent) pasos.push(`El navegador no ha dejado abrir la pestaña: <a href="${esc(w.url(txt))}" target="_blank" rel="noopener">ábrela aquí</a>.`);
+    if (w.escrito) pasos.push("El encargo ya va escrito en ChatGPT.");
+    else if (copiado) pasos.push("📋 Encargo copiado: en la pestaña nueva, pégalo con Ctrl+V (en el móvil, mantén pulsado › Pegar).");
+    else pasos.push("No he podido copiar el encargo: cópialo con «📋 Copiar el encargo» y pégalo allí.");
+    if (hayRef) pasos.push(w.fotos ? "La IA esperará a la imagen: vuelve, pulsa «🖼️ Copiar la imagen de referencia» y pégala allí." : "Esta web no admite fotos: la camiseta saldrá a partir del texto.");
+    pasos.push("Cuando la tengas, descárgala y súbela aquí con el botón naranja.");
+    est.innerHTML = pasos.join("<br>");
   }
   async function cargarServicios(c) {
     if (serviciosListos || cargarServicios.pend) return;
@@ -1514,6 +1547,7 @@
     if (!serviciosListos || !capa) return;
     capa.querySelectorAll("[data-servicio]").forEach(s => {
       s.querySelectorAll("option").forEach(o => {
+        if (WEBS[o.value]) return;
         const x = SERVICIOS.find(y => y.v === o.value), off = o.value !== "auto" && !serviciosListos.includes(o.value);
         o.disabled = off; o.textContent = x.t + (off ? " · sin configurar" : "");
       });
@@ -1542,6 +1576,8 @@
     return { equipacion: eq.id || "", descripcionEq: eq.descripcion || eq.nombre || "", referencias };
   }
   async function generar(btn) {
+    const servicioSel = (capa.querySelector("[data-servicio]") || {}).value || servicioGuardado();
+    if (WEBS[servicioSel]) return abrirWeb(btn, servicioSel);
     const capaId = btn.dataset.generar, est = capa.querySelector(`[data-estado="${capaId}"]`);
     const sb = window.nva && window.nva.cliente;
     if (!sb) { est.textContent = "No hay conexión con Supabase."; return; }
@@ -1556,8 +1592,7 @@
         : capaId === "fondo"
         ? { prompt: promptFondo(), aspecto: F.ar }
         : Object.assign({ prompt: promptPersonaje(), aspecto: nPers() <= 1 || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
-      const servicio = (capa.querySelector("[data-servicio]") || {}).value || servicioGuardado();
-      if (servicio !== "auto") body.proveedor = servicio;
+      if (servicioSel !== "auto") body.proveedor = servicioSel;
       let data = await llamarFuncion(sb, body);
       // Stable Horde es asíncrono: se pregunta cada 5 s hasta que lo pinten (máx. 10 min)
       while (data && data.pendiente && data.id) {

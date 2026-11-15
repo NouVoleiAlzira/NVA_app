@@ -1719,6 +1719,15 @@
     .cp-lg.placed { border: 2px dashed var(--balon); }
     .cp-lg.warn { border: 2px solid var(--alzira); }
     .cp-tl-hint { font-style: italic; }
+    /* Tarjeta de detalle de un partido (al tocarlo en la línea temporal) */
+    .cp-ficha { text-align: left; line-height: 1.3; min-width: min(300px, 70vw); }
+    .cp-ficha-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 0.65em; }
+    .cp-ficha-hora { font-weight: 800; color: var(--balon); white-space: nowrap; }
+    .cp-ficha-ent { text-align: right; color: var(--niebla); font-size: 0.9em; }
+    .cp-ficha-eq { font-weight: 700; color: #fff; }
+    .cp-ficha-vs { color: var(--niebla); font-size: 0.85em; font-weight: 700; letter-spacing: .08em; }
+    .cp-ficha-campo { margin-top: 0.65em; color: var(--tiza); font-size: 0.92em; }
+    .cp-ficha-aviso { margin-top: 6px; color: #fca5a5; font-size: 0.85em; }
     /* Botón de pantalla completa (a la derecha de la leyenda) y ventana horizontal */
     .cp-tl-expand { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border-radius: 8px; border: 1px solid var(--linea); background: rgba(233,238,250,0.08); color: var(--balon); cursor: pointer; }
     @media (hover: hover) and (pointer: fine) { .cp-tl-expand:hover { border-color: rgba(245,197,24,0.55); filter: brightness(1.12); } }

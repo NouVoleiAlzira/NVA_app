@@ -383,7 +383,9 @@
           const pos = m.seg
             ? `left:calc(${pct(m.start)} - ${SEG}px);width:calc(${pct(minH * 60 + Math.max(15, m.seg.end - m.start))} + ${2 * SEG}px)`
             : `left:${pct(m.start)};width:${pct(minH * 60 + DUR)}`;
-          t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
+          t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-info="${esc(JSON.stringify({
+            hora: toHHMM(m.start) + (m.placed ? " (propuesta)" : "") + (m.moved ? " (movido)" : ""), jor: jorOf(m), ent: m.coaches.join(", "),
+            local: isHome(m) ? m.team : (m.rival || "?"), visit: isHome(m) ? (m.rival || "?") : m.team, campo, avisos: w ? w.map(x => x.text) : [] }))}" data-mk="${esc(m.mk)}" data-start="${m.start}">
             <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}${tlFull && jorOf(m) ? ` · J${esc(jorOf(m))}` : ""}</span><span class="cp-tl-n">${esc(tlFull ? vsTxt(short(m.team)) : short(m.team))}</span>${tlFull ? `<span class="cp-tl-v">📍 ${esc(campo)}</span>` : ""}</div>`;
         });
         t += `</div></div>`;
@@ -414,7 +416,22 @@
   };
   window.cpShowMatch = function (el) {
     if (drag.justDropped) { drag.justDropped = false; return; }
-    alert(el.getAttribute("data-tip"));
+    let d = null; try { d = JSON.parse(el.getAttribute("data-info")); } catch (e) {}
+    if (!d || typeof nvaAviso !== "function") { alert(el.getAttribute("data-tip")); return; }
+    // Tarjeta: hora - jornada (entrenador a la derecha) / local / VS / visitante / campo
+    const c = document.createElement("div");
+    c.className = "cp-ficha";
+    const fila = (cls, txt) => { const x = document.createElement("div"); x.className = cls; x.textContent = txt; c.appendChild(x); return x; };
+    const cab = fila("cp-ficha-cab", "");
+    const izq = document.createElement("span"); izq.className = "cp-ficha-hora"; izq.textContent = d.hora + (d.jor ? " - Jornada " + d.jor : "");
+    const der = document.createElement("span"); der.className = "cp-ficha-ent"; der.textContent = d.ent || "";
+    cab.append(izq, der);
+    fila("cp-ficha-eq cp-ficha-local", d.local);
+    fila("cp-ficha-vs", "VS");
+    fila("cp-ficha-eq", d.visit);
+    fila("cp-ficha-campo", "📍 " + d.campo);
+    (d.avisos || []).forEach(a => fila("cp-ficha-aviso", "⚠ " + a));
+    nvaAviso("", { nodo: c });
   };
 
   // ---------- Mover partidos propuestos (mantener pulsado y arrastrar) ----------

@@ -48,7 +48,9 @@
       }
       const p = document.createElement("div");
       p.className = "cp-modal-txt nva-dlg-txt";
-      p.textContent = ic ? sinEmojiInicial(texto) : String(texto == null ? "" : texto);
+      // opc.nodo: contenido propio ya montado (p. ej. la tarjeta de un partido) en lugar del texto
+      if (opc.nodo) p.appendChild(opc.nodo);
+      else p.textContent = ic ? sinEmojiInicial(texto) : String(texto == null ? "" : texto);
       caja.appendChild(p);
 
       let campo = null;

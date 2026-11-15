@@ -1418,7 +1418,6 @@
       try { localStorage.setItem("NVA_EV_SERVICIO", s.value); } catch (e) { /* nada */ }
       c.querySelectorAll("[data-servicio]").forEach(o => { o.value = s.value; });
     });
-    cargarServicios(c);
     const qf = c.querySelector("[data-qf]");
     if (qf) qf.onchange = () => { quitarFondo.activo = qf.checked; procesarPersonaje(); pintar(); };
     const qft = c.querySelector("[data-qftol]");
@@ -1487,34 +1486,24 @@
     };
   }
 
-  /* ---------- Generar con IA: abrir la web elegida con el encargo, o pintarlo dentro de la app ---------- */
-  // «web:…» copia el encargo y abre esa web (ChatGPT lo recibe ya escrito en la dirección).
-  // El resto son los servicios de la función generar-cartel («auto» deja que elija la función).
+  /* ---------- Generar con IA: abrir la web elegida con el encargo ---------- */
+  // Copia el encargo y abre esa web; ChatGPT y Grok lo reciben ya escrito en la dirección.
   const WEBS = {
-    "web:chatgpt": { t: "ChatGPT (el encargo va ya escrito)", url: txt => `https://chatgpt.com/?q=${encodeURIComponent(txt)}`, fotos: true, escrito: true },
     "web:gemini": { t: "Google Gemini", url: () => "https://gemini.google.com/app", fotos: true },
+    "web:chatgpt": { t: "ChatGPT (el encargo va ya escrito)", url: txt => `https://chatgpt.com/?q=${encodeURIComponent(txt)}`, fotos: true, escrito: true },
+    "web:grok": { t: "Grok (el encargo va ya escrito)", url: txt => `https://grok.com/?q=${encodeURIComponent(txt)}`, fotos: true, escrito: true },
     "web:hf": { t: "Hugging Face · FLUX.1 schnell", url: () => "https://huggingface.co/spaces/black-forest-labs/FLUX.1-schnell" },
     "web:horde": { t: "Stable Horde · ArtBot", url: () => "https://tinybots.net/artbot/create" },
   };
-  const SERVICIOS = [
-    { v: "auto", t: "Automático" },
-    { v: "cloudflare", t: "Cloudflare · FLUX.2 (gratis, cupo diario)" },
-    { v: "gemini", t: "Google Gemini (de pago, copia la camiseta)" },
-    { v: "huggingface", t: "Hugging Face · FLUX.1 schnell" },
-    { v: "horde", t: "Stable Horde (gratis, puede tardar)" },
-  ];
-  let serviciosListos = null;       // los que tienen secretos en Supabase (null = sin saber)
-  const servicioGuardado = () => { try { return localStorage.getItem("NVA_EV_SERVICIO") || "web:gemini"; } catch (e) { return "web:gemini"; } };
+  const servicioGuardado = () => {
+    let v = "web:gemini";
+    try { v = localStorage.getItem("NVA_EV_SERVICIO") || v; } catch (e) { /* nada */ }
+    return WEBS[v] ? v : "web:gemini";
+  };
   function servicioHtml() {
     const g = servicioGuardado();
-    const webs = Object.entries(WEBS).map(([v, x]) => `<option value="${v}"${v === g ? " selected" : ""}>${esc(x.t)}</option>`).join("");
-    const api = SERVICIOS.map(x => {
-      const off = serviciosListos && x.v !== "auto" && !serviciosListos.includes(x.v);
-      return `<option value="${x.v}"${x.v === g ? " selected" : ""}${off ? " disabled" : ""}>${esc(x.t)}${off ? " · sin configurar" : ""}</option>`;
-    }).join("");
-    return `<div class="ev-acc"><label class="ev-servicio">Con <select data-servicio>
-      <optgroup label="Abrir la web y pegar el encargo">${webs}</optgroup>
-      <optgroup label="Dentro de la app (claves en Supabase)">${api}</optgroup></select></label></div>`;
+    return `<div class="ev-acc"><label class="ev-servicio">Abrir en <select data-servicio>${Object.entries(WEBS).map(([v, x]) =>
+      `<option value="${v}"${v === g ? " selected" : ""}>${esc(x.t)}</option>`).join("")}</select></label></div>`;
   }
   // Copia el encargo y abre la web elegida en otra pestaña
   async function abrirWeb(btn, servicio) {
@@ -1527,90 +1516,16 @@
     const hayRef = !!capa.querySelector("[data-copiareq]");
     const pasos = [];
     if (!vent) pasos.push(`El navegador no ha dejado abrir la pestaña: <a href="${esc(w.url(txt))}" target="_blank" rel="noopener">ábrela aquí</a>.`);
-    if (w.escrito) pasos.push("El encargo ya va escrito en ChatGPT.");
+    if (w.escrito) pasos.push(`El encargo ya va escrito en ${w.t.split(" ")[0]}.`);
     else if (copiado) pasos.push("📋 Encargo copiado: en la pestaña nueva, pégalo con Ctrl+V (en el móvil, mantén pulsado › Pegar).");
     else pasos.push("No he podido copiar el encargo: cópialo con «📋 Copiar el encargo» y pégalo allí.");
     if (hayRef) pasos.push(w.fotos ? "La IA esperará a la imagen: vuelve, pulsa «🖼️ Copiar la imagen de referencia» y pégala allí." : "Esta web no admite fotos: la camiseta saldrá a partir del texto.");
     pasos.push("Cuando la tengas, descárgala y súbela aquí con el botón naranja.");
     est.innerHTML = pasos.join("<br>");
   }
-  async function cargarServicios(c) {
-    if (serviciosListos || cargarServicios.pend) return;
-    const sb = window.nva && window.nva.cliente;
-    if (!sb || !c.querySelector("[data-servicio]")) return;
-    cargarServicios.pend = true;
-    try {
-      const { data } = await sb.functions.invoke("generar-cartel", { body: { accion: "proveedores" } });
-      if (data && Array.isArray(data.proveedores)) serviciosListos = data.proveedores;
-    } catch (e) { /* sin función: se queda la lista entera */ }
-    cargarServicios.pend = false;
-    if (!serviciosListos || !capa) return;
-    capa.querySelectorAll("[data-servicio]").forEach(s => {
-      s.querySelectorAll("option").forEach(o => {
-        if (WEBS[o.value]) return;
-        const x = SERVICIOS.find(y => y.v === o.value), off = o.value !== "auto" && !serviciosListos.includes(o.value);
-        o.disabled = off; o.textContent = x.t + (off ? " · sin configurar" : "");
-      });
-      if (s.selectedOptions[0] && s.selectedOptions[0].disabled) s.value = "auto";
-    });
-  }
-  async function llamarFuncion(sb, body) {
-    const { data, error } = await sb.functions.invoke("generar-cartel", { body });
-    if (error) {
-      let msg = error.message;
-      try { msg = (await error.context.json()).error || msg; } catch (e) { /* sin detalle */ }
-      throw new Error(msg);
-    }
-    return data;
-  }
-  async function referenciasEq() {
-    if (!esPersona() || r.equip === "otro") return {};
-    const eq = equipaciones.find(e => e.id === r.equip) || {};
-    const referencias = [];
-    for (const ru of (eq.imagenes || []).slice(0, 3)) {
-      const b = await blobEq(ru).catch(() => null);
-      if (!b) continue;
-      const b64 = await new Promise(ok => { const f = new FileReader(); f.onload = () => ok(String(f.result).split(",")[1]); f.readAsDataURL(b); });
-      referencias.push({ mime: b.type || "image/jpeg", datos: b64 });
-    }
-    return { equipacion: eq.id || "", descripcionEq: eq.descripcion || eq.nombre || "", referencias };
-  }
-  async function generar(btn) {
-    const servicioSel = (capa.querySelector("[data-servicio]") || {}).value || servicioGuardado();
-    if (WEBS[servicioSel]) return abrirWeb(btn, servicioSel);
-    const capaId = btn.dataset.generar, est = capa.querySelector(`[data-estado="${capaId}"]`);
-    const sb = window.nva && window.nva.cliente;
-    if (!sb) { est.textContent = "No hay conexión con Supabase."; return; }
-    btn.disabled = true;
-    const t0 = Date.now();
-    let cola = "";
-    const reloj = setInterval(() => { est.textContent = `🎨 Pintando… ${Math.round((Date.now() - t0) / 1000)} s${cola}`; }, 500);
-    try {
-      const F = formato();
-      const body = modo === "ia"
-        ? Object.assign({ prompt: promptCartel(), aspecto: F.ar, dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq())
-        : capaId === "fondo"
-        ? { prompt: promptFondo(), aspecto: F.ar }
-        : Object.assign({ prompt: promptPersonaje(), aspecto: nPers() <= 1 || F.h >= F.w ? "3:4" : "4:5", dorsal: r.dorsal === "otro" ? r.dorsal_o : r.dorsal || "" }, await referenciasEq());
-      if (servicioSel !== "auto") body.proveedor = servicioSel;
-      let data = await llamarFuncion(sb, body);
-      // Stable Horde es asíncrono: se pregunta cada 5 s hasta que lo pinten (máx. 10 min)
-      while (data && data.pendiente && data.id) {
-        if (Date.now() - t0 > 600000) throw new Error("Stable Horde tarda demasiado; prueba otra vez más tarde");
-        cola = data.cola != null ? ` · en cola: ${data.cola}${data.espera ? `, unos ${data.espera} s` : ""}` : "";
-        await new Promise(ok => setTimeout(ok, 5000));
-        data = await llamarFuncion(sb, { accion: "horde_estado", id: data.id });
-      }
-      if (!data || !data.imagen) throw new Error((data && data.error) || "La IA no devolvió ninguna imagen");
-      const i = new Image();
-      await new Promise((ok, ko) => { i.onload = ok; i.onerror = () => ko(new Error("La imagen recibida no se puede abrir")); i.src = `data:${data.mime || "image/png"};base64,${data.imagen}`; });
-      clearInterval(reloj);
-      ponerImagen(capaId, i);
-    } catch (e) {
-      clearInterval(reloj);
-      est.textContent = "❌ " + e.message + " · Puedes copiar el encargo y crearla en Gemini o ChatGPT.";
-      btn.disabled = false;
-    }
+  function generar(btn) {
+    const v = (capa.querySelector("[data-servicio]") || {}).value;
+    return abrirWeb(btn, WEBS[v] ? v : servicioGuardado());
   }
 
   /* ---------- Dibujo ---------- */

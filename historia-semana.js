@@ -1155,9 +1155,9 @@
     Object.assign(p, { res: true, setsL: r.setsL, setsV: r.setsV, sets: r.sets, gana: p.nvaLocal ? r.setsL > r.setsV : r.setsV > r.setsL });
   }
   function quitarResultado(p) { Object.assign(p, { res: false, setsL: null, setsV: null, sets: [], gana: null }); }
-  function resultadoAMano(it) {
+  async function resultadoAMano(it) {
     const p = it.p, antes = it.manual ? `${it.manual.setsL}-${it.manual.setsV}${it.manual.sets.length ? " (" + it.manual.sets.map(s => `${s.local}-${s.visitante}`).join(" ") + ")" : ""}` : "";
-    const txt = prompt(`Resultado de ${p.local.nombre} vs ${p.visit.nombre} (primero el local).\nEjemplos: 3-1  ·  3-1 (25-20 23-25 25-18 25-22)  ·  25-20 23-25 25-18 25-22\nDéjalo vacío para quitarlo.`, antes);
+    const txt = await nvaPreguntar(`Resultado de ${p.local.nombre} vs ${p.visit.nombre} (primero el local).\nEjemplos: 3-1  ·  3-1 (25-20 23-25 25-18 25-22)  ·  25-20 23-25 25-18 25-22\nDéjalo vacío para quitarlo.`, antes);
     if (txt == null) return false;
     if (!txt.trim()) { it.manual = null; quitarResultado(p); return true; }
     const r = leerResultado(txt);
@@ -1536,7 +1536,7 @@
       const b = ev.target.closest("[data-s],[data-estilo],[data-ajustar],[data-mano],[data-editar]");
       if (!b) return;
       if (b.dataset.editar != null) { if (await editarPartido(estado.items[+b.dataset.editar])) pintarLista(m); return; }
-      if (b.dataset.mano != null) { if (resultadoAMano(estado.items[+b.dataset.mano])) { if (estado.dividir) repartir(); pintarLista(m); } return; }
+      if (b.dataset.mano != null) { if (await resultadoAMano(estado.items[+b.dataset.mano])) { if (estado.dividir) repartir(); pintarLista(m); } return; }
       if (b.dataset.estilo) { estado.estilo = b.dataset.estilo; reencajar(); marcarEstilo(m); return; }
       if (b.dataset.ajustar != null) { if (await ajustarFoto(estado.items[+b.dataset.ajustar])) marcarEstilo(m); return; }
       const a = b.dataset.s;

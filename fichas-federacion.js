@@ -166,7 +166,7 @@
       if (!(file.type === "application/pdf" || /\.pdf$/i.test(file.name))) { alert("El archivo debe ser un PDF."); return; }
       if (file.size > MAX_BYTES) { alert("El PDF es demasiado grande (máximo 10 MB)."); return; }
       if (!navigator.onLine) { alert("Sin conexión: no se puede subir ahora."); return; }
-      if (indice[key] && !confirm(`¿Sustituir la ${cfg.una} de ${key} por "${file.name}"?`)) return;
+      if (indice[key] && !await nvaConfirmar(`¿Sustituir la ${cfg.una} de ${key} por "${file.name}"?`)) return;
       mostrarCargando(`Guardando la ${cfg.una} de ${key} en el Drive...`);
       try {
         await subir(key, file);

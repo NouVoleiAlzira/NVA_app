@@ -735,6 +735,52 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
   [style*="#cbd5e1"], [style*="#e2e8f0"], [style*="var(--gray-border)"], [style*="#fca5a5"]) { border-color: var(--borde-fuerte) !important; }
 
 /* ---------------------------------------------------------------------
+   Avisos propios (dialogos.js): sustituyen a alert/confirm/prompt
+   --------------------------------------------------------------------- */
+.cp-modal.nva-dlg { z-index: 2147483000; animation: nvaDlgFondo 160ms ease both; }
+.nva-dlg-box {
+  max-width: 380px;
+  text-align: center;
+  align-items: stretch;
+  gap: 14px;
+  padding: 22px 18px 18px;
+  animation: nvaDlgCaja 220ms var(--ease-sis) both;
+}
+.nva-dlg-txt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  color: var(--txt-1);
+  max-height: 55vh;
+  overflow-y: auto;
+}
+/* Textos largos (listas numeradas) se leen mejor alineados a la izquierda */
+.nva-dlg-txt:has(+ .nva-dlg-campo), .nva-dlg-box:has(.nva-dlg-no) .nva-dlg-txt { text-align: left; }
+.nva-dlg-titulo { text-align: center; }
+.nva-dlg-ico {
+  align-self: center;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 1.6rem;
+  color: #fff;
+  --c: var(--c-verde);
+  background: rgba(var(--c), 0.22);
+  box-shadow: inset 0 0 0 1.5px rgba(var(--c), 0.75), 0 0 18px rgba(var(--c), 0.25);
+}
+.nva-dlg-error { --c: var(--c-peligro); }
+.nva-dlg-aviso { --c: var(--c-amarillo); }
+.nva-dlg-campo { width: 100%; box-sizing: border-box; font-size: 1rem; }
+.nva-dlg-botones { margin-top: 2px; }
+.nva-dlg-botones .cp-modal-btn { min-height: 40px; font-size: 0.85rem; }
+.nva-dlg-fuera { opacity: 0; transition: opacity 140ms ease; }
+@keyframes nvaDlgFondo { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nvaDlgCaja { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cp-modal.nva-dlg, .nva-dlg-box { animation: none; } }
+
+/* ---------------------------------------------------------------------
    Movimiento reducido
    --------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {

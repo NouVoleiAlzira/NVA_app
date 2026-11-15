@@ -70,7 +70,7 @@
     if (!campos.length) throw new Error("no encuentro la fila de campos en la primera hoja");
     if (!campos.some(c => /Palau d'Esports/i.test(c))) throw new Error("falta el campo «Palau d'Esports (Alzira)»");
     const nuevos = campos.filter(c => !CAMPOS.includes(c)).length, quitados = CAMPOS.filter(c => !campos.includes(c)).length;
-    if (!confirm(`Matriz leída: ${campos.length} campos (${nuevos} nuevos, ${quitados} quitados).\n\n¿Usar estas distancias a partir de ahora?`)) return false;
+    if (!await nvaConfirmar(`Matriz leída: ${campos.length} campos (${nuevos} nuevos, ${quitados} quitados).\n\n¿Usar estas distancias a partir de ahora?`)) return false;
     usarMatriz(d);
     try { localStorage.setItem("NVA_KM_MATRIZ", JSON.stringify(d)); } catch (e) {}
     const ok = await writeGitHubFile(MATRIZ_GH, d, "Actualizar matriz de distancias");
@@ -406,10 +406,10 @@
       st.desde = fDesde.value; st.hasta = fHasta.value; recargar(true);
     };
     fDesde.onchange = cambiaRango; fHasta.onchange = cambiaRango;
-    o.querySelector(".km-otro").onclick = () => {
+    o.querySelector(".km-otro").onclick = async () => {
       const libres = appData.coaches.filter(c => !st.coaches.includes(String(c.id)));
       if (!libres.length) { alert("No hay más entrenadores."); return; }
-      const nombre = prompt("¿De qué entrenador quieres añadir partidos?\n\n" + libres.map((c, i) => `${i + 1}. ${c.name}`).join("\n") + "\n\nEscribe el número:");
+      const nombre = await nvaPreguntar("¿De qué entrenador quieres añadir partidos?\n\n" + libres.map((c, i) => `${i + 1}. ${c.name}`).join("\n") + "\n\nEscribe el número:");
       const c = libres[(parseInt(nombre, 10) || 0) - 1];
       if (c) { st.coaches.push(String(c.id)); recargar(); }
     };
@@ -417,8 +417,8 @@
     const lista = o.querySelector(".km-list");
     const fila = (e) => st.filas[+e.target.closest(".km-row").dataset.i];
     o.querySelector(".km-evento").onclick = () => nuevoEvento(o);
-    lista.addEventListener("click", (e) => {
-      if (e.target.classList.contains("km-ev-del")) { const f = fila(e); if (confirm(`¿Quitar el evento «${f.concepto}»?`)) { st.filas = st.filas.filter(x => x !== f); pintar(o); } return; }
+    lista.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("km-ev-del")) { const f = fila(e); if (await nvaConfirmar(`¿Quitar el evento «${f.concepto}»?`)) { st.filas = st.filas.filter(x => x !== f); pintar(o); } return; }
       if (e.target.classList.contains("km-flecha")) { const f = fila(e); f.chain = !f.chain; pintar(o); }
       if (e.target.classList.contains("km-reg")) abrirRegistro(fila(e), o);
     });
@@ -450,7 +450,7 @@
   async function guardarPdf() {
     const s = calcular();
     if (!s.length) { alert("Marca al menos un partido."); return; }
-    if (s.some(f => f._sinMatriz && !f._km)) { if (!confirm("Hay partidos sin campo en la matriz y sin km escritos (contarán 0 km). ¿Guardar igualmente?")) return; }
+    if (s.some(f => f._sinMatriz && !f._km)) { if (!await nvaConfirmar("Hay partidos sin campo en la matriz y sin km escritos (contarán 0 km). ¿Guardar igualmente?")) return; }
     try {
       await ensureExportLibs();
       const { jsPDF } = window.jspdf;

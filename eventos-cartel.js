@@ -398,9 +398,9 @@
     const avisar = t => { if (est) est.textContent = t; };
     try {
       if (tipo === "nueva") {
-        const nombre = (prompt("Nombre de la equipación (por ejemplo «Camiseta naranja»):") || "").trim();
+        const nombre = (await nvaPreguntar("Nombre de la equipación (por ejemplo «Camiseta naranja»):") || "").trim();
         if (!nombre) return;
-        alert("Ahora elige de 1 a 3 fotos de la camiseta (delante, detrás…).");
+        await nvaAviso("Ahora elige de 1 a 3 fotos de la camiseta (delante, detrás…).");
         const files = await elegirFotos();
         if (!files.length) return;
         avisar("Guardando las fotos…");
@@ -423,14 +423,14 @@
       } else if (tipo === "nombre") {
         const eq = equipaciones.find(e => e.id === id);
         if (!eq) return;
-        const nombre = (prompt("Nuevo nombre:", eq.nombre) || "").trim();
+        const nombre = (await nvaPreguntar("Nuevo nombre:", eq.nombre) || "").trim();
         if (!nombre) return;
         eq.nombre = nombre;
         await guardarEquipaciones();
       } else if (tipo === "quitar") {
         const eq = equipaciones.find(e => e.id === id);
         if (!eq || equipaciones.length < 2) { alert("Tiene que quedar al menos una equipación."); return; }
-        if (!confirm(`¿Quitar «${eq.nombre}» de la lista?`)) return;
+        if (!await nvaConfirmar(`¿Quitar «${eq.nombre}» de la lista?`)) return;
         equipaciones = equipaciones.filter(e => e.id !== id);
         await guardarEquipaciones();
         if (r.equip === id) delete r.equip;
@@ -631,8 +631,8 @@
     await cargarCatalogos();
     render(true);
   }
-  function cerrar() {
-    if (capa && (img.fondo || img.pers || E.textos.length) && !confirm("¿Cerrar el cartel? Se perderá lo que no hayas descargado.")) return;
+  async function cerrar() {
+    if (capa && (img.fondo || img.pers || E.textos.length) && !await nvaConfirmar("¿Cerrar el cartel? Se perderá lo que no hayas descargado.")) return;
     window.removeEventListener("resize", colocarSeleccion);
     if (capa) capa.remove();
     capa = null;

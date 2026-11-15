@@ -974,7 +974,7 @@
   async function completeQuery(queryId) {
     const q = queriesData.find(x => x.id === queryId);
     if (!q) return;
-    if (!confirm(`¿Completar la consulta "${q.text}"?\n\nDejará de mostrarse en los equipos. Las respuestas se conservan y podrás seguir sacando su PDF.`)) return;
+    if (!await nvaConfirmar(`¿Completar la consulta "${q.text}"?\n\nDejará de mostrarse en los equipos. Las respuestas se conservan y podrás seguir sacando su PDF.`)) return;
     removeQueryNoticeFromTablon(q);
     const pending = saveQueryOp({ type: "complete", id: queryId, at: new Date().toISOString() });
     openSelectQueryPdfModal();
@@ -986,7 +986,7 @@
   async function deleteQuery(queryId) {
     const q = queriesData.find(x => x.id === queryId);
     if (!q) return;
-    if (!confirm(`¿Borrar por completo la consulta "${q.text}"?\n\nSe eliminarán también todas sus respuestas, para todos los dispositivos. No se puede deshacer.`)) return;
+    if (!await nvaConfirmar(`¿Borrar por completo la consulta "${q.text}"?\n\nSe eliminarán también todas sus respuestas, para todos los dispositivos. No se puede deshacer.`)) return;
     removeQueryNoticeFromTablon(q);
     const pending = saveQueryOp({ type: "delete", id: queryId });
     openSelectQueryPdfModal();
@@ -3090,13 +3090,13 @@
     inputName.value = "";
   }
 
-  function deleteTeam(idx) {
+  async function deleteTeam(idx) {
     const team = appData.teams[idx];
     if (!team) return;
     const teamKey = getTeamKey(team);
     const teamName = team.name;
 
-    const confirmDelete = confirm(`¿Estás seguro de que deseas eliminar el equipo "${team.name} (${team.category})"? Esta acción también borrará sus jugadores y asignaciones.`);
+    const confirmDelete = await nvaConfirmar(`¿Estás seguro de que deseas eliminar el equipo "${team.name} (${team.category})"? Esta acción también borrará sus jugadores y asignaciones.`);
     if (!confirmDelete) return;
 
     appData.teams.splice(idx, 1);
@@ -3244,8 +3244,8 @@
     localStorage.setItem("NVA_QUERIES_DATA", JSON.stringify(queriesData));
   }
 
-  function clearAllLocalStorageData() {
-    const confirmDelete = confirm("⚠️ ATENCIÓN: ¿Estás seguro de que deseas borrar TODOS los datos guardados en el almacenamiento local de este dispositivo?\n\nEsta acción limpiará la memoria local y reajustará los ajustes.");
+  async function clearAllLocalStorageData() {
+    const confirmDelete = await nvaConfirmar("⚠️ ATENCIÓN: ¿Estás seguro de que deseas borrar TODOS los datos guardados en el almacenamiento local de este dispositivo?\n\nEsta acción limpiará la memoria local y reajustará los ajustes.");
     if (!confirmDelete) return;
 
     localStorage.clear();
@@ -4568,7 +4568,7 @@
 
     if (ownIdx < 0) {
       const menu = rows.map((r, i) => `${i + 1}. ${r.name}`).join("\n");
-      const ans = prompt(`No encuentro "${ownName}" en la tabla.\nEscribe el número de TU equipo para excluirlo (o deja vacío para no excluir ninguno):\n\n${menu}`);
+      const ans = await nvaPreguntar(`No encuentro "${ownName}" en la tabla.\nEscribe el número de TU equipo para excluirlo (o deja vacío para no excluir ninguno):\n\n${menu}`);
       if (ans === null) return;
       const n = parseInt(ans, 10);
       if (n >= 1 && n <= rows.length) ownIdx = n - 1;
@@ -4579,7 +4579,7 @@
 
     let finalList;
     if (leagueEdit.list.length > 0) {
-      const replace = confirm(`Se han encontrado ${rivals.length} rivales.\n\nAceptar = REEMPLAZAR la lista actual (${leagueEdit.list.length} equipos).\nCancelar = AÑADIR solo los que falten.`);
+      const replace = await nvaConfirmar(`Se han encontrado ${rivals.length} rivales.\n\n«Reemplazar» cambia la lista actual (${leagueEdit.list.length} equipos).\n«Añadir» solo suma los que falten.`, { si: "Reemplazar", no: "Añadir", peligro: false });
       if (replace) finalList = rivals;
       else {
         const have = new Set(leagueEdit.list.map(normalizeTeamName));
@@ -5260,9 +5260,9 @@
 
   // 3) "Borrar datos locales" también vacía la caché de partidos en memoria.
   const _origClearAllLocalStorageData = clearAllLocalStorageData;
-  clearAllLocalStorageData = function () {
+  clearAllLocalStorageData = async function () {
     const prevQueueRef = offlineQueue;
-    _origClearAllLocalStorageData.apply(this, arguments);
+    await _origClearAllLocalStorageData.apply(this, arguments);
     if (offlineQueue !== prevQueueRef) { // solo si el usuario confirmó el borrado
       allMatchLogs = [];
       matchData = [];
@@ -5483,7 +5483,7 @@
   async function deleteOtros(id) {
     const item = otrosData.find(o => o.id === id);
     if (!item) return;
-    if (!confirm(`¿Eliminar el botón "${item.title}"?`)) return;
+    if (!await nvaConfirmar(`¿Eliminar el botón "${item.title}"?`)) return;
     await withLoading(() => mutateOtros(() => {
       otrosData = otrosData.filter(o => o.id !== id);
       if (otrosOpenId === id) otrosOpenId = null;
@@ -5877,10 +5877,10 @@
     hzUI.venueOpen[v.id] = true;
     hzChanged("st");
   }
-  function hzDelVenue(id) {
+  async function hzDelVenue(id) {
     const v = hzFindVenue(id); if (!v) return;
     let n = 0; v.courts.forEach(c => { n += hzTrainingsUsingCourt(c.id); });
-    if (!confirm(`¿Eliminar el pabellón "${v.name}" y todas sus pistas?` + (n ? `\n\nSe eliminarán también ${n} entrenamiento(s) asignados a él.` : ""))) return;
+    if (!await nvaConfirmar(`¿Eliminar el pabellón "${v.name}" y todas sus pistas?` + (n ? `\n\nSe eliminarán también ${n} entrenamiento(s) asignados a él.` : ""))) return;
     v.courts.forEach(c => hzRemoveTrainingsOfCourt(c.id));
     hz.venues = hz.venues.filter(x => x.id !== id);
     hzChanged("st");
@@ -5895,10 +5895,10 @@
     v.courts.push(hzNewCourt("Pista " + (v.courts.length + 1)));
     hzChanged("st");
   }
-  function hzDelCourt(vid, cid) {
+  async function hzDelCourt(vid, cid) {
     const v = hzFindVenue(vid), c = hzFindCourt(vid, cid); if (!c) return;
     const n = hzTrainingsUsingCourt(cid);
-    if (!confirm(`¿Eliminar la pista "${c.name}"?` + (n ? `\n\nSe eliminarán también ${n} entrenamiento(s) asignados a ella.` : ""))) return;
+    if (!await nvaConfirmar(`¿Eliminar la pista "${c.name}"?` + (n ? `\n\nSe eliminarán también ${n} entrenamiento(s) asignados a ella.` : ""))) return;
     hzRemoveTrainingsOfCourt(cid);
     v.courts = v.courts.filter(x => x.id !== cid);
     hzChanged("st");
@@ -6477,7 +6477,7 @@
       return;
     }
     if (!navigator.onLine) { alert("Sin conexión: no se pueden refrescar los Horarios ahora mismo."); return; }
-    if (hzDirty && !confirm("Tienes cambios sin guardar. Si refrescas se perderán y se cargará la versión guardada. ¿Continuar?")) return;
+    if (hzDirty && !await nvaConfirmar("Tienes cambios sin guardar. Si refrescas se perderán y se cargará la versión guardada. ¿Continuar?")) return;
     if (hzDirty) hzSetDirty(false);
     if (offlineQueue.length > 0) await processOfflineQueue();
     const ok = await fetchHorariosFromGitHub();

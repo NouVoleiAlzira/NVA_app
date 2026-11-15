@@ -58,7 +58,7 @@
     if (!sb) { alert("No hay conexión con Supabase."); return; }
     const keys = equipos();
     if (!keys.length) { alert("No hay equipos dados de alta."); return; }
-    if (!confirm(`Se van a generar y subir al Drive del club los PDF de Partidos y Resultados de ${keys.length} equipos.\n\nLos enlaces que ya tienen los jugadores/as no cambian. ¿Continuar?`)) return;
+    if (!await nvaConfirmar(`Se van a generar y subir al Drive del club los PDF de Partidos y Resultados de ${keys.length} equipos.\n\nLos enlaces que ya tienen los jugadores/as no cambian. ¿Continuar?`)) return;
 
     const enlaces = await leerEnlaces();
     const fallos = [];
@@ -88,8 +88,8 @@
 
   function copiar(texto, boton) {
     const hecho = () => { const t = boton.textContent; boton.textContent = "✅"; setTimeout(() => { boton.textContent = t; }, 1200); };
-    if (navigator.clipboard) navigator.clipboard.writeText(texto).then(hecho, () => prompt("Copia el enlace:", texto));
-    else prompt("Copia el enlace:", texto);
+    if (navigator.clipboard) navigator.clipboard.writeText(texto).then(hecho, () => nvaPreguntar("Copia el enlace:", texto));
+    else nvaPreguntar("Copia el enlace:", texto);
   }
 
   const mensaje = (key, url) => `📊 Partidos y resultados de ${key} (se actualiza cada semana):\n${url}`;

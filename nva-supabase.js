@@ -754,7 +754,7 @@
     s.id = "nvaUsuario";
     s.title = "Cerrar sesión";
     s.textContent = "👤 " + (perfil.nombre || perfil.email.split("@")[0]);
-    s.onclick = () => { if (confirm(`Has entrado como ${perfil.email} (${perfil.rol}).\n\n¿Cerrar sesión?`)) salir(); };
+    s.onclick = async () => { if (await nvaConfirmar(`Has entrado como ${perfil.email} (${perfil.rol}).\n\n¿Cerrar sesión?`)) salir(); };
     engranaje.parentNode.insertBefore(s, engranaje.nextSibling);
   }
 
@@ -946,7 +946,7 @@
       const rol = roles.find(x => x.id === b.dataset.id);
       const n = usuariosDeRol(rol.id);
       if (n) return alert(`Hay ${n} usuario${n === 1 ? "" : "s"} con el rol «${rol.nombre}». Cámbiales el rol antes de borrarlo.`);
-      if (!confirm(`¿Borrar el rol «${rol.nombre}»?`)) return;
+      if (!await nvaConfirmar(`¿Borrar el rol «${rol.nombre}»?`)) return;
       const { error: e } = await sb.from("roles").delete().eq("id", rol.id);
       if (e) return alert("No se pudo borrar el rol: " + e.message);
       pintarPanelUsuarios();

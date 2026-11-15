@@ -113,10 +113,10 @@
   };
 
   // ---------- Deshacer desde el Historial ----------
-  window.nvaDeshacer = function (e) {
+  window.nvaDeshacer = async function (e) {
     const op = e && e.extra && e.extra.deshacer;
     if (!op || window.nvaAccionDeshecha(e.id)) return;
-    if (!confirm("¿Deshacer este cambio?\n\n" + e.texto)) return;
+    if (!await nvaConfirmar("¿Deshacer este cambio?\n\n" + e.texto)) return;
     cambiar(d => { if (d.deshechos.indexOf(e.id) === -1) d.deshechos.push(e.id); }, "Deshacer anulación");
     aplicar(op);
     anotar("↩ Deshecho: " + e.texto, null);

@@ -92,8 +92,8 @@
     }
   }
 
-  function igDeactivate() {
-    if (!confirm("¿Quitar el token de Instagram de este dispositivo? Reels y Stories dejarán de verse.")) return;
+  async function igDeactivate() {
+    if (!await nvaConfirmar("¿Quitar el token de Instagram de este dispositivo? Reels y Stories dejarán de verse.")) return;
     saveIg(null);
   }
 
@@ -236,7 +236,7 @@
 
   // Quita un reel o unas stories publicadas de la app (estado «eliminado»)
   async function eliminar(dir, clave, id, recargar) {
-    if (!confirm("¿Borrar de la app? Desaparece de esta lista. Si también quieres quitarlo de Instagram, bórralo desde Instagram (en «👀 VER» tienes el enlace cuando lo hay).")) return;
+    if (!await nvaConfirmar("¿Borrar de la app? Desaparece de esta lista. Si también quieres quitarlo de Instagram, bórralo desde Instagram (en «👀 VER» tienes el enlace cuando lo hay).")) return;
     try {
       const meta = (await getJson(`${dir}/${id}/meta.json`)) || {};
       meta.estado = "eliminado";
@@ -398,7 +398,7 @@
   }
 
   async function cambiarEstado(id, meta, estado, extra) {
-    if (estado === "descartado" && !confirm("¿Descartar este borrador? No se publicará.")) return;
+    if (estado === "descartado" && !await nvaConfirmar("¿Descartar este borrador? No se publicará.")) return;
     try {
       Object.assign(meta, { estado }, extra || {});
       await putJson(`${DIR}/${id}/meta.json`, meta, `Reel ${id}: ${estado}`);
@@ -424,13 +424,13 @@
         <button type="button" class="btn-save-session ig-cancelar-pub" style="flex:1; background:#64748b;">↩️ Volver a borrador</button>
         <button type="button" class="btn-save-session ig-relanzar" style="flex:2;">🚀 Publicar ahora</button></div>`);
     det.querySelector(".ig-relanzar").onclick = async (e) => {
-      if (!confirm("¿Lanzar ahora la publicación en el Instagram del club?")) return;
+      if (!await nvaConfirmar("¿Lanzar ahora la publicación en el Instagram del club?")) return;
       e.target.disabled = true;
       await alRelanzar();
       e.target.disabled = false;
     };
-    det.querySelector(".ig-cancelar-pub").onclick = () => {
-      if (confirm("¿Quitar la confirmación? No se publicará hasta que lo vuelvas a confirmar.")) alCancelar();
+    det.querySelector(".ig-cancelar-pub").onclick = async () => {
+      if (await nvaConfirmar("¿Quitar la confirmación? No se publicará hasta que lo vuelvas a confirmar.")) alCancelar();
     };
   }
 
@@ -444,7 +444,7 @@
 
   async function confirmar(id, meta) {
     if (!meta.texto) { alert("Escribe el texto del post."); return; }
-    if (!confirm("¿Has visto el vídeo y el texto? Al confirmar se publicará en el Instagram del club.")) return;
+    if (!await nvaConfirmar("¿Has visto el vídeo y el texto? Al confirmar se publicará en el Instagram del club.")) return;
     const quien = (JSON.parse(localStorage.getItem("NVA_IG_SETTINGS") || "{}").login) || "";
     const ahora = new Date().toISOString();
     const ok = await cambiarEstado(id, meta, "confirmado", { confirmadoPor: quien, confirmadoEn: ahora });
@@ -1598,7 +1598,7 @@
   }
 
   async function estadoHistoria(id, meta, estado, extra) {
-    if (estado === "descartado" && !confirm("¿Descartar estas stories? No se publicarán.")) return false;
+    if (estado === "descartado" && !await nvaConfirmar("¿Descartar estas stories? No se publicarán.")) return false;
     try {
       Object.assign(meta, { estado }, extra || {});
       await putJson(`${DIR_H}/${id}/meta.json`, meta, `Stories ${id}: ${estado}`);
@@ -1615,7 +1615,7 @@
   }
 
   async function confirmarHistoria(id, meta) {
-    if (!confirm("¿Has visto las stories? Al confirmar se publicarán en el Instagram del club.")) return;
+    if (!await nvaConfirmar("¿Has visto las stories? Al confirmar se publicarán en el Instagram del club.")) return;
     const quien = (JSON.parse(localStorage.getItem("NVA_IG_SETTINGS") || "{}").login) || "";
     const ahora = new Date().toISOString();
     if (!await estadoHistoria(id, meta, "confirmado", { confirmadoPor: quien, confirmadoEn: ahora, duracion: meta.duracion || 5 })) return;

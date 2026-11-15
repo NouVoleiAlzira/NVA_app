@@ -153,7 +153,7 @@
   }
   window.histDeshacer = async function (id) {
     if (!window.nvaDeshacer || !porId[id]) return;
-    window.nvaDeshacer(porId[id]);
+    await window.nvaDeshacer(porId[id]);
     setTimeout(() => pintar(ultimaLista.concat(lsGet(PEND_KEY, []).map(x => Object.assign({}, x, { pend: true }))).filter((x, i, a) => a.findIndex(y => y.id === x.id) === i).sort((a, b) => a.t < b.t ? 1 : -1), ""), 300);
   };
 

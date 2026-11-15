@@ -2356,6 +2356,8 @@
 .nva-pdf-apretado-2 .nva-team-head { margin-bottom: 4px; }
 
 /* Calendario de encuentros (.ics) */
+.cp-ics { padding: 4px 2px 2px; }
+.cp-ics-txt { margin: 0 0 10px; font-size: .82em; color: var(--txt-2, #94a3b8); line-height: 1.4; }
 .ics-ayuda { margin-top: 10px; font-size: .82em; color: var(--txt-2, #64748b); }
 .ics-ayuda summary { cursor: pointer; font-weight: 600; }
 .ics-ayuda p { margin: 6px 0; line-height: 1.4; }

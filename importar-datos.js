@@ -2,16 +2,13 @@
    Importar datos en Opciones
    - Jugadores/as y Equipos: cargar un Excel de Cluber (Nombre, Apellidos,
      Equipos y Estado de pago; el resto de columnas no se lee ni se guarda)
-   - Ligas: cargar las ligas de todos los equipos desde los PDF de la
-     federación guardados en GitHub (carpeta Calendarios)
-   En los dos casos se muestran las diferencias y se pregunta antes de guardar.
+   Se muestran las diferencias y se pregunta antes de guardar.
    ===================================================================== */
 (function () {
   "use strict";
 
   const XLSX_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
   const XLSX_SRI = "sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw";
-  const CAL_FOLDER = "Calendarios";
   const CATEGORIES = ["Escuela", "Alevín", "Infantil", "Cadete", "Juvenil", "Junior", "Senior Femenino", "Senior Masculino", "Mixto"];
 
   const esc = escapeHtml;
@@ -362,112 +359,4 @@
 
   window.impPickExcel = () => document.getElementById("impExcelInput").click();
   window.impHandleExcel = handleExcel;
-
-  // =====================================================================
-  // 2) Ligas desde los PDF de la federación guardados en GitHub
-  // =====================================================================
-  async function fetchCalendarPdf(key) {
-    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${CAL_FOLDER}/${encodeURIComponent(sanitizeFileName(key))}.pdf`;
-    const headers = { "Accept": "application/vnd.github.raw" };
-    if (ghSettings.token) headers.Authorization = `token ${ghSettings.token}`;
-    const r = await fetch(url, { headers, cache: "no-store" });
-    if (!r.ok) return null;
-    const b = await r.blob();
-    return b.size ? b : null;
-  }
-
-  const isClubName = (n) => /\bNVA\b|NOU VOLEI ALZIRA|NOU VOLEI CLUB ALZIRA/.test(norm(n));
-
-  // Rivales de la liga: tabla de CLASIFICACIÓN del PDF; si no la hay (o no se reconoce
-  // el equipo), los rivales de sus partidos ya leídos en «Calendario de partidos».
-  function rivalsFor(team, key, rows, cpTeam) {
-    if (rows.length >= 2) {
-      let own = -1;
-      if (cpTeam && cpTeam.fedName) own = findOwnTeamRow(rows, cpTeam.fedName);
-      if (own < 0) own = findOwnTeamRow(rows, team.name);
-      if (own < 0) {
-        const club = rows.map((r, i) => i).filter(i => isClubName(rows[i].name));
-        if (club.length === 1) own = club[0];
-      }
-      if (own >= 0) return { list: rows.filter((_, i) => i !== own).map(r => r.name), from: "clasificación" };
-    }
-    if (cpTeam && cpTeam.matches && cpTeam.matches.length) {
-      const seen = new Set(), list = [];
-      cpTeam.matches.forEach(m => {
-        const n = (m.rival || "").trim();
-        if (!n || /DESCANSA/.test(norm(n)) || seen.has(norm(n))) return;
-        seen.add(norm(n)); list.push(n);
-      });
-      if (list.length) return { list, from: "partidos" };
-    }
-    return null;
-  }
-
-  async function importLeagues() {
-    if (!(ghSettings.user && ghSettings.repo)) { alert("Configura primero la conexión con GitHub (pestaña Conexión GitHub)."); return; }
-    if (!navigator.onLine) { alert("Hace falta conexión para leer los PDF guardados."); return; }
-    const teams = appData.teams.slice();
-    if (!teams.length) { alert("No hay equipos configurados."); return; }
-    let cpData = {};
-    try { cpData = JSON.parse(localStorage.getItem("NVA_CALENDARIO_PARTIDOS") || "{}") || {}; } catch (e) { cpData = {}; }
-    const cpTeams = cpData.teams || {};
-
-    await leagueWriteChain;
-    if (offlineQueue.length > 0) await processOfflineQueue();
-
-    const diffs = [], notes = [];
-    try {
-      for (let i = 0; i < teams.length; i++) {
-        const team = teams[i], key = getTeamKey(team);
-        mostrarCargando(`Leyendo ${i + 1}/${teams.length}: ${key}...`);
-        let blob = null;
-        try { blob = await fetchCalendarPdf(key); } catch (e) { console.warn(e); }
-        if (!blob) { notes.push(`- ${key}: sin PDF en ${CAL_FOLDER}`); continue; }
-        let rows = [];
-        try { rows = await extractStandingsTeamsFromPdf(blob); } catch (e) { console.warn(e); notes.push(`- ${key}: no se pudo leer el PDF`); continue; }
-        const r = rivalsFor(team, key, rows, cpTeams[key]);
-        if (!r) { notes.push(`- ${key}: no he encontrado la liga en el PDF`); continue; }
-        const current = await fetchLeagueTeamsForTeam(key);
-        const have = new Set(current.map(norm)), want = new Set(r.list.map(norm));
-        const added = r.list.filter(n => !have.has(norm(n)));
-        const removed = current.filter(n => !want.has(norm(n)));
-        if (!added.length && !removed.length) { notes.push(`- ${key}: sin cambios (${current.length} equipos)`); continue; }
-        // Se respeta el orden que ya tenía la lista y se añaden al final los nuevos
-        const finalList = current.filter(n => want.has(norm(n))).concat(added);
-        diffs.push({ key, finalList, added, removed, from: r.from, before: current.length });
-      }
-    } finally {
-      ocultarCargando();
-    }
-
-    if (!diffs.length) { alert("Ligas revisadas: no hay diferencias.\n\n" + notes.join("\n")); return; }
-
-    const groups = diffs.map((d, i) => ({
-      title: d.key,
-      extra: ` <small>· ${d.before} → ${d.finalList.length} equipos (${d.from})</small>`,
-      items: [{ id: `L${i}`, checked: true, cls: "imp-league",
-        label: `Actualizar esta liga<div class="imp-sub">${d.added.map(n => `<div class="imp-add">➕ ${esc(n)}</div>`).join("")}${d.removed.map(n => `<div class="imp-del">➖ ${esc(n)}</div>`).join("")}</div>` }]
-    }));
-    const res = await askDiffs("Diferencias en las ligas",
-      `${diffs.length} de ${teams.length} equipos tienen cambios respecto a los PDF de ${CAL_FOLDER}. Marca las ligas que quieras actualizar.${notes.length ? `<details class="imp-notes"><summary>${notes.length} equipos sin cambios o sin PDF</summary><small>${notes.map(esc).join("<br>")}</small></details>` : ""}`,
-      groups, "Actualizar ligas");
-    if (!res) return;
-
-    const done = [];
-    diffs.forEach((d, i) => {
-      if (!res.sel.has(`L${i}`)) return;
-      const snapshot = d.finalList.slice();
-      localStorage.setItem(`NVA_LEAGUE_${sanitizeFileName(d.key)}`, JSON.stringify(snapshot));
-      if (ghSettings.user && ghSettings.repo && ghSettings.token) {
-        leagueWriteChain = leagueWriteChain
-          .then(() => saveLeagueTeamsToGitHub(d.key, snapshot))
-          .catch(e => console.error("Error al guardar la liga:", e));
-      }
-      if (leagueEdit && leagueEdit.key === d.key) { leagueEdit.list = snapshot.slice(); renderLeagueManagement(); }
-      done.push(`- ${d.key}: ${snapshot.length} equipos`);
-    });
-    alert(done.length ? "Ligas actualizadas:\n\n" + done.join("\n") : "No se ha actualizado ninguna liga.");
-  }
-
-  window.impLeaguesFromPdfs = () => importLeagues().catch(e => { console.error(e); ocultarCargando(); alert("Error al cargar las ligas: " + e.message); });
 })();

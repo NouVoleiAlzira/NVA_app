@@ -381,7 +381,7 @@
         t += `</div></div>`;
       });
       const nCh = changeList().length;
-      t += `<div class="cp-tl-legend"><span><i class="cp-lg home"></i>Casa</span><span><i class="cp-lg away"></i>Fuera</span><span><i class="cp-lg alevin"></i>Alevín</span><span><i class="cp-lg placed"></i>Hora propuesta</span><span><i class="cp-lg warn"></i>Aviso</span><span>✎ Movido</span></div>
+      t += `<div class="cp-tl-legend"><span><i class="cp-lg home"></i>Casa</span><span><i class="cp-lg away"></i>Fuera</span><span><i class="cp-lg alevin"></i>Alevín</span><span><i class="cp-lg placed"></i>Hora propuesta</span><span><i class="cp-lg warn"></i>Aviso</span><span>✎ Movido</span><button type="button" class="cp-tl-expand" onclick="cpTlFull()" title="${tlFull ? "Cerrar pantalla completa" : "Ver en pantalla completa (horizontal)"}" aria-label="${tlFull ? "Cerrar pantalla completa" : "Ver en pantalla completa"}">${tlFull ? ICO_CONTRAER : ICO_EXPANDIR}</button></div>
         <div class="cp-tl-legend"><span class="cp-tl-hint">Toca un partido para ver el detalle. Mantén pulsado cualquier partido para moverlo (hora o día).</span></div>
         <div class="cp-tl-actions"><button type="button" class="cp-tl-btn" onclick="cpToggleChanges()">📝 Cambios realizados (${nCh}) ${changesOpen ? "▴" : "▾"}</button></div>
         <div class="cp-changes" id="cpChanges" style="${changesOpen ? "" : "display:none"}">${renderChanges()}</div>`;
@@ -561,6 +561,57 @@
       if (typeof ocultarCargando === "function") ocultarCargando();
     }
   };
+  // ---------- Línea temporal a pantalla completa y en horizontal ----------
+  // Se mueve el propio #cpTimeline a una ventana que ocupa toda la pantalla, así conserva
+  // todo (tocar para ver el detalle, mantener pulsado para mover, cambios realizados).
+  // En el móvil se intenta girar la pantalla de verdad (pantalla completa + bloqueo en
+  // horizontal); si el navegador no lo permite (iPhone), la ventana se gira con CSS.
+  const ICO_EXPANDIR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const ICO_CONTRAER = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const GIRO_CSS = "(orientation: portrait) and (max-width: 900px)";
+  let tlFull = false, tlSitio = null, tlPantalla = false;
+  const tlGirada = () => tlFull && window.matchMedia && matchMedia(GIRO_CSS).matches;
+  window.cpTlFull = async function (on) {
+    const tl = document.getElementById("cpTimeline");
+    if (!tl) return;
+    if (on === undefined) on = !tlFull;
+    if (on === tlFull) return;
+    tlFull = on;
+    if (on) {
+      const r = selRange();
+      const rango = r.from && r.to ? `${DIAS[dow(r.from)]} ${fmtDay(r.from).slice(0, 5)} – ${DIAS[dow(r.to)]} ${fmtDay(r.to).slice(0, 5)}` : "";
+      const ov = document.createElement("div");
+      ov.id = "cpTlFull"; ov.className = "cp-tl-full";
+      ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-label", "Línea temporal");
+      ov.innerHTML = `<div class="cp-tl-full-box"><div class="cp-tl-full-head"><b>📊 Línea temporal</b><span>${esc(rango)}</span>
+        <button type="button" class="cp-tl-full-x" onclick="cpTlFull(false)" aria-label="Cerrar">✕</button></div><div class="cp-tl-full-body"></div></div>`;
+      tlSitio = document.createComment("cpTimeline");
+      tl.parentNode.insertBefore(tlSitio, tl);
+      ov.querySelector(".cp-tl-full-body").appendChild(tl);
+      document.body.appendChild(ov);
+      document.body.classList.add("cp-tl-abierta");
+      renderMatches();
+      try {
+        const de = document.documentElement;
+        if (de.requestFullscreen && !document.fullscreenElement) { await de.requestFullscreen({ navigationUI: "hide" }); tlPantalla = true; }
+        if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
+      } catch (e) { /* sin bloqueo de giro: se gira con CSS */ }
+    } else {
+      const ov = document.getElementById("cpTlFull");
+      if (tlSitio && tlSitio.parentNode) { tlSitio.parentNode.insertBefore(tl, tlSitio); tlSitio.remove(); }
+      tlSitio = null;
+      if (ov) ov.remove();
+      document.body.classList.remove("cp-tl-abierta");
+      renderMatches();
+      try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+      if (tlPantalla && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      tlPantalla = false;
+    }
+  };
+  // Salir de pantalla completa (botón atrás, Esc) cierra también la ventana
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && tlPantalla && tlFull) { tlPantalla = false; cpTlFull(false); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tlFull && !document.querySelector(".nva-dlg")) cpTlFull(false); });
+
   function dragTarget(x, y) {
     const tl = document.getElementById("cpTimeline");
     const under = document.elementsFromPoint(x, y).find(e => e.classList && e.classList.contains("cp-tl-row"));
@@ -570,7 +621,9 @@
     const track = row.querySelector(".cp-tl-track");
     const r = track.getBoundingClientRect();
     const minH = +tl.dataset.minh, span = +tl.dataset.span;
-    let start = minH * 60 + (x - drag.dx - r.left) / r.width * span;
+    // Con la ventana girada por CSS, el eje de horas va de arriba abajo en la pantalla
+    const g = tlGirada();
+    let start = minH * 60 + ((g ? y : x) - drag.dx - (g ? r.top : r.left)) / (g ? r.height : r.width) * span;
     start = Math.round(start / 15) * 15;
     start = Math.max(minH * 60, Math.min(minH * 60 + span - DUR, start));
     return { row, track, day: row.dataset.day, start, left: (start - minH * 60) / span * 100 };
@@ -581,7 +634,7 @@
     if (!el) return;
     cancelLongPress();
     drag.el = el; drag.x0 = e.clientX; drag.y0 = e.clientY;
-    const r = el.getBoundingClientRect(); drag.dx = e.clientX - r.left;
+    const r = el.getBoundingClientRect(); drag.dx = tlGirada() ? e.clientY - r.top : e.clientX - r.left;
     drag.timer = setTimeout(() => {
       drag.active = true; drag.timer = null;
       el.classList.add("dragging");

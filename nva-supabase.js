@@ -49,6 +49,7 @@
     "tablon.calendario": ["[data-nva-menu=\"tablon.calendario\"]"],
     "calendario.linea": ["#cpSubHead_tl", "#cpSub_tl"],
     "calendario.avisos": ["#cpSubHead_warn", "#cpSub_warn"],
+    "calendario.premisas": ["#cpSubHead_prem", "#cpSub_prem"],
     "calendario.lista": ["#cpSubHead_list", "#cpSub_list"],
     "calendario.equipos": ["#cpSubHead_teams", "#cpSub_teams"],
     "calendario.programada": ["#cpSubHead_prog", "#cpSub_prog"],

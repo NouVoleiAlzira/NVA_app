@@ -1,5 +1,5 @@
 /* =====================================================================
-   Tablón de Consultas › Calendario de encuentros (.ics)
+   Calendario de partidos › Calendario de encuentros (.ics)
    Se eligen uno o varios equipos y se descarga un archivo iCalendar con
    sus partidos, para importarlo en Google Calendar, Outlook o el
    calendario del móvil. Los partidos salen de «Calendario de partidos»

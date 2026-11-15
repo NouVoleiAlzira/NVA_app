@@ -270,7 +270,7 @@
   }
   function initSubs() {
     const st = subState();
-    const def = { tl: true, warn: true, prem: false, list: false, teams: false, prog: false };
+    const def = { tl: true, warn: true, prem: false, list: false, teams: false, prog: false, ics: false };
     Object.keys(def).forEach(id => applySub(id, st[id] === undefined ? def[id] : st[id]));
   }
 

@@ -172,10 +172,6 @@
         <button class="btn-save-session" style="flex:0 0 auto; width:auto; white-space:nowrap; background: var(--btn-fondoVerde);" onclick="withLoading(refreshTablon, 'Refrescando Tablón...')">🔄 Refrescar</button>
         <button class="btn-save-session" style="flex:1; background: var(--btn-fondoAmarillo);" onclick="openOtros()">🗃️ Otras INFOs</button>
       </div>
-      <div data-nva-menu="tablon.calendario">
-      <div class="section-subtitle" style="margin-top:14px;">Calendario de encuentros</div>
-      <button class="btn-pdf-mode2" style="margin-bottom:0;" onclick="icsAbrir()">📆 Exportar partidos a Google / Outlook (.ics)</button>
-      </div>
     </div>
 
     <!-- ===== Sección plegable: Calendario de partidos (empieza plegada) ===== -->
@@ -199,6 +195,11 @@
       <div class="cp-sub-body" id="cpSub_teams"><div id="cpTeams" class="cp-teams"></div></div>
       <div class="cp-sub-head" id="cpSubHead_prog" role="button" tabindex="0" aria-expanded="true" onclick="cpToggleSub('prog')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpToggleSub('prog');}">⏰ Actualización programada <span class="sec-arrow">▾</span></div>
       <div class="cp-sub-body" id="cpSub_prog"><div id="cpProg" class="cp-prog"></div></div>
+      <div class="cp-sub-head" id="cpSubHead_ics" role="button" tabindex="0" aria-expanded="true" onclick="cpToggleSub('ics')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpToggleSub('ics');}">📆 Calendario de encuentros para Outlook <span class="sec-arrow">▾</span></div>
+      <div class="cp-sub-body" id="cpSub_ics"><div class="cp-ics">
+        <p class="cp-ics-txt">Elige equipos y descarga sus partidos en un archivo .ics para Google Calendar, Outlook o el móvil.</p>
+        <button class="btn-pdf-mode2" style="margin-bottom:0;" onclick="icsAbrir()">📆 Exportar partidos a Google / Outlook (.ics)</button>
+      </div></div>
       <input type="file" id="cpFileInput" accept="application/pdf,.pdf" style="display:none;">
     </div>
 

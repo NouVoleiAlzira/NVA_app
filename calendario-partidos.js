@@ -358,6 +358,7 @@
           if (g) { g.ms.push(m); g.end = Math.max(g.end, m.start + DUR); }
           else grupos.push({ alevin: m.alevin ? m.team : "", ms: [m], start: m.start, end: m.start + DUR });
         });
+        const LANE = tlFull ? 52 : 34;   // alto de cada carril (en pantalla completa caben 3 líneas)
         const lanes = [];   // carriles para que no se monten los bloques
         grupos.forEach(g => { let l = lanes.findIndex(end => end <= g.start); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = g.end; g.ms.forEach(m => { m.lane = l; }); });
         // Bloque alevín: cada partido llega hasta el inicio del siguiente, separados por una diagonal
@@ -367,16 +368,19 @@
         }));
         const fr = isWeekend(day) ? [...new Set(dm.filter(enPalau).map(m => franja(m).endsWith("M") ? "mañana" : "tarde"))] : [];
         t += `<div class="cp-tl-row${dm.length ? "" : " empty"}" data-day="${day}"><div class="cp-tl-label"><b>${DIAS[dow(day)]}</b>${fmtDay(day).slice(0, 5)}${fr.length ? `<small>🏠 ${fr.join(" + ")}</small>` : ""}</div>
-          <div class="cp-tl-track" style="height:${Math.max(1, lanes.length) * 34 + 4}px">${tardeBg}`;
+          <div class="cp-tl-track" style="height:${Math.max(1, lanes.length) * LANE + 4}px">${tardeBg}`;
         dm.forEach(m => {
           const w = warnOf[m.id];
           const cls = ["cp-tl-blk", m.alevin ? "alevin" : isHome(m) ? "home" : "away", m.seg ? "seg" + (m.seg.first ? "" : " seg-l") + (m.seg.last ? "" : " seg-r") : "", m.placed ? "placed" : "", m.moved ? "moved" : "", w ? "warn" : ""].join(" ");
-          const tip = `${toHHMM(m.start)}${m.placed ? " (propuesta)" : ""}${m.moved ? " (movido)" : ""} · ${m.team} ${isHome(m) ? "vs" : "en"} ${m.rival || "?"}${m.coaches.length ? " · " + m.coaches.join(", ") : ""}${w ? "\n⚠ " + w.map(x => x.text).join("\n⚠ ") : ""}`;
+          // Primero el equipo de casa y después el visitante
+          const vsTxt = (nom) => isHome(m) ? `${nom} vs ${m.rival || "?"}` : `${m.rival || "?"} vs ${nom}`;
+          const campo = m.venue && !m.forced ? m.venue : (isHome(m) ? "Local" : "Visitante") + (m.forced ? " (cambiado)" : "");
+          const tip = `${toHHMM(m.start)}${m.placed ? " (propuesta)" : ""}${m.moved ? " (movido)" : ""} · ${vsTxt(m.team)}\nCampo: ${campo}${m.jornada ? "\nJornada " + m.jornada : ""}${m.coaches.length ? "\nEntrenadores: " + m.coaches.join(", ") : ""}${w ? "\n⚠ " + w.map(x => x.text).join("\n⚠ ") : ""}`;
           const pos = m.seg
             ? `left:calc(${pct(m.start)} - ${SEG}px);width:calc(${pct(minH * 60 + Math.max(15, m.seg.end - m.start))} + ${2 * SEG}px)`
             : `left:${pct(m.start)};width:${pct(minH * 60 + DUR)}`;
-          t += `<div class="${cls}" style="${pos};top:${m.lane * 34 + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
-            <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}</span><span class="cp-tl-n">${esc(short(m.team))}</span></div>`;
+          t += `<div class="${cls}" style="${pos};top:${m.lane * LANE + 2}px" title="${esc(tip)}" onclick="cpShowMatch(this)" data-tip="${esc(tip)}" data-mk="${esc(m.mk)}" data-start="${m.start}">
+            <span class="cp-tl-t">${w ? "⚠️" : ""}${m.moved ? "✎" : ""}${toHHMM(m.start)}${tlFull && m.jornada ? ` · J${esc(m.jornada)}` : ""}</span><span class="cp-tl-n">${esc(tlFull ? vsTxt(short(m.team)) : short(m.team))}</span>${tlFull ? `<span class="cp-tl-v">📍 ${esc(campo)}</span>` : ""}</div>`;
         });
         t += `</div></div>`;
       });

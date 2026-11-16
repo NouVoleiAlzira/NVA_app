@@ -152,6 +152,15 @@
     const club = { nombre: ((nva && nva.equipo) || p.team.name).toUpperCase(), logo: await cargarImg((nva && nva.logo) || LOGO_CLUB) };
     const otro = { nombre: limpiarClub(p.rival), logo: await cargarImg(rival && rival.logo) || await cargarImg(SIN_ESCUDO) };
     if (!club.logo) club.logo = await cargarImg(LOGO_CLUB);
+    // .club: es un equipo del club (va en negrita en los estilos que destacan un equipo).
+    // El rival también lo es si juegan dos equipos del club entre sí.
+    club.club = true;
+    const otroClub = buscarFicha(fichas.nva.filter(f => f !== nva), otro.nombre, p.team.category);
+    otro.club = !!otroClub || tokens(otro.nombre).includes("NVA");
+    if (otro.club && (!rival || !rival.logo)) {   // partido entre dos equipos del club: su escudo de Escudos
+      const l = await cargarImg((otroClub && otroClub.logo) || LOGO_CLUB);
+      if (l) otro.logo = l;
+    }
     let color = (nva && nva.color) || "";
     if (color && !color.startsWith("#")) color = "#" + color;
     if (!/^#[0-9a-f]{6}$/i.test(color)) color = "#f5c518";
@@ -871,8 +880,10 @@
         contener(ctx, p.visit.logo, lx + lado * 1.55, cy, lado);
         const tx = lx + lado * 2.1 + 14, tw = x + w - tx, px = Math.min(56, filaH * 0.23);
         ctx.font = FB(px * 0.62, 700); espaciado(ctx, p.cat, tx, cy - px * 1.45, 3, mezcla(p.color, "#111111", luz(p.color) > 0.6 ? 0.45 : 0));
-        texto(ctx, p.local.nombre, tx, cy - px * 0.42, tw, px, (s) => F(s, 800, true), "#111111");
-        texto(ctx, p.visit.nombre, tx, cy + px * 0.62, tw, px, (s) => F(s, 700), "#3b3b3b");
+        // En negrita, el equipo del club (los dos si juegan dos equipos del club)
+        const fuerte = (e) => e.club ? [(s) => F(s, 800, true), "#111111"] : [(s) => F(s, 700), "#3b3b3b"];
+        texto(ctx, p.local.nombre, tx, cy - px * 0.42, tw, px, ...fuerte(p.local));
+        texto(ctx, p.visit.nombre, tx, cy + px * 0.62, tw, px, ...fuerte(p.visit));
         texto(ctx, p.campo, tx, cy + px * 1.55, tw, px * 0.56, (s) => FB(s, 600), "#6d675c");
         ctx.textBaseline = "alphabetic";
         y += filaH;

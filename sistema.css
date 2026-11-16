@@ -766,6 +766,93 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .cp-modal.nva-dlg, .nva-dlg-box { animation: none; } }
 
 /* ---------------------------------------------------------------------
+   Listas desplegables propias (selector.js): sustituyen a la ventana
+   del sistema al tocar cualquier <select>
+   --------------------------------------------------------------------- */
+.nva-sel {
+  position: fixed; inset: 0; z-index: 2147483100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(5, 11, 32, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: nvaDlgFondo 140ms ease both;
+}
+.nva-sel-box {
+  width: 100%; max-width: 420px; max-height: min(78vh, 640px);
+  display: flex; flex-direction: column;
+  background: var(--sf-win);
+  color: var(--txt-1);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sombra-win);
+  overflow: hidden;
+  animation: nvaDlgCaja 200ms var(--ease-sis) both;
+}
+.nva-sel-titulo {
+  flex: none;
+  padding: 14px 18px 10px;
+  font-family: var(--font-display);
+  font-style: italic; font-weight: 800;
+  font-size: 1.05rem; letter-spacing: 0.01em;
+  color: #fff;
+  border-bottom: 1px solid var(--borde);
+}
+.nva-sel-lista { overflow-y: auto; overscroll-behavior: contain; padding: 6px; -webkit-overflow-scrolling: touch; }
+.nva-sel-op {
+  width: 100%;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  margin: 0;
+  border: 0; border-radius: 12px;
+  background: transparent;
+  color: var(--txt-1);
+  font-family: var(--font-body);
+  font-size: 1rem; font-weight: 500; text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms ease;
+}
+.nva-sel-op { position: relative; }
+.nva-sel-op + .nva-sel-op::before { content: ""; position: absolute; top: 0; left: 12px; right: 12px; height: 1px; background: var(--borde); }
+.nva-sel-op:active, .nva-sel-op:focus-visible { background: var(--sf-fila-hover); outline: none; }
+.nva-sel-op:focus-visible { box-shadow: inset 0 0 0 2px rgba(245, 197, 24, 0.55); }
+@media (hover: hover) and (pointer: fine) { .nva-sel-op:not(:disabled):hover { background: var(--sf-fila-hover); } }
+.nva-sel-txt { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+/* Círculo de la opción; la elegida en amarillo de la app */
+.nva-sel-marca {
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--borde-fuerte);
+  transition: box-shadow 150ms ease;
+}
+.nva-sel-activa { background: rgba(245, 197, 24, 0.10); color: #fff; font-weight: 700; }
+.nva-sel-activa::before, .nva-sel-activa + .nva-sel-op::before, .nva-sel-op:focus-visible::before, .nva-sel-op:focus-visible + .nva-sel-op::before { display: none; }
+.nva-sel-activa .nva-sel-marca { box-shadow: inset 0 0 0 2px var(--balon, #F5C518), inset 0 0 0 5px var(--sf-win-solid), inset 0 0 0 10px var(--balon, #F5C518); }
+.nva-sel-off { opacity: 0.4; cursor: default; }
+.nva-sel-off .nva-sel-marca { visibility: hidden; }
+.nva-sel-grupo {
+  padding: 12px 12px 4px;
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--txt-2);
+}
+.nva-sel-engrupo { padding-left: 20px; }
+/* Ordenador: pegada a la lista, como un menú */
+.nva-sel.nva-sel-pegada { display: block; padding: 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; animation: none; }
+.nva-sel-pegada .nva-sel-box { position: fixed; max-width: none; border-radius: var(--r-md); animation: nvaSelBaja 140ms var(--ease-sis) both; }
+.nva-sel-pegada .nva-sel-arriba { animation-name: nvaSelSube; }
+.nva-sel-pegada .nva-sel-titulo { display: none; }
+.nva-sel-pegada .nva-sel-lista { padding: 4px; }
+.nva-sel-pegada .nva-sel-op { min-height: 36px; padding: 7px 10px; font-size: 0.9rem; border-radius: 9px; }
+.nva-sel-pegada .nva-sel-marca { width: 16px; height: 16px; }
+.nva-sel-pegada .nva-sel-activa .nva-sel-marca { box-shadow: inset 0 0 0 2px var(--balon, #F5C518), inset 0 0 0 4px var(--sf-win-solid), inset 0 0 0 8px var(--balon, #F5C518); }
+select.nva-sel-abierta { border-color: var(--balon, #F5C518) !important; box-shadow: var(--foco); }
+.nva-sel-fuera { opacity: 0; transition: opacity 120ms ease; }
+@keyframes nvaSelBaja { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes nvaSelSube { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nva-sel, .nva-sel-box { animation: none !important; } }
+
+/* ---------------------------------------------------------------------
    Movimiento reducido
    --------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {

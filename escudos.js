@@ -7,7 +7,8 @@
 //  - Todo se guarda en la carpeta Escudos/:
 //      Escudos/escudos.json        nombres, categorías, colores y escudos
 //      Escudos/imagenes/<nombre>.png  las imágenes de los escudos
-//  - La primera vez se crea a partir de DATOS.xls y la carpeta LOGOs.
+//  - Las Stories, los Reels y los carteles de Eventos sacan de aquí los
+//    escudos, colores y patrocinadores (window.nvaEscudos.cargar()).
 //  - «Actualizar desde los PDF» añade los rivales de los calendarios de
 //    partidos (CalendarioPartidos.json) que aún no estén.
 //  - El color de un equipo del club es el de Horarios.json (teamColors):
@@ -23,8 +24,6 @@
   const IMG_DIR = "Escudos/imagenes";
   const ESC_LOCAL = "NVA_ESCUDOS";
   const HZ = "Horarios.json";
-  const XLSX_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-  const XLSX_SRI = "sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw";
   const MAX_LADO = 400;   // px del lado mayor al guardar un escudo
 
   const esc = (s) => escapeHtml(s);
@@ -246,109 +245,18 @@
     } catch (e) { console.warn("Escudos: no se pudieron copiar los colores", e); }
   };
 
-  // ---------- Primera vez: desde DATOS.xls y LOGOs ----------
-  function asegurarXlsx() {
-    if (window.XLSX) return Promise.resolve();
-    return new Promise((ok, mal) => {
-      const s = document.createElement("script");
-      s.src = XLSX_URL; s.integrity = XLSX_SRI; s.crossOrigin = "anonymous"; s.async = true;
-      s.onload = () => ok(); s.onerror = () => mal(new Error("No se pudo cargar el lector de Excel"));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function leerDatosXls() {
-    await asegurarXlsx();
-    const r = await fetch("DATOS.xls", { cache: "no-cache" });
-    if (!r.ok) throw new Error("No se ha podido leer DATOS.xls");
-    const wb = XLSX.read(new Uint8Array(await r.arrayBuffer()), { type: "array" });
-    const hoja = (p) => { const n = wb.SheetNames.find(s => sinAcentos(s).includes(p)); return n ? XLSX.utils.sheet_to_json(wb.Sheets[n]) : []; };
-    const fila = (f) => ({ equipo: String(f.EQUIPO || "").trim(), categoria: String(f.CATEGORIA || f["CATEGORÍA"] || "").trim(),
-      logo: String(f.LOGO || "").trim(), color: String(f.COLOR || "").trim() });
-    return { nva: hoja("EQUIPOS NVA").map(fila).filter(f => f.equipo), otros: hoja("OTRO").map(fila).filter(f => f.equipo) };
-  }
-
-  // Copia LOGOs/<logo>.png a Escudos/imagenes/<nombre>.png (null si no hay imagen)
-  async function copiarLogo(logo, nombre, hechos) {
-    if (!logo || /^noescudo$/i.test(logo)) return "";
-    const ruta = `${IMG_DIR}/${slug(nombre)}.png`;
-    if (hechos[ruta] !== undefined) return hechos[ruta];
-    try {
-      const r = await fetch("LOGOs/" + encodeURIComponent(logo) + (/\.(png|jpe?g)$/i.test(logo) ? "" : ".png"));
-      if (!r.ok) { hechos[ruta] = ""; return ""; }
-      const url = URL.createObjectURL(await r.blob());
-      const b64 = await aPng(url);
-      URL.revokeObjectURL(url);
-      await subirImagen(ruta, b64);
-      hechos[ruta] = ruta;
-    } catch (e) { console.warn("Logo", logo, e); hechos[ruta] = ""; }
-    return hechos[ruta];
-  }
-
-  async function crearDesdeDatos() {
+  // ---------- Primera vez: carpeta vacía con los equipos del club ----------
+  async function crearVacia() {
     if (!puedeEditar()) return;
-    if (!await nvaConfirmar("Se creará la carpeta Escudos con los equipos, colores y escudos de DATOS.xls y la carpeta LOGOs. ¿Continuar?")) return;
-    mostrarCargando("Creando la carpeta Escudos...");
-    try {
-      const x = await leerDatosXls();
-      const hechos = {};
-      const nuevo = { version: 1, actualizado: "", club: {}, clubes: [] };
-
-      // Equipos del club
-      for (const t of (appData.teams || [])) {
-        const key = getTeamKey(t);
-        let mejor = null, valor = 0;
-        x.nva.forEach(f => {
-          let v = similitud(t.name, f.equipo);
-          if (v < 0.8) return;
-          if (catBase(f.categoria) === catBase(t.category)) v += 0.5;
-          if (v > valor) { mejor = f; valor = v; }
-        });
-        const color = mejor && /^[0-9a-f]{6}$/i.test(mejor.color) ? "#" + mejor.color.toLowerCase() : "";
-        nuevo.club[key] = {
-          nombre: mejor ? mejor.equipo : t.name, categoria: mejor ? mejor.categoria : t.category,
-          escudo: mejor ? await copiarLogo(mejor.logo, "club-" + key, hechos) : "",
-          color: (typeof hz !== "undefined" && hz.teamColors[key]) || color
-        };
-      }
-
-      // Otros clubes: un club por escudo; los «sin escudo» se agrupan por nombre
-      const otros = x.otros.filter(f => !tokens(f.equipo).includes("NVA"));
-      const porLogo = new Map();
-      otros.forEach(f => {
-        const k = f.logo && !/^noescudo$/i.test(f.logo) ? "L:" + f.logo.toLowerCase() : null;
-        if (k) { if (!porLogo.has(k)) porLogo.set(k, []); porLogo.get(k).push(f); }
-      });
-      const grupos = Array.from(porLogo.values());
-      otros.filter(f => !f.logo || /^noescudo$/i.test(f.logo)).forEach(f => {
-        const g = grupos.find(g => g.some(o => similitud(o.equipo, f.equipo) >= 0.8 || esDelClub(f.equipo, o.equipo) || esDelClub(o.equipo, f.equipo)));
-        if (g) g.push(f); else grupos.push([f]);
-      });
-      for (const g of grupos) {
-        // Nombre del club: la fila sin categoría (es el nombre general) o el más corto
-        const general = g.filter(f => !f.categoria).map(f => f.equipo);
-        const nombre = (general.length ? general : g.map(f => f.equipo)).sort((a, b) => a.length - b.length)[0];
-        const equipos = [];
-        g.filter(f => f.categoria || !g.some(o => o.categoria)).forEach(f => {
-          if (!equipos.some(e => e.nombre === f.equipo && e.categoria === f.categoria)) equipos.push({ id: uid(), nombre: f.equipo, categoria: f.categoria });
-        });
-        const logo = (g.find(f => f.logo && !/^noescudo$/i.test(f.logo)) || {}).logo;
-        nuevo.clubes.push({ id: uid(), nombre, escudo: await copiarLogo(logo, nombre, hechos), equipos });
-      }
-      ordenarClubes(nuevo);
-      nuevo.actualizado = new Date().toISOString();
-      datos = nuevo;
-      guardarLocal();
-      const ok = await writeGitHubFile(ESC_FILE, datos, "Crear Escudos desde DATOS.xls");
-      await leerImagenes();
-      ocultarCargando();
-      pintar();
-      nvaAviso(`Carpeta Escudos creada: ${Object.keys(datos.club).length} equipos del club y ${datos.clubes.length} clubes rivales.` +
-        (ok ? "" : " Se enviará al recuperar la conexión."));
-    } catch (e) {
-      ocultarCargando();
-      nvaAviso("No se pudo crear la carpeta Escudos: " + (e.message || e), { tipo: "error" });
-    }
+    if (!await nvaConfirmar("Se creará la carpeta Escudos con los equipos del club, sin escudos. Después podrás añadir escudos, clubes rivales y patrocinadores. ¿Continuar?")) return;
+    const nuevo = { version: 1, actualizado: "", club: {}, clubes: [], patrocinadores: [] };
+    (appData.teams || []).forEach(t => {
+      const key = getTeamKey(t);
+      nuevo.club[key] = { nombre: t.name, categoria: t.category, escudo: "", color: (typeof hz !== "undefined" && hz.teamColors[key]) || "", patrocinador: "" };
+    });
+    datos = nuevo;
+    guardar("Crear Escudos");
+    pintar();
   }
 
   function ordenarClubes(d) {
@@ -510,7 +418,7 @@
       box.innerHTML = `<div class="config-section">
           <div class="config-subtitle">Escudos</div>
           <p class="esc-nota">${leido ? "Aún no existe la carpeta Escudos." : "Cargando…"}</p>
-          ${leido && ed ? `<button class="btn-save-session" data-esc="crear">📥 Crear desde DATOS.xls y LOGOs</button>` : ""}
+          ${leido && ed ? `<button class="btn-save-session" data-esc="crear">📁 Crear la carpeta Escudos</button>` : ""}
         </div>`;
       return;
     }
@@ -656,7 +564,7 @@
       const b = ev.target.closest("[data-esc]");
       if (!b || b.tagName === "INPUT") return;
       const a = b.dataset.esc, c = datos && clubDe(b);
-      if (a === "crear") return crearDesdeDatos();
+      if (a === "crear") return crearVacia();
       if (a === "actualizar") return actualizarDesdePdf();
       if (a === "patro-importar") return importarPatrocinadores();
       if (a === "patro-tipo") {
@@ -766,6 +674,17 @@
       if (a === "eq-cat" && e) { e.categoria = v; return guardar("Categoría de equipo"); }
     });
   }
+
+  // Para Stories, Reels y carteles: lee la carpeta Escudos (y sus imágenes como blob:)
+  // y devuelve { datos, urls } (urls: ruta de imagen -> URL para dibujarla).
+  let cargando = null;
+  window.nvaEscudos = {
+    cargar() {
+      if (!cargando) cargando = leer().then(() => ({ datos, urls })).finally(() => { cargando = null; });
+      return cargando;
+    },
+    url: (ruta) => (ruta && urls[ruta]) || ""
+  };
 
   // Se llama al abrir la pestaña
   window.escAbrir = async function () {

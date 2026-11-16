@@ -4,15 +4,14 @@
    story se dibuja aquí mismo en un lienzo 1080×1920, con 10 estilos
    (5 sin fotos y 5 con fotos). Por defecto, todos los partidos van en una
    sola story; se pueden repartir en varias páginas eligiendo cuáles van
-   en cada una. Escudos y colores: DATOS.xls (Equipos NVA y OTROS Equipos).
+   en cada una. Escudos, colores y patrocinadores: Configuración › Escudos
+   (escudos.js, window.nvaEscudos).
    El borrador se crea con historia-editor.js (nvaStory.crearBorrador).
    ===================================================================== */
 (function () {
   "use strict";
 
   const W = 1080, H = 1920;
-  const XLSX_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-  const XLSX_SRI = "sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw";
   const LOGO_CLUB = "LOGOs/LOGO NVA 800x800.png";
   const SIN_ESCUDO = "LOGOs/noescudo.png";
   const ESTILO_KEY = "NVA_STORY_SEMANA_ESTILO";
@@ -36,46 +35,39 @@
     return imagenes.get(src);
   }
 
-  /* ---------- DATOS.xls: escudos y colores ---------- */
-  let xlsxPromesa = null, fichasPromesa = null;
-  function asegurarXlsx() {
-    if (window.XLSX) return Promise.resolve();
-    if (!xlsxPromesa) xlsxPromesa = new Promise((ok, mal) => {
-      const s = document.createElement("script");
-      s.src = XLSX_URL; s.integrity = XLSX_SRI; s.crossOrigin = "anonymous"; s.async = true;
-      s.onload = () => ok();
-      s.onerror = () => { xlsxPromesa = null; mal(new Error("No se pudo cargar el lector de Excel")); };
-      document.head.appendChild(s);
-    });
-    return xlsxPromesa;
-  }
-
+  /* ---------- Configuración › Escudos: escudos, colores y patrocinadores ----------
+     Fichas: nva = equipos del club (key = getTeamKey), otros = equipos de otros
+     clubes (con el escudo de su club), globales = logos de los patrocinadores
+     globales. Los logos ya vienen como URL (blob:) que se puede dibujar. */
+  let fichasPromesa = null, fichasHora = 0;
   function cargarFichas() {
-    if (!fichasPromesa) fichasPromesa = (async () => {
-      await asegurarXlsx();
-      const r = await fetch("DATOS.xls", { cache: "no-cache" });
-      if (!r.ok) throw new Error("No se ha podido leer DATOS.xls");
-      const wb = XLSX.read(new Uint8Array(await r.arrayBuffer()), { type: "array" });
-      const hoja = (pista) => {
-        const n = wb.SheetNames.find(s => sinAcentos(s).includes(pista));
-        return n ? XLSX.utils.sheet_to_json(wb.Sheets[n]) : [];
-      };
-      const fila = (f) => ({
-        equipo: String(f.EQUIPO || f.Equipo || f.Nombre || "").trim(),
-        categoria: String(f.CATEGORIA || f["CATEGORÍA"] || f.Categoria || "").trim(),
-        logo: String(f.LOGO || f.Logo || "").trim(),
-        color: String(f.COLOR || f.Color || "").trim()
+    if (fichasPromesa && Date.now() - fichasHora < 60000) return fichasPromesa;
+    fichasHora = Date.now();
+    fichasPromesa = (async () => {
+      if (!window.nvaEscudos) throw new Error("No se ha podido leer la pestaña Escudos");
+      const { datos } = await window.nvaEscudos.cargar();
+      const url = window.nvaEscudos.url;
+      const vacio = { nva: [], otros: [], globales: [] };
+      if (!datos) return vacio;
+      const patros = Array.isArray(datos.patrocinadores) ? datos.patrocinadores : [];
+      const logoPatro = (id) => { const x = id && patros.find(q => q.id === id); return x ? url(x.logo) : ""; };
+      const colores = (typeof hz !== "undefined" && hz.teamColors) || {};
+      const nva = Object.keys(datos.club || {}).map(k => {
+        const c = datos.club[k] || {};
+        return { key: k, equipo: String(c.nombre || k.replace(/\s*\(.*\)\s*$/, "")).trim(), categoria: String(c.categoria || "").trim(),
+          logo: url(c.escudo), color: colores[k] || c.color || "", patro: logoPatro(c.patrocinador) };
       });
-      return { nva: hoja("NVA").map(fila).filter(f => f.equipo), otros: hoja("OTRO").map(fila).filter(f => f.equipo) };
+      const otros = [];
+      (datos.clubes || []).forEach(c => {
+        const logo = url(c.escudo);
+        otros.push({ equipo: String(c.nombre || "").trim(), categoria: "", logo });
+        (c.equipos || []).forEach(e => otros.push({ equipo: String(e.nombre || "").trim(), categoria: String(e.categoria || "").trim(), logo }));
+      });
+      return { nva: nva.filter(f => f.equipo), otros: otros.filter(f => f.equipo),
+        globales: patros.filter(x => x.tipo === "global").map(x => url(x.logo)).filter(Boolean) };
     })().catch(e => { fichasPromesa = null; throw e; });
     return fichasPromesa;
   }
-
-  const rutaLogo = (v) => {
-    if (!v) return "";
-    const s = /\.(png|jpe?g|svg)$/i.test(v) ? v : v + ".png";
-    return /^logos[\\/]/i.test(s) ? s : "LOGOs/" + s;
-  };
 
   // Mismo criterio que Partidos.html (similitudNombres): 1 = mismo nombre, desde 0.8 = mismo equipo
   const IGNORAR = new Set(["CV", "CD", "CB", "CLUB", "DE", "DEL", "LA", "EL", "LES", "ELS", "VOLEI", "VOLEY", "VOLEIBOL", "VOLEYBOL", "C", "V"]);
@@ -155,10 +147,10 @@
 
   // p: partido de partidosSemana (partidos-semana.js) -> datos listos para dibujar
   async function prepararPartido(p, fichas) {
-    const nva = buscarFicha(fichas.nva, p.team.name, p.team.category);
+    const nva = fichas.nva.find(f => f.key === p.key) || buscarFicha(fichas.nva, p.team.name, p.team.category);
     const rival = buscarFicha(fichas.otros, limpiarClub(p.rival), p.team.category);
-    const club = { nombre: (nva && nva.equipo) || p.team.name.toUpperCase(), logo: await cargarImg(rutaLogo(nva && nva.logo) || LOGO_CLUB) };
-    const otro = { nombre: limpiarClub(p.rival), logo: await cargarImg(rutaLogo(rival && rival.logo)) || await cargarImg(SIN_ESCUDO) };
+    const club = { nombre: ((nva && nva.equipo) || p.team.name).toUpperCase(), logo: await cargarImg((nva && nva.logo) || LOGO_CLUB) };
+    const otro = { nombre: limpiarClub(p.rival), logo: await cargarImg(rival && rival.logo) || await cargarImg(SIN_ESCUDO) };
     if (!club.logo) club.logo = await cargarImg(LOGO_CLUB);
     let color = (nva && nva.color) || "";
     if (color && !color.startsWith("#")) color = "#" + color;
@@ -172,7 +164,8 @@
       color, local: p.home ? club : otro, visit: p.home ? otro : club, nvaLocal: !!p.home,
       fecha: p.fecha, dia: fechaCorta(p.fecha), hora: p.hora || "", campo: apos(p.campo || "").toUpperCase(),
       res: !!res, setsL: res ? res.setsL : null, setsV: res ? res.setsV : null, sets: res ? res.sets || [] : [],
-      gana: res ? nvaSets > rivSets : null, foto: null
+      gana: res ? nvaSets > rivSets : null, foto: null,
+      patro: nva && nva.patro ? await cargarImg(nva.patro) : null   // patrocinador del equipo (Escudos)
     };
   }
 
@@ -1068,7 +1061,51 @@
     ctx.scale(escala || 1, escala || 1);
     ctx.imageSmoothingQuality = "high";
     (ESTILOS.find(e => e.id === estilo) || ESTILOS[0]).dibujar(ctx, pag);
+    dibujarPatrocinadores(ctx, pag.patros);
     return c;
+  }
+
+  // Patrocinadores globales (Configuración › Escudos): pequeños, abajo a la derecha.
+  // Sin placa: cada logo lleva un halo suave claro u oscuro (el contrario del logo) para leerse
+  // sobre cualquier estilo.
+  const lumaLogo = new WeakMap();
+  function esOscuro(im) {
+    if (!lumaLogo.has(im)) {
+      let l = 128;
+      try {
+        const c = lienzo(24, 24), x = c.getContext("2d");
+        x.drawImage(im, 0, 0, 24, 24);
+        const d = x.getImageData(0, 0, 24, 24).data;
+        let suma = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { suma += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; n++; }
+        if (n) l = suma / n;
+      } catch (e) { /* imagen de otro origen: se deja el valor medio */ }
+      lumaLogo.set(im, l);
+    }
+    return lumaLogo.get(im) < 128;
+  }
+  function dibujarPatrocinadores(ctx, logos) {
+    const lista = (logos || []).filter(Boolean);
+    if (!lista.length) return;
+    const ALTO = 64, ANCHO_MAX = 190, GAP = 26, DER = W - 44, ABAJO = H - 44;
+    const tam = lista.map(im => {
+      let h = ALTO, w = h * im.width / im.height;
+      if (w > ANCHO_MAX) { w = ANCHO_MAX; h = w * im.height / im.width; }
+      return { im, w, h };
+    });
+    const ancho = tam.reduce((t, x) => t + x.w, 0) + GAP * (tam.length - 1);
+    const k = Math.min(1, (W * 0.6) / ancho);   // si hay muchos, más pequeños
+    let x = DER - ancho * k;
+    tam.forEach(t => {
+      const w = t.w * k, h = t.h * k, y = ABAJO - (ALTO * k + h) / 2;
+      ctx.save();
+      ctx.shadowColor = esOscuro(t.im) ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.75)";
+      ctx.shadowBlur = 10;
+      ctx.drawImage(t.im, x, y, w, h);
+      ctx.drawImage(t.im, x, y, w, h);   // dos pasadas: el halo se nota más
+      ctx.restore();
+      x += w + GAP * k;
+    });
   }
 
   /* =====================================================================
@@ -1175,7 +1212,7 @@
       const ps = sel.filter(it => (estado.dividir ? it.pag : 1) === k).map(it => Object.assign({}, it.p, { foto: estado.tipo === "resultados" ? it.foto || null : null, ajuste: it.ajuste }));
       if (ps.length) out.push(ps);
     }
-    return out.map((ps, i) => ({ tipo: estado.tipo, desde: estado.desde, hasta: estado.hasta, partidos: ps, n: i + 1, total: out.length }));
+    return out.map((ps, i) => ({ tipo: estado.tipo, desde: estado.desde, hasta: estado.hasta, partidos: ps, n: i + 1, total: out.length, patros: estado.patros || [] }));
   }
 
   // Reparto inicial: seguido, el mismo número en cada página
@@ -1214,6 +1251,7 @@
     const tok = estado.carga = {};
     try {
       const fichas = await cargarFichas();
+      estado.patros = (await Promise.all((fichas.globales || []).map(cargarImg))).filter(Boolean);
       const crudos = window.partidosSemana ? window.partidosSemana(estado.desde, estado.hasta, estado.tipo === "resultados") : [];
       const previos = new Map(estado.items.map(it => [it.p.id, it]));
       const nuevos = [];

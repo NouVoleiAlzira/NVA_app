@@ -444,12 +444,18 @@
 
   async function cargarCatalogos() {
     await cargarEquipaciones();
+    // Patrocinadores: los de Configuración › Escudos (primero los globales). «archivo» es la
+    // ruta de su logo en Escudos/imagenes; se dibuja con la URL blob: que da nvaEscudos.
     try {
-      const j = await (await fetch("Patrocinadores/patrocinadores.json", { cache: "no-cache" })).json();
-      patrocinadores = (j.equipos || []).map(x => ({ archivo: x.archivo, nombre: x.nombre }))
-        .concat((j.comunes || []).map((a, i) => ({ archivo: a, nombre: "Común " + (i + 1) })));
+      const { datos } = window.nvaEscudos ? await window.nvaEscudos.cargar() : {};
+      const lista = (datos && Array.isArray(datos.patrocinadores) ? datos.patrocinadores : []).filter(x => x.logo);
+      patrocinadores = lista.filter(x => x.tipo === "global").concat(lista.filter(x => x.tipo !== "global"))
+        .map(x => ({ archivo: x.logo, nombre: x.nombre }));
     } catch (e) { patrocinadores = []; }
   }
+  // Logo de un patrocinador para <img> y el lienzo (los carteles antiguos guardan el nombre
+  // del archivo de la carpeta Patrocinadores/)
+  const srcPatro = (a) => /^Escudos\//.test(a || "") ? ((window.nvaEscudos && window.nvaEscudos.url(a)) || "") : "Patrocinadores/" + a;
 
   /* ---------- Estilos de la ventana ----------
      Idea: un «banquillo de diseño» con la pista de vóley como referencia. Fondo azul
@@ -806,7 +812,7 @@
       const selP = r.patros || (r.patros = []);
       h += `<div class="ev-patro">` + patrocinadores.map(pt => {
         const n = selP.indexOf(pt.archivo);
-        return `<button type="button" class="${n >= 0 ? "sel" : ""}" data-patro="${esc(pt.archivo)}" title="${esc(pt.nombre)}" aria-label="${esc(pt.nombre)}">${n >= 0 ? `<i>${n + 1}</i>` : ""}<img src="Patrocinadores/${esc(pt.archivo)}" alt=""></button>`;
+        return `<button type="button" class="${n >= 0 ? "sel" : ""}" data-patro="${esc(pt.archivo)}" title="${esc(pt.nombre)}" aria-label="${esc(pt.nombre)}">${n >= 0 ? `<i>${n + 1}</i>` : ""}<img src="${esc(srcPatro(pt.archivo))}" alt=""></button>`;
       }).join("") + `</div>`;
       h += ordenPatrosHtml();
       if (!r.patros_ok) h += `<div class="ev-fila"><button type="button" class="ev-op" data-patrook>${selP.length ? "✓ Estos" : "Sin patrocinadores"}</button></div>`;
@@ -899,7 +905,7 @@
       for (const c of crudos.slice(0, 40)) {
         let pa = null;
         if (fichas) { try { pa = await window.nvaSemana.prepararPartido(c, fichas); } catch (e) { pa = null; } }
-        if (!pa) {   // sin DATOS.xls: solo nombres
+        if (!pa) {   // sin la pestaña Escudos: solo nombres
           const club = { nombre: c.team.name.toUpperCase(), logo: await cargarImg("LOGO-NVA.png") }, otro = { nombre: String(c.rival || "").toUpperCase(), logo: null };
           pa = { id: `${c.key}|${c.fecha}|${c.rival}`, cat: (c.team.category || "").toUpperCase(), local: c.home ? club : otro, visit: c.home ? otro : club, fecha: c.fecha, hora: c.hora || "", campo: String(c.campo || "").toUpperCase() };
         }
@@ -1637,7 +1643,7 @@
     cajas.push({ id, cx, cy, w, h, rot: l.rot });
   }
   function dibujarPatros(ctx, W, H, M) {
-    const lista = (r.patros || []).map(a => imgLista("Patrocinadores/" + a)).filter(Boolean);
+    const lista = (r.patros || []).map(a => srcPatro(a)).filter(Boolean).map(u => imgLista(u)).filter(Boolean);
     if (!lista.length) return;
     const P = E.patros, base = M * 0.085 * P.s, gap = M * 0.022 * P.s;
     const factor = i => Math.max(0.5, 1 - i * 0.16);   // el primero, el más grande
@@ -1798,7 +1804,7 @@
   /* ---------- Guardar ---------- */
   async function lienzoFinal() {
     await cargarFuentes();
-    await Promise.all(["LOGO-NVA.png"].concat((r.patros || []).map(a => "Patrocinadores/" + a)).map(u => cargarImg(u).then(i => { if (i) imgsListas[u] = i; })));
+    await Promise.all(["LOGO-NVA.png"].concat((r.patros || []).map(srcPatro).filter(Boolean)).map(u => cargarImg(u).then(i => { if (i) imgsListas[u] = i; })));
     const F = formato();
     const cv = document.createElement("canvas");
     cv.width = F.w; cv.height = F.h;

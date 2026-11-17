@@ -35,7 +35,7 @@
     return "";
   }
 
-  function abrir(sel) {
+  function abrir(sel, porToque) {
     if (abierta) abierta.cerrar(false);
     const capa = document.createElement("div");
     capa.className = "nva-sel";
@@ -86,10 +86,11 @@
     });
     capa.appendChild(caja);
 
-    // En ordenador, debajo de la lista; en el móvil, en el centro (como el sistema)
+    // Se abre justo debajo de la lista (o encima si abajo no cabe). Solo si la
+    // lista no se ve (p. ej. oculta) sale en el centro de la pantalla
     const r = sel.getBoundingClientRect();
     const ancho = window.innerWidth, alto = window.innerHeight;
-    const pegada = window.matchMedia("(hover: hover) and (pointer: fine)").matches && ancho >= 640 && r.width > 0;
+    const pegada = r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < alto;
     if (pegada) {
       capa.classList.add("nva-sel-pegada");
       const w = Math.min(Math.max(r.width, 220), ancho - 16);
@@ -115,12 +116,15 @@
       abierta = null;
       document.removeEventListener("keydown", teclas, true);
       window.removeEventListener("resize", porFuera);
+      document.removeEventListener("scroll", alDesplazar, true);
       capa.classList.add("nva-sel-fuera");
       setTimeout(() => capa.remove(), 120);
       sel.classList.remove("nva-sel-abierta");
-      if (devolverFoco && pegada) try { sel.focus({ preventScroll: true }); } catch (e) {}
+      if (devolverFoco && !porToque) try { sel.focus({ preventScroll: true }); } catch (e) {}
     }
     const porFuera = () => cerrar(false);
+    // Si se mueve la página, la lista dejaría de estar pegada: se cierra
+    const alDesplazar = e => { if (!caja.contains(e.target)) cerrar(false); };
     function teclas(e) {
       const act = filas.filter(b => !b.disabled);
       const pos = act.indexOf(document.activeElement);
@@ -143,6 +147,7 @@
     capa.addEventListener("click", e => { if (e.target === capa) cerrar(true); });
     document.addEventListener("keydown", teclas, true);
     window.addEventListener("resize", porFuera);
+    document.addEventListener("scroll", alDesplazar, true);
     (document.body || document.documentElement).appendChild(capa);
     sel.classList.add("nva-sel-abierta");
     abierta = { sel, capa, cerrar };
@@ -151,9 +156,9 @@
     const act = filas.find(b => b.classList.contains("nva-sel-activa"));
     if (act) {
       lista.scrollTop = Math.max(0, act.offsetTop - lista.clientHeight / 2 + act.offsetHeight / 2);
-      if (pegada) act.focus({ preventScroll: true });
+      if (!porToque) act.focus({ preventScroll: true });
     }
-    if (!pegada && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (porToque && document.activeElement && document.activeElement.blur) document.activeElement.blur();
   }
 
   // --- Interceptar la apertura del selector del sistema ---------------
@@ -169,7 +174,7 @@
     if (!t || Math.abs(t.clientX - ini.x) > 10 || Math.abs(t.clientY - ini.y) > 10) return;  // era un desplazamiento
     e.preventDefault();          // sin ratón ni «click» simulados: no se abre la lista del sistema
     ultimoToque = Date.now();
-    abrir(ini.s);
+    abrir(ini.s, true);
   }, { capture: true, passive: false });
 
   document.addEventListener("mousedown", e => {

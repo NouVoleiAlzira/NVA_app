@@ -25,6 +25,7 @@
   const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
   const DIAS_SEM = DIAS.concat(["Sábado", "Domingo"]);
   let offset = 0;   // 0 = semana en curso
+  const RELEER_MS = 2 * 60 * 1000;   // como mucho una lectura cada 2 minutos (Egress de Supabase)
 
   const norm = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
   function datos() { try { return appData; } catch (e) { return null; } }   // de app.js
@@ -199,14 +200,15 @@
   // ---------- Clasificación ----------
   const clasif = {};   // clave del equipo -> { d, cuando } o { error }
   let leyendo = false;
-  async function cargarClasificaciones(claves, forzar) {
+  // siHaceMs: se vuelve a leer el PDF de un equipo ya leído solo si la lectura es más antigua que eso
+  async function cargarClasificaciones(claves, siHaceMs) {
     if (leyendo || !window.nvaCuadrante || !window.nvaCuadrante.leerEquipo) return;
     leyendo = true;
     try {
       for (const key of claves) {
-        if (clasif[key] && !forzar) continue;
-        try { clasif[key] = { d: await window.nvaCuadrante.leerEquipo(key) }; }
-        catch (e) { clasif[key] = { error: e && e.message || String(e) }; }
+        if (clasif[key] && !(siHaceMs && Date.now() - clasif[key].cuando >= siHaceMs)) continue;
+        try { clasif[key] = { d: await window.nvaCuadrante.leerEquipo(key), cuando: Date.now() }; }
+        catch (e) { clasif[key] = { error: e && e.message || String(e), cuando: Date.now() }; }
         renderClasificacion();
       }
     } finally { leyendo = false; renderClasificacion(); }
@@ -271,28 +273,23 @@
     st[id] = !st[id];
     try { localStorage.setItem(PLEGADO, JSON.stringify(st)); } catch (e) {}
     aplicar(id, st[id]);
-    if (id === "dlgcla" && st[id]) { renderClasificacion(); cargarClasificaciones(equiposClasif(), true); }
+    if (id === "dlgcla" && st[id]) { renderClasificacion(); cargarClasificaciones(equiposClasif(), RELEER_MS); }
     if (id === "dlgpar" && st[id]) {
       renderPartidos();
-      // Al abrir se traen los partidos y resultados más recientes
-      if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
+      // Al abrir se traen los partidos y resultados más recientes (si la última lectura tiene más de 2 min)
+      if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub(RELEER_MS)).catch(() => {});
     }
   };
   aplicar("dlgpar", !!estado().dlgpar);
   aplicar("dlgcla", !!estado().dlgcla);
-  // Si se dejó abierta, al entrar también se traen los partidos más recientes
-  if (estado().dlgpar && window.nva && window.nva.listo) window.nva.listo.then(() => setTimeout(() => {
-    if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
-  }, 0));
 
-  let partidosPedidos = false;
+  // El calendario de partidos ya se lee al arrancar y al volver a la app: cuando llega, se repinta
+  document.addEventListener("nva-partidos", () => {
+    if (!document.documentElement.classList.contains("modo-delegados")) return;
+    renderCalendario(); renderPartidos();
+  });
   window.renderDelegados = function () {
     if (!document.documentElement.classList.contains("modo-delegados")) return;
-    // Los partidos del fin de semana salen del calendario de partidos: se traen al entrar
-    if (!partidosPedidos && window.cpRefreshFromGitHub && navigator.onLine && puedeVer("delegados.calendario")) {
-      partidosPedidos = true;
-      Promise.resolve(window.cpRefreshFromGitHub()).then(() => { renderCalendario(); renderPartidos(); }).catch(() => {});
-    }
     renderCalendario();
     renderPartidos();
     renderClasificacion();

@@ -1182,14 +1182,21 @@
       const res = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${CP_FILE}`, { headers, cache: "no-store" });
       if (!res.ok) return;
       const data = JSON.parse(b64_to_utf8((await res.json()).content));
-      if (data && data.teams) { cp = data; revisarEstadosCambios(); saveLocal(); render(); }
+      if (data && data.teams) {
+        cp = data; ultimaCarga = Date.now(); revisarEstadosCambios(); saveLocal(); render();
+        document.dispatchEvent(new Event("nva-partidos"));   // la página de delegados se vuelve a pintar
+      }
     } catch (e) { console.error(`Error al cargar ${CP_FILE}:`, e); }
   }
+  // Como mucho una lectura cada 2 minutos al volver a la app o abrir una sección (Egress de Supabase)
+  const RELEER_MS = 2 * 60 * 1000;
+  let ultimaCarga = 0;
 
   // Acceso para otras partes de la app (partidos de la semana para las Stories)
   window.cpGetData = () => cp;
   window.cpGetRange = () => ({ from: (document.getElementById("cpFrom") || {}).value || "", to: (document.getElementById("cpTo") || {}).value || "" });
-  window.cpRefreshFromGitHub = () => fetchFromGitHub();
+  // Con «siHaceMs», solo si la última lectura es más antigua que eso
+  window.cpRefreshFromGitHub = (siHaceMs) => siHaceMs && Date.now() - ultimaCarga < siHaceMs ? Promise.resolve() : fetchFromGitHub();
 
   function init() {
     const from = document.getElementById("cpFrom"), to = document.getElementById("cpTo");
@@ -1212,7 +1219,12 @@
     loadProg();
     loadPrem();
     // Al volver a la app (p. ej. por la mañana) se recogen los cambios de la actualización programada
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { fetchFromGitHub(); loadProg(); loadPrem(); } });
+    let ultimaVuelta = Date.now();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || Date.now() - ultimaVuelta < RELEER_MS) return;
+      ultimaVuelta = Date.now();
+      fetchFromGitHub(); loadProg(); loadPrem();
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

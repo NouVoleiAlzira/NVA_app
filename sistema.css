@@ -1002,8 +1002,16 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
 /* Partidos de la página de delegados: 1.ª línea jornada · día y hora · campo;
    2.ª línea local · resultado · visitante */
 .dlg-partidos { font-size: 0.82rem; color: var(--txt-1); }
-.dlg-par-equipo { font-weight: 800; margin: 14px 0 6px; color: var(--txt-1); }
-.dlg-par-equipo:first-child { margin-top: 0; }
+/* Título de cada equipo (Partidos y Clasificación): más grande y bien separado del anterior */
+.dlg-par-equipo {
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; letter-spacing: 0.01em;
+  color: #fff; margin: 26px 0 8px; padding: 16px 0 6px 10px;
+  border-top: 1px solid var(--borde-fuerte, var(--borde));
+  border-left: 3px solid rgb(var(--c-amarillo)); background-clip: padding-box;
+}
+.dlg-par-equipo:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.dlg-cla-bloque + .dlg-cla-bloque { margin-top: 26px; }
+.dlg-cla-bloque + .dlg-cla-bloque > .dlg-par-equipo { padding-top: 16px; border-top: 1px solid var(--borde-fuerte, var(--borde)); }
 .dlg-par {
   padding: 8px 10px; margin-bottom: 6px; border-radius: 10px;
   background: var(--sf-fila); border: 1px solid var(--borde);
@@ -1028,7 +1036,6 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
 }
 /* Clasificación de la página de delegados */
 .dlg-clasif { font-size: 0.8rem; color: var(--txt-1); }
-.dlg-cla-bloque + .dlg-cla-bloque { margin-top: 16px; }
 .dlg-cla-liga { color: var(--txt-2); font-size: 0.74rem; margin-bottom: 6px; }
 .dlg-cla-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--borde); }
 .dlg-cla { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }

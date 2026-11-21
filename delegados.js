@@ -146,17 +146,48 @@
     const p = h.partido, m = p.m || {};
     const L = window.nvaCalLectura || {};
     const nuestro = nombreEquipo(p.key), rival = p.rival || "?";
+    const local = p.casa ? nuestro : rival, visitante = p.casa ? rival : nuestro;
     const jor = jornadaDe(m);
-    const { c, fila } = tarjeta();
-    cabecera(fila, diaLargo(m.date) + (conHora(m) ? " · " + m.time : ""), jor ? "Jornada " + jor : "Partido");
-    fila("cp-ficha-eq cp-ficha-local", p.casa ? nuestro : rival);
+    const cuando = diaLargo(m.date) + (conHora(m) ? " · " + m.time : "");
     const res = L.parseResult ? L.parseResult(m.raw) : null;
-    fila("cp-ficha-vs", res ? `${res.setsL} - ${res.setsV}` : "VS");
-    fila("cp-ficha-eq", p.casa ? rival : nuestro);
-    if (res && res.sets && res.sets.length) fila("dlg-ficha-sets", res.sets.map((s, i) => `Set ${i + 1}: ${s.local}-${s.visitante}`).join(" · "));
-    fila("cp-ficha-campo", "📍 " + p.campo);
-    if (p.anulado) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 Anulado" + (p.motivo ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(p.motivo)) || "") + " " + p.motivo).trim() : ""));
-    nvaAviso("", { nodo: c });
+    const sets = res && res.sets && res.sets.length ? res.sets.map(s => `${s.local}-${s.visitante}`).join(" / ") : "";
+    const sede = campoDe(m);   // el pabellón real; sin él, solo «Local»/«Visitante»
+    const mapa = sede ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(sede) : "";
+    const motivo = p.anulado ? "Anulado" + (p.motivo ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(p.motivo)) || "") + " " + p.motivo).trim() : "") : "";
+
+    // Tarjeta: fecha·hora y jornada / local / resultado (pastilla) y sets / visitante / campo (Google Maps)
+    const { c, fila } = tarjeta();
+    cabecera(fila, cuando, jor ? "Jornada " + jor : "Partido");
+    fila("cp-ficha-eq", local);
+    const marcador = fila("dlg-ficha-marcador", "");
+    const pastilla = document.createElement("span");
+    pastilla.className = "dlg-ficha-pastilla" + (res ? "" : " vs");
+    pastilla.textContent = res ? `${res.setsL} - ${res.setsV}` : "VS";
+    marcador.appendChild(pastilla);
+    if (sets) { const x = document.createElement("span"); x.className = "dlg-ficha-sets"; x.textContent = sets; marcador.appendChild(x); }
+    fila("cp-ficha-eq", visitante);
+    const campo = fila("cp-ficha-campo", "");
+    if (mapa) {
+      const a = document.createElement("a");
+      a.href = mapa; a.target = "_blank"; a.rel = "noopener"; a.className = "dlg-ficha-mapa";
+      a.textContent = "📍 " + p.campo;
+      campo.appendChild(a);
+    } else campo.textContent = "📍 " + p.campo;
+    if (motivo) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 " + motivo);
+
+    // Mensaje de WhatsApp con la misma información
+    const texto = [
+      `🏐 *${jor ? "Jornada " + jor + " · " : ""}${cuando}*`,
+      local,
+      res ? `*${res.setsL} - ${res.setsV}*${sets ? " (" + sets + ")" : ""}` : "VS",
+      visitante,
+      "📍 " + p.campo + (mapa ? "\n" + mapa : ""),
+      motivo ? "🚫 " + motivo : ""
+    ].filter(Boolean).join("\n");
+    nvaAviso("", { nodo: c, extra: {
+      texto: "Enviar", clase: "dlg-btn-whatsapp", titulo: "Enviar por WhatsApp",
+      accion: () => window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener")
+    } });
   }
   (function () {
     const canvas = document.getElementById("dlgCanvas");

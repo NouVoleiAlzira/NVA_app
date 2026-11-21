@@ -1094,3 +1094,35 @@ button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
 
 /* Iconos dibujados del botón y la cabecera de la página de delegados */
 #btnPaginaDelegados svg { display: block; margin: auto; }
+
+/* Página de delegados › Cuadrante (PDF «Partidos y Resultados») */
+#secHead_dlgcua {
+  --nv-acc: linear-gradient(135deg, #F0607A, #B8283F);
+  --nv-glow: rgba(240, 96, 122, 0.5);
+  --nv-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5M9 13h6M9 17h6'/%3E%3C/svg%3E");
+}
+.dlg-cua-vista {
+  position: relative; display: block; width: 100%; padding: 0; border: 1px solid var(--borde); border-radius: 12px;
+  overflow: hidden; background: #fff; cursor: zoom-in; max-height: 420px;
+}
+.dlg-cua-vista img { display: block; width: 100%; height: auto; }
+.dlg-cua-lupa {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  padding: 5px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+  color: #fff; background: rgba(6, 18, 60, 0.82); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.dlg-cua-botones, .dlg-visor-pie { display: flex; gap: 8px; margin-top: 10px; }
+.dlg-cua-btn { flex: 1; margin: 0 !important; min-width: 0; padding: 10px 6px !important; font-size: 0.82rem !important; }
+.dlg-visor { position: fixed; inset: 0; z-index: 120; display: flex; flex-direction: column; background: #070f2e; }
+.dlg-visor-barra { display: flex; align-items: center; gap: 6px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); border-bottom: 1px solid var(--borde); }
+.dlg-visor-tit { flex: 1; min-width: 0; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dlg-visor-pct { min-width: 46px; text-align: center; font-size: 0.8rem; color: var(--txt-2); font-variant-numeric: tabular-nums; }
+.dlg-visor-b {
+  width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--borde); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 1.2rem; font-weight: 700; line-height: 1; cursor: pointer;
+}
+.dlg-visor-x { margin-left: 4px; }
+.dlg-visor-zona { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; padding: 10px; }
+.dlg-visor-hojas { width: 100%; margin: 0 auto; }
+.dlg-visor-hojas img { display: block; width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px; background: #fff; user-select: none; -webkit-user-select: none; }
+.dlg-visor-pie { margin: 0; padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid var(--borde); }

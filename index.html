@@ -322,6 +322,11 @@
         <p class="dlg-vacio" id="dlgSinEquipos" hidden>Todavía no tienes equipos asignados. Pídelo en el club (Opciones › Entrenadores y equipos).</p>
         <div class="dlg-anulados" id="dlgAnulados"></div>
       </div>
+      <!-- Partidos de sus equipos por jornada (empieza plegada; delegados.js) -->
+      <div class="section-title section-toggle collapsed" id="secHead_dlgpar" role="button" tabindex="0" aria-expanded="false" aria-controls="secBody_dlgpar" style="margin-top:20px;" onclick="dlgToggleSeccion('dlgpar')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dlgToggleSeccion('dlgpar');}">Partidos <span class="sec-arrow">▾</span></div>
+      <div class="section-body collapsed" id="secBody_dlgpar">
+        <div id="dlgPartidos" class="dlg-partidos"></div>
+      </div>
     </div>
   </div>
 

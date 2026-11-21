@@ -950,9 +950,9 @@ body.wk-full-abierta { overflow: hidden; }
 
 /* ---------- Página de delegados (delegados.js) ----------
    Vive dentro de #screenCoachTeam para heredar el aspecto de la principal.
-   En «modo delegados» solo se ve ella; fuera de ese modo no se ve. */
-body:not(.modo-delegados) #dlgPagina { display: none !important; }
-body.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !important; }
+   En «modo delegados» (clase en <html>) solo se ve ella; fuera de ese modo no se ve. */
+html:not(.modo-delegados) #dlgPagina { display: none !important; }
+html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !important; }
 .dlg-cabecera {
   font-family: var(--font-display); font-size: 0.78rem; font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--txt-2);

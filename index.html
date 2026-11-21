@@ -103,7 +103,7 @@
     <!-- ===== Sección plegable: Calendario semanal ===== -->
     <div class="section-title section-toggle" id="secHead_wk" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_wk" onclick="toggleSection('wk')" onkeydown="sectionKey(event,'wk')">Calendario semanal <span class="sec-arrow">▾</span></div>
     <div class="section-body" id="secBody_wk">
-      <div class="anul-barra" id="anulBarra" hidden>🚫 <span>Modo anulación: toca un entrenamiento o la cabecera de un día para anularlo o reactivarlo.</span> <button onclick="nvaDeselEntrenos()">Terminar</button></div>
+      <div class="anul-barra" id="anulBarra" hidden>🚫 <span>Modo anulación: toca un entrenamiento o la cabecera de un día para anularlo o reactivarlo.<br>Motivo: <b class="anul-motivo" id="anulMotivo"></b></span> <button onclick="nvaCambiarMotivoEntrenos()">Cambiar motivo</button> <button onclick="nvaDeselEntrenos()">Terminar</button></div>
       <div class="wk-canvas-wrap">
         <canvas id="wkCanvas" class="wk-canvas" onclick="wkCanvasClick(event)" oncontextmenu="return false;" title="Toca un entrenamiento para abrir su registro. Mantén pulsado para borrarlo."></canvas>
         <button class="wk-nav-btn wk-nav-prev" onclick="wkMove(-1)" aria-label="Semana anterior">‹</button>
@@ -669,6 +669,7 @@
       </div>
       <div class="hist-estado" id="anulSemTxt"></div>
       <p class="hist-estado">Marca los partidos que se han anulado: no se pedirá su registro.</p>
+      <div class="hist-estado anul-motivo-fila">Motivo: <b class="anul-motivo" id="anulMotivoPartidos"></b> <button class="hist-chip" onclick="anulCambiarMotivoPartidos()">Cambiar motivo</button></div>
       <div class="hist-list" id="anulPartidos"></div>
     </div>
   </div>

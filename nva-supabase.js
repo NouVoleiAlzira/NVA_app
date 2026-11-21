@@ -65,7 +65,8 @@
     "opciones.escudos": [".tab-btn[onclick=\"switchTab(6)\"]", "#tabContent6"],
     // Página de delegados: sus bloques (la página en sí la decide nvaPaginas)
     "delegados.calendario": ["#secHead_dlgcal", "#secBody_dlgcal"],
-    "delegados.partidos": ["#secHead_dlgpar", "#secBody_dlgpar"]
+    "delegados.partidos": ["#secHead_dlgpar", "#secBody_dlgpar"],
+    "delegados.clasificacion": ["#secHead_dlgcla", "#secBody_dlgcla"]
   };
   // Secciones de la página principal (si el rol no ve ninguna, entra directo en la de delegados)
   const MENUS_PRINCIPAL = ["inicio", "informes", "tablon", "otros", "calendario", "direccion", "instagram"];

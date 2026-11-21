@@ -1021,3 +1021,24 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
 }
 .dlg-par-res.jugado { color: #fff; background: rgba(var(--c-azul), 0.28); border-color: rgba(var(--c-azul), 0.6); }
 .dlg-par .dlg-motivo { margin: 6px 0 0; }
+#secHead_dlgcla {
+  --nv-acc: linear-gradient(135deg, #34C784, #1E8A57);
+  --nv-glow: rgba(52, 199, 132, 0.5);
+  --nv-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V11h5v9M10 20V5h5v15M16 20v-6h4v6M3 20h18'/%3E%3C/svg%3E");
+}
+/* Clasificación de la página de delegados */
+.dlg-clasif { font-size: 0.8rem; color: var(--txt-1); }
+.dlg-cla-bloque + .dlg-cla-bloque { margin-top: 16px; }
+.dlg-cla-liga { color: var(--txt-2); font-size: 0.74rem; margin-bottom: 6px; }
+.dlg-cla-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--borde); }
+.dlg-cla { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.dlg-cla th, .dlg-cla td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+.dlg-cla th { font-size: 0.7rem; font-weight: 800; color: var(--txt-2); background: rgba(255, 255, 255, 0.06); }
+.dlg-cla td.eq, .dlg-cla th.eq { text-align: left; white-space: normal; min-width: 110px; }
+.dlg-cla td.pos { color: var(--txt-2); font-weight: 700; }
+.dlg-cla td.pts { font-weight: 800; }
+.dlg-cla tbody tr:nth-child(even) { background: var(--sf-fila); }
+.dlg-cla tbody tr:last-child td { border-bottom: 0; }
+.dlg-cla tr.propio td { background: rgba(var(--c-amarillo), 0.26); font-weight: 800; color: #fff; }
+.dlg-cla tr.propio td.pos { color: rgb(var(--c-amarillo)); }
+.dlg-cla-fecha { color: var(--txt-2); font-size: 0.7rem; margin-top: 6px; text-align: right; }

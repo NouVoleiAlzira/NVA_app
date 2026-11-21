@@ -87,6 +87,8 @@
     <button class="btn-header-icon btn-back" id="btnBack" onclick="withLoading(goBack, 'Sincronizando datos...')" style="display: none; visibility: visible; flex-direction: column; align-items: center; justify-content: center; line-height: 1; padding: 0; min-height: 50px;" aria-label="Volver">
       <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block; margin:auto;"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 3v5h5"/></svg>
     </button>  
+    <!-- Cambia entre la página principal y la de delegados (solo si el rol tiene las dos) -->
+    <button class="btn-header-icon" id="btnPaginaDelegados" title="Ir a la página de delegados" aria-label="Ir a la página de delegados" aria-pressed="false" style="font-size: 1.2rem;" onclick="nvaCambiarPagina()" hidden>🪪</button>
     <div class="header-title-container">
       <h1>NOU VÒLEI ALZIRA</h1>
     </div>
@@ -302,6 +304,23 @@
         <button class="btn-save-session" style="width:100%; margin:0 0 10px; --c: var(--c-violeta);" onclick="evAbrirCartel()">✨ Crear cartel de evento</button>
         <button class="btn-save-session" style="width:100%; margin:0 0 10px; --c: 255, 122, 40;" onclick="evAbrirCartel('ia')">🖼️ Cartel con estilo (prompt completo)</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== PÁGINA DE DELEGADOS (delegados.js). Solo se ve en «modo delegados»
+         (botón 🪪 de la cabecera, o directamente si el rol solo tiene esta página).
+         Cada bloque tiene su permiso en Permisos por rol › Página de delegados. ===== -->
+    <div id="dlgPagina">
+      <div class="dlg-cabecera">🪪 Delegados</div>
+      <div class="section-title section-toggle" id="secHead_dlgcal" role="button" tabindex="0" aria-expanded="true" aria-controls="secBody_dlgcal" onclick="toggleSection('dlgcal')" onkeydown="sectionKey(event,'dlgcal')">Calendario de entrenamientos <span class="sec-arrow">▾</span></div>
+      <div class="section-body" id="secBody_dlgcal">
+        <div class="wk-canvas-wrap">
+          <canvas id="dlgCanvas" class="wk-canvas dlg-canvas" oncontextmenu="return false;" aria-label="Calendario de entrenamientos de tus equipos"></canvas>
+          <button class="wk-nav-btn wk-nav-prev" onclick="dlgMove(-1)" aria-label="Semana anterior">‹</button>
+          <button class="wk-nav-btn wk-nav-next" onclick="dlgMove(1)" aria-label="Semana siguiente">›</button>
+        </div>
+        <p class="dlg-vacio" id="dlgSinEquipos" hidden>Todavía no tienes equipos asignados. Pídelo en el club (Opciones › Entrenadores y equipos).</p>
+        <div class="dlg-anulados" id="dlgAnulados"></div>
       </div>
     </div>
   </div>
@@ -801,6 +820,18 @@
           <select id="selectCoachAssign" class="app-select" style="margin-bottom: 6px;" onchange="renderCoachAssignments()"></select>
           <div id="coachTeamsCheckboxes" style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
         </div>
+
+        <div class="config-section">
+          <div class="config-subtitle">Delegados <span class="badge" id="delegadoCountBadge">0</span></div>
+          <div class="item-list" id="configDelegadosList"></div>
+          <p style="font-size:0.72rem; color:#64748b; margin-top:6px;">Son los usuarios con el rol Delegado. Se crean en la pestaña «Usuarios y permisos». En su página solo ven los equipos que tengan asignados.</p>
+        </div>
+
+        <div class="config-section" id="grpDelegadoAssign" hidden>
+          <div class="config-subtitle">Asignar Equipos a Delegado</div>
+          <select id="selectDelegadoAssign" class="app-select" style="margin-bottom: 6px;" onchange="renderDelegadoAssignments()"></select>
+          <div id="delegadoTeamsCheckboxes" style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
+        </div>
       </div>
 
       <div class="tab-content" id="tabContent2">
@@ -1004,6 +1035,7 @@
 <script src="registro.js" defer></script>
 <script src="avisos.js" defer></script>
 <script src="anulaciones.js" defer></script>
+<script src="delegados.js" defer></script>
 <script src="supabase/functions/_shared/lectura-calendarios.js" defer></script>
 <script src="supabase/functions/_shared/pdf-resultados.js" defer></script>
 <script src="calendario-partidos.js" defer></script>

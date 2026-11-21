@@ -440,8 +440,17 @@
     const ruta = resto.slice(1).map(decodeURIComponent).join("/").replace(/\/$/, "");
     if (metodo === "PUT") return guardar(ruta, init);
     if (metodo === "DELETE") return borrar(ruta);
-    return (ruta && await leerArchivo(ruta, init)) || (await listarCarpeta(ruta)) || noEncontrado();
+    // Quien solo ve la página de delegados no puede leer los datos de la principal
+    // (registros, avisos, consultas…): se contesta aquí sin preguntar a Supabase.
+    if (paginas.delegados && !paginas.principal && !LEE_DELEGADO.test(ruta)) return noEncontrado();
+    const leido = ruta && await leerArchivo(ruta, init);
+    if (leido) return leido;
+    // Un archivo (con extensión) que no existe no es una carpeta: no se lista
+    if (/\.[a-z0-9]{2,5}$/i.test(ruta)) return noEncontrado();
+    return (await listarCarpeta(ruta)) || noEncontrado();
   }
+  // Lo que puede leer la página de delegados (igual que puede_leer en Supabase)
+  const LEE_DELEGADO = /^(configuracion\.json|Horarios\.json|CalendarioPartidos\.json|Historial\/(anulaciones|avisos)\.json|Calendarios\/.+|Escudos\/.+)$/;
 
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";

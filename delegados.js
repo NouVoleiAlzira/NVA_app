@@ -154,7 +154,7 @@
     fila("cp-ficha-vs", res ? `${res.setsL} - ${res.setsV}` : "VS");
     fila("cp-ficha-eq", p.casa ? rival : nuestro);
     if (res && res.sets && res.sets.length) fila("dlg-ficha-sets", res.sets.map((s, i) => `Set ${i + 1}: ${s.local}-${s.visitante}`).join(" · "));
-    fila("cp-ficha-campo", "📍 " + p.campo + (p.casa === true ? " (local)" : p.casa === false ? " (visitante)" : ""));
+    fila("cp-ficha-campo", "📍 " + p.campo);
     if (p.anulado) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 Anulado" + (p.motivo ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(p.motivo)) || "") + " " + p.motivo).trim() : ""));
     nvaAviso("", { nodo: c });
   }

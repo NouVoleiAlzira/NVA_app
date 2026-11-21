@@ -861,13 +861,16 @@
     if (btn) btn.hidden = !(paginas.principal && paginas.delegados);
     mostrarPagina(paginas.delegados && !paginas.principal ? "delegados" : "principal");
   }
+  // Iconos dibujados (el emoji 🪪 no existe en algunos móviles y salía un cuadrado)
+  const ICO_DELEGADOS = '<svg class="ico-delegados" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3"/><path d="M6.5 20v-1.5a5.5 5.5 0 0 1 11 0V20"/><circle cx="4.8" cy="10" r="2"/><path d="M1.5 19v-.8a3.6 3.6 0 0 1 4.2-3.5"/><circle cx="19.2" cy="10" r="2"/><path d="M22.5 19v-.8a3.6 3.6 0 0 0-4.2-3.5"/></svg>';
+  const ICO_CASA = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg>';
   function mostrarPagina(cual) {
     if (cual === "delegados" && !paginas.delegados) cual = "principal";
     const enDelegados = cual === "delegados";
     document.documentElement.classList.toggle("modo-delegados", enDelegados);
     const btn = document.getElementById("btnPaginaDelegados");
     if (btn) {
-      btn.innerHTML = enDelegados ? "🏠" : "🪪";
+      btn.innerHTML = enDelegados ? ICO_CASA : ICO_DELEGADOS;
       btn.title = enDelegados ? "Ir a la página principal" : "Ir a la página de delegados";
       btn.setAttribute("aria-label", btn.title);
       btn.setAttribute("aria-pressed", enDelegados ? "true" : "false");

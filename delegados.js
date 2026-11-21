@@ -155,7 +155,10 @@
         const lado = (txt, nva, cls) => `<span class="${cls}${nva ? " nva" : ""}">${escapeHtml(txt)}</span>`;
         return `<div class="dlg-par${anul ? " anulado" : ""}">
           <div class="dlg-par-l1"><b>${jor ? "Jornada " + escapeHtml(jor) : "Jornada —"}</b><span>${escapeHtml(dia)}${conHora(m) ? " · " + escapeHtml(m.time) : " · hora por confirmar"}</span><span>📍 ${escapeHtml(campo)}</span></div>
-          <div class="dlg-par-l2">${lado(enCasa ? nuestro : rival, enCasa, "loc")}<span class="dlg-par-res${res ? " jugado" : ""}">${res ? `${res.setsL} - ${res.setsV}` : "-"}</span>${lado(enCasa ? rival : nuestro, !enCasa, "vis")}</div>
+          <div class="dlg-par-l2">${lado(enCasa ? nuestro : rival, enCasa, "loc")}${res && res.sets && res.sets.length
+            ? `<button type="button" class="dlg-par-res jugado" data-k="${escapeHtml(key + "|" + m.date + "|" + rival)}" aria-expanded="${setsAbiertos.has(key + "|" + m.date + "|" + rival)}" title="Ver los sets" onclick="dlgVerSets(this)">${res.setsL} - ${res.setsV}</button>`
+            : `<span class="dlg-par-res${res ? " jugado" : ""}">${res ? `${res.setsL} - ${res.setsV}` : "-"}</span>`}${lado(enCasa ? rival : nuestro, !enCasa, "vis")}</div>
+          ${res && res.sets && res.sets.length ? `<div class="dlg-par-sets"${setsAbiertos.has(key + "|" + m.date + "|" + rival) ? "" : " hidden"}>${res.sets.map((x, i) => `<span><small>Set ${i + 1}</small><b>${x.local} - ${x.visitante}</b></span>`).join("")}</div>` : ""}
           ${anul ? `<span class="dlg-motivo">🚫 Anulado${anul.motivo ? " · " + escapeHtml(((window.nvaIcoMotivo && window.nvaIcoMotivo(anul.motivo)) || "") + " " + anul.motivo) : ""}</span>` : ""}
         </div>`;
       }).join("");
@@ -212,6 +215,16 @@
     }).join("");
     if (claves.some(k => !clasif[k])) cargarClasificaciones(claves);
   }
+
+  const setsAbiertos = new Set();
+  // Tocar el resultado despliega (o pliega) el resultado de cada set
+  window.dlgVerSets = function (btn) {
+    const sets = btn.closest(".dlg-par").querySelector(".dlg-par-sets");
+    if (!sets) return;
+    sets.hidden = !sets.hidden;
+    if (sets.hidden) setsAbiertos.delete(btn.dataset.k); else setsAbiertos.add(btn.dataset.k);   // se mantiene al repintar
+    btn.setAttribute("aria-expanded", sets.hidden ? "false" : "true");
+  };
 
   // Secciones plegables propias (empiezan plegadas); se recuerda en cada dispositivo
   const PLEGADO = "NVA_DLG_SECCIONES";

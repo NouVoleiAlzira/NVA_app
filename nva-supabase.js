@@ -66,7 +66,8 @@
     // Página de delegados: sus bloques (la página en sí la decide nvaPaginas)
     "delegados.calendario": ["#secHead_dlgcal", "#secBody_dlgcal"],
     "delegados.partidos": ["#secHead_dlgpar", "#secBody_dlgpar"],
-    "delegados.clasificacion": ["#secHead_dlgcla", "#secBody_dlgcla"]
+    "delegados.clasificacion": ["#secHead_dlgcla", "#secBody_dlgcla"],
+    "delegados.cuadrante": ["#secHead_dlgcua", "#secBody_dlgcua"]
   };
   // Secciones de la página principal (si el rol no ve ninguna, entra directo en la de delegados)
   const MENUS_PRINCIPAL = ["inicio", "informes", "tablon", "otros", "calendario", "direccion", "instagram"];
@@ -450,7 +451,7 @@
     return (await listarCarpeta(ruta)) || noEncontrado();
   }
   // Lo que puede leer la página de delegados (igual que puede_leer en Supabase)
-  const LEE_DELEGADO = /^(configuracion\.json|Horarios\.json|CalendarioPartidos\.json|Historial\/(anulaciones|avisos)\.json|Calendarios\/.+|Escudos\/.+)$/;
+  const LEE_DELEGADO = /^(configuracion\.json|Horarios\.json|CalendarioPartidos\.json|Historial\/(anulaciones|avisos)\.json|DrivePDFs\/enlaces\.json|Calendarios\/.+|Escudos\/.+)$/;
 
   window.fetch = function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || "";

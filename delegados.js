@@ -4,7 +4,7 @@
 // esta página (nva-supabase.js decide qué página se muestra).
 // Cada bloque tiene su permiso en Opciones › Permisos por rol › Página de
 // delegados. Por ahora:
-//   · Calendario de entrenamientos (delegados.calendario): el horario de la
+//   · Calendario (delegados.calendario): el horario de la
 //     semana de SUS equipos con los entrenamientos anulados rayados y su
 //     motivo (Festivo, Alerta meteorológica…), y debajo la lista de los
 //     entrenamientos y partidos anulados de la semana. Solo se ve: no se
@@ -355,6 +355,179 @@
     btn.setAttribute("aria-expanded", sets.hidden ? "false" : "true");
   };
 
+  // ---------- Cuadrante: el PDF «Partidos y Resultados» que se sube al Drive del club ----------
+  // Se dibuja en el móvil con los mismos datos (el PDF de la federación, que ya está en la
+  // caché del dispositivo): así no hay que bajarlo de Drive. «Abrir PDF» abre el de Drive.
+  const cuad = {};   // clave del equipo -> { blob, url, paginas: [imagen], cuando } o { error }
+  let enlacesDrive = null, enlacesCuando = 0, generando = false;
+  const nombrePdf = key => `Partidos y Resultados - ${key}.pdf`;
+
+  async function leerEnlaces() {
+    if (enlacesDrive && Date.now() - enlacesCuando < RELEER_MS) return enlacesDrive;
+    try {
+      const r = await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/DrivePDFs/enlaces.json`,
+        { headers: { "Authorization": `token ${ghSettings.token}` }, cache: "no-store" });
+      enlacesDrive = r.ok ? (JSON.parse(b64_to_utf8((await r.json()).content)) || {}) : (enlacesDrive || {});
+    } catch (e) { enlacesDrive = enlacesDrive || {}; }
+    enlacesCuando = Date.now();
+    return enlacesDrive;
+  }
+  async function paginasPdf(blob) {
+    await ensurePdfJs();
+    const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const out = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const pg = await pdf.getPage(i);
+      const vp = pg.getViewport({ scale: 2.2 });
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+      await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+      out.push(cv.toDataURL("image/jpeg", 0.88));
+    }
+    return out;
+  }
+  async function cargarCuadrantes(claves, siHaceMs) {
+    if (generando || !window.nvaCuadrante || !window.nvaCuadrante.pdfDeEquipo) return;
+    generando = true;
+    try {
+      leerEnlaces().then(renderCuadrante);
+      const logo = typeof nvaLogoDataUrl === "function" ? await Promise.resolve(nvaLogoDataUrl()).catch(() => null) : null;
+      for (const key of claves) {
+        const c = cuad[key];
+        if (c && !(siHaceMs && Date.now() - c.cuando >= siHaceMs)) continue;
+        try {
+          const blob = await window.nvaCuadrante.pdfDeEquipo(key, logo);
+          const paginas = await paginasPdf(blob);
+          if (c && c.url) URL.revokeObjectURL(c.url);
+          cuad[key] = { blob, url: URL.createObjectURL(blob), paginas, cuando: Date.now() };
+        } catch (e) { cuad[key] = { error: e && e.message || String(e), cuando: Date.now() }; }
+        renderCuadrante();
+      }
+    } finally { generando = false; renderCuadrante(); }
+  }
+  function renderCuadrante() {
+    const caja = document.getElementById("dlgCuadrante");
+    const body = document.getElementById("secBody_dlgcua");
+    if (!caja || !body || body.classList.contains("collapsed") || !puedeVer("delegados.cuadrante")) return;
+    const claves = equiposClasif();
+    if (!claves.length) {
+      caja.innerHTML = `<p class="dlg-vacio">Todavía no tienes equipos asignados. Pídelo en el club (Opciones › Entrenadores y equipos).</p>`;
+      return;
+    }
+    caja.innerHTML = claves.map(key => {
+      const c = cuad[key], k = escapeHtml(key);
+      let cuerpo;
+      if (!c) cuerpo = `<p class="dlg-vacio">Preparando el PDF…</p>`;
+      else if (c.error) cuerpo = `<p class="dlg-vacio">No hay PDF de este equipo todavía (${escapeHtml(/no hay PDF/i.test(c.error) ? "el club aún no ha subido su calendario de la federación" : c.error)}).</p>`;
+      else cuerpo = `
+        <button type="button" class="dlg-cua-vista" data-k="${k}" onclick="dlgVerCuadrante(this.dataset.k)" aria-label="Ver el PDF de ${k} en grande">
+          <img src="${c.paginas[0]}" alt="">
+          <span class="dlg-cua-lupa">🔍 Toca para ampliar${c.paginas.length > 1 ? ` · ${c.paginas.length} páginas` : ""}</span>
+        </button>
+        <div class="dlg-cua-botones">
+          <button type="button" class="btn-save-session dlg-cua-btn" data-k="${k}" onclick="dlgAbrirCuadrante(this.dataset.k)">Abrir PDF</button>
+          <button type="button" class="btn-save-session dlg-cua-btn" data-k="${k}" onclick="dlgDescargarCuadrante(this.dataset.k)">Descargar PDF</button>
+        </div>`;
+      return `<div class="dlg-cla-bloque">${claves.length > 1 || !misEquipos() ? `<div class="dlg-par-equipo">${k}</div>` : ""}${cuerpo}</div>`;
+    }).join("");
+    if (claves.some(k => !cuad[k])) cargarCuadrantes(claves);
+  }
+
+  // «Abrir PDF»: el de Drive (el mismo enlace que tienen los jugadores/as); si no hay, el del móvil
+  window.dlgAbrirCuadrante = function (key) {
+    const e = (enlacesDrive || {})[key], c = cuad[key];
+    if (e && e.url) window.open(e.url, "_blank", "noopener");
+    else if (c && c.url) window.open(c.url, "_blank");
+  };
+  window.dlgDescargarCuadrante = function (key) {
+    const c = cuad[key];
+    if (c && c.blob) {
+      const a = document.createElement("a");
+      a.href = c.url; a.download = nombrePdf(key);
+      document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    const e = (enlacesDrive || {})[key];
+    if (e && e.id) window.open("https://drive.google.com/uc?export=download&id=" + encodeURIComponent(e.id), "_blank", "noopener");
+  };
+
+  // Ventana a pantalla completa con zoom (pellizcar, doble toque, botones o Ctrl+rueda) y desplazamiento
+  window.dlgVerCuadrante = function (key) {
+    const c = cuad[key];
+    if (!c || !c.paginas) return;
+    const o = document.createElement("div");
+    o.className = "dlg-visor";
+    o.innerHTML = `
+      <div class="dlg-visor-barra">
+        <span class="dlg-visor-tit">${escapeHtml(key)}</span>
+        <button type="button" class="dlg-visor-b" data-z="-" aria-label="Alejar">−</button>
+        <span class="dlg-visor-pct">100%</span>
+        <button type="button" class="dlg-visor-b" data-z="+" aria-label="Acercar">+</button>
+        <button type="button" class="dlg-visor-b dlg-visor-x" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="dlg-visor-zona"><div class="dlg-visor-hojas">${c.paginas.map((src, i) => `<img src="${src}" alt="Página ${i + 1}" draggable="false">`).join("")}</div></div>
+      <div class="dlg-visor-pie">
+        <button type="button" class="btn-save-session dlg-cua-btn" data-a="abrir">Abrir PDF</button>
+        <button type="button" class="btn-save-session dlg-cua-btn" data-a="bajar">Descargar PDF</button>
+      </div>`;
+    document.body.appendChild(o);
+    const zona = o.querySelector(".dlg-visor-zona"), hojas = o.querySelector(".dlg-visor-hojas"), pct = o.querySelector(".dlg-visor-pct");
+    let zoom = 1;
+    // Cambia el zoom manteniendo quieto el punto (px, py) de la zona
+    const fijar = (z, px, py) => {
+      z = Math.max(1, Math.min(5, z));
+      if (px == null) { px = zona.clientWidth / 2; py = zona.clientHeight / 2; }
+      const fx = (zona.scrollLeft + px) / zona.scrollWidth, fy = (zona.scrollTop + py) / zona.scrollHeight;
+      zoom = z;
+      hojas.style.width = (z * 100) + "%";
+      zona.scrollLeft = fx * zona.scrollWidth - px;
+      zona.scrollTop = fy * zona.scrollHeight - py;
+      pct.textContent = Math.round(z * 100) + "%";
+    };
+    const cerrar = () => { document.removeEventListener("keydown", teclas, true); o.remove(); };
+    function teclas(e) { if (e.key === "Escape") { e.preventDefault(); cerrar(); } }
+    document.addEventListener("keydown", teclas, true);
+    o.querySelector(".dlg-visor-x").onclick = cerrar;
+    o.querySelectorAll("[data-z]").forEach(b => { b.onclick = () => fijar(zoom * (b.dataset.z === "+" ? 1.4 : 1 / 1.4)); });
+    o.querySelector('[data-a="abrir"]').onclick = () => window.dlgAbrirCuadrante(key);
+    o.querySelector('[data-a="bajar"]').onclick = () => window.dlgDescargarCuadrante(key);
+    const local = (x, y) => { const r = zona.getBoundingClientRect(); return [x - r.left, y - r.top]; };
+    // Pellizcar con dos dedos
+    let pin = null, ultimoToque = 0;
+    zona.addEventListener("touchstart", e => {
+      if (e.touches.length === 2) {
+        const [a, b] = e.touches;
+        pin = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z: zoom };
+        e.preventDefault();
+      } else if (e.touches.length === 1) {
+        const ahora = Date.now();
+        if (ahora - ultimoToque < 300) {   // doble toque: acercar / volver al 100%
+          const [px, py] = local(e.touches[0].clientX, e.touches[0].clientY);
+          fijar(zoom > 1.2 ? 1 : 2.5, px, py);
+          e.preventDefault();
+        }
+        ultimoToque = ahora;
+      }
+    }, { passive: false });
+    zona.addEventListener("touchmove", e => {
+      if (!pin || e.touches.length !== 2) return;
+      const [a, b] = e.touches;
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const [px, py] = local((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+      fijar(pin.z * d / pin.d, px, py);
+      e.preventDefault();
+    }, { passive: false });
+    zona.addEventListener("touchend", e => { if (e.touches.length < 2) pin = null; });
+    zona.addEventListener("wheel", e => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const [px, py] = local(e.clientX, e.clientY);
+      fijar(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), px, py);
+    }, { passive: false });
+  };
+
   // Secciones plegables propias (empiezan plegadas); se recuerda en cada dispositivo
   const PLEGADO = "NVA_DLG_SECCIONES";
   function estado() { try { return JSON.parse(localStorage.getItem(PLEGADO)) || {}; } catch (e) { return {}; } }
@@ -371,6 +544,7 @@
     try { localStorage.setItem(PLEGADO, JSON.stringify(st)); } catch (e) {}
     aplicar(id, st[id]);
     if (id === "dlgcla" && st[id]) { renderClasificacion(); cargarClasificaciones(equiposClasif(), RELEER_MS); }
+    if (id === "dlgcua" && st[id]) { renderCuadrante(); cargarCuadrantes(equiposClasif(), RELEER_MS); }
     if (id === "dlgpar" && st[id]) {
       renderPartidos();
       // Al abrir se traen los partidos y resultados más recientes (si la última lectura tiene más de 2 min)
@@ -379,6 +553,7 @@
   };
   aplicar("dlgpar", !!estado().dlgpar);
   aplicar("dlgcla", !!estado().dlgcla);
+  aplicar("dlgcua", !!estado().dlgcua);
 
   // El calendario de partidos ya se lee al arrancar y al volver a la app: cuando llega, se repinta
   document.addEventListener("nva-partidos", () => {
@@ -390,6 +565,7 @@
     renderCalendario();
     renderPartidos();
     renderClasificacion();
+    renderCuadrante();
   };
   window.dlgMove = function (delta) { offset += delta; renderCalendario(); };
 })();

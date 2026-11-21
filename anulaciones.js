@@ -5,6 +5,8 @@
 // «Deselección partidos»: ventana para anular partidos sin registro.
 // «Deselección equipos»: ventana para marcar equipos que no tienen que
 // registrar sus entrenamientos (salen con un icono amarillo y no generan aviso).
+// Al pulsar «Deselección entrenamientos» o «Deselección partidos» se pide el
+// motivo (MOTIVOS); se guarda con cada anulación y lo ven los delegados.
 // Se guarda en GitHub (Historial/anulaciones.json) para todos; cada cambio
 // sale en el Historial de cambios con la opción de deshacerlo.
 (function () {
@@ -12,6 +14,20 @@
   const FILE = "Historial/anulaciones.json";
   const LS = "NVA_ANULACIONES";
   const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  const MOTIVOS = [
+    { valor: "Alerta meteorológica", texto: "Alerta meteorológica", ico: "🌧️" },
+    { valor: "Instalación NO disponible", texto: "Instalación NO disponible", ico: "🚧" },
+    { valor: "Festivo", texto: "Festivo", ico: "📅" },
+    { valor: "Motivos sanitarios", texto: "Motivos sanitarios", ico: "🩺" },
+    { valor: "Otros eventos", texto: "Otros eventos", ico: "🏆" }
+  ];
+  window.nvaMotivosAnulacion = MOTIVOS;
+  const icoMotivo = m => { const x = MOTIVOS.find(o => o.valor === m); return x ? x.ico : ""; };
+  window.nvaIcoMotivo = icoMotivo;
+  function elegirMotivo(que, actual) {
+    return nvaElegir("¿Por qué se " + que + "?", MOTIVOS, { titulo: "🚫 Motivo de la deselección", actual });
+  }
+  const conMotivo = m => m ? " (" + m + ")" : "";
 
   function lsGet(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -30,8 +46,21 @@
   window.nvaPartidoAnulado = (team, date, rival) => !!datos.partidos[pkey(team, date, rival)];
   window.nvaEquipoDeselec = team => !!datos.equipos[team];
   window.nvaAccionDeshecha = id => datos.deshechos.indexOf(id) !== -1;
+  // Motivo de un entrenamiento anulado (el suyo o el del día entero); "" si no tiene
+  window.nvaMotivoEntreno = (team, date) => {
+    const e = datos.entrenos[team + "|" + date], d = datos.dias[date];
+    return (e && e.motivo) || (d && d.motivo) || "";
+  };
+  // Partidos anulados entre dos fechas (aaaa-mm-dd), con su motivo
+  window.nvaPartidosAnulados = (desde, hasta) => Object.keys(datos.partidos).map(k => {
+    const [team, date, rival] = k.split("|");
+    return { team, date, rival: rival || "", motivo: datos.partidos[k].motivo || "" };
+  }).filter(p => p.date >= desde && p.date <= hasta).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 
-  function redibujar() { try { if (typeof renderWeekCalendar === "function") renderWeekCalendar(); } catch (e) {} }
+  function redibujar() {
+    try { if (typeof renderWeekCalendar === "function") renderWeekCalendar(); } catch (e) {}
+    try { if (window.renderDelegados) window.renderDelegados(); } catch (e) {}
+  }
 
   // ---------- GitHub ----------
   function url(g) { return `https://api.github.com/repos/${g.user}/${g.repo}/contents/${FILE}`; }
@@ -70,27 +99,33 @@
   }
   window.nvaRecargarAnulaciones = cargar;
 
-  function quien() { return { t: new Date().toISOString(), usuario: window.nvaUsuario ? window.nvaUsuario() : "" }; }
+  function quien(motivo) {
+    const q = { t: new Date().toISOString(), usuario: window.nvaUsuario ? window.nvaUsuario() : "" };
+    if (motivo) q.motivo = motivo;
+    return q;
+  }
   function anotar(texto, deshacer) { if (window.nvaRegistrar) window.nvaRegistrar("anulacion", texto, { deshacer }); }
   function nombreEquipo(k) { return k; }
 
   // ---------- Entrenamientos (calendario semanal) ----------
-  let modo = false;
+  let modo = false, motivoEntrenos = "";
   window.nvaModoAnular = () => modo;
   window.nvaToggleEntreno = function (team, date) {
     const k = team + "|" + date;
     if (datos.dias[date] && !datos.entrenos[k]) { alert("Todo el " + fmt(date) + " está anulado. Toca la cabecera del día para reactivarlo."); return; }
     const anular = !datos.entrenos[k];
-    aplicar({ tipo: "entreno", team, date, anular });
-    anotar((anular ? "🚫 Entrenamiento anulado: " : "↩ Entrenamiento reactivado: ") + nombreEquipo(team) + " · " + fmt(date), { tipo: "entreno", team, date, anular: !anular });
+    const motivo = anular ? motivoEntrenos : (datos.entrenos[k].motivo || "");
+    aplicar({ tipo: "entreno", team, date, anular, motivo });
+    anotar((anular ? "🚫 Entrenamiento anulado" + conMotivo(motivo) + ": " : "↩ Entrenamiento reactivado: ") + nombreEquipo(team) + " · " + fmt(date), { tipo: "entreno", team, date, anular: !anular, motivo });
   };
   window.nvaToggleDia = function (date) {
     const anular = !datos.dias[date];
-    aplicar({ tipo: "dia", date, anular });
-    anotar((anular ? "🚫 Día anulado (todos los entrenamientos): " : "↩ Día reactivado: ") + fmt(date), { tipo: "dia", date, anular: !anular });
+    const motivo = anular ? motivoEntrenos : (datos.dias[date].motivo || "");
+    aplicar({ tipo: "dia", date, anular, motivo });
+    anotar((anular ? "🚫 Día anulado (todos los entrenamientos)" + conMotivo(motivo) + ": " : "↩ Día reactivado: ") + fmt(date), { tipo: "dia", date, anular: !anular, motivo });
   };
   function aplicar(op) {
-    const q = quien();
+    const q = quien(op.anular ? op.motivo : "");
     const fn = d => {
       if (op.tipo === "entreno") { const k = op.team + "|" + op.date; if (op.anular) d.entrenos[k] = q; else delete d.entrenos[k]; }
       else if (op.tipo === "dia") { if (op.anular) d.dias[op.date] = q; else delete d.dias[op.date]; }
@@ -100,7 +135,20 @@
     return cambiar(fn, "Anulaciones de registros");
   }
 
-  window.nvaDeselEntrenos = function () {
+  function pintarMotivoEntrenos() {
+    const el = document.getElementById("anulMotivo");
+    if (el) el.textContent = icoMotivo(motivoEntrenos) + " " + motivoEntrenos;
+  }
+  window.nvaCambiarMotivoEntrenos = async function () {
+    const m = await elegirMotivo("deseleccionan estos entrenamientos", motivoEntrenos);
+    if (m) { motivoEntrenos = m; pintarMotivoEntrenos(); }
+  };
+  window.nvaDeselEntrenos = async function () {
+    if (!modo) {
+      const m = await elegirMotivo("deseleccionan estos entrenamientos");
+      if (!m) return;
+      motivoEntrenos = m; pintarMotivoEntrenos();
+    }
     modo = !modo;
     document.getElementById("anulBarra").hidden = !modo;
     const btn = document.getElementById("btnDeselEntrenos");
@@ -123,7 +171,7 @@
   };
 
   // ---------- Partidos ----------
-  let semana = 0;
+  let semana = 0, motivoPartidos = "";
   function lunes(off) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 7 * off); return d; }
   function partidosSemana() {
     const l = lunes(semana), dom = new Date(l); dom.setDate(l.getDate() + 6);
@@ -142,22 +190,36 @@
     document.querySelectorAll(".anul-sem").forEach(b => b.classList.toggle("on", Number(b.dataset.s) === semana));
     const l = lunes(semana), dom = new Date(l); dom.setDate(l.getDate() + 6);
     document.getElementById("anulSemTxt").textContent = "Del " + l.getDate() + "/" + (l.getMonth() + 1) + " al " + dom.getDate() + "/" + (dom.getMonth() + 1);
+    const mp = document.getElementById("anulMotivoPartidos");
+    if (mp) mp.textContent = icoMotivo(motivoPartidos) + " " + motivoPartidos;
     const lista = partidosSemana();
     const box = document.getElementById("anulPartidos");
     if (!lista.length) { box.innerHTML = '<p class="hist-vacio">No hay partidos en el calendario esta semana.</p>'; return; }
     box.innerHTML = lista.map((p, i) => {
       const reg = registrado(p), an = window.nvaPartidoAnulado(p.team, p.date, p.rival);
+      const mot = an ? (datos.partidos[pkey(p.team, p.date, p.rival)].motivo || "") : "";
       return `<label class="anul-part${an ? " anul-si" : ""}${reg ? " anul-reg" : ""}"><input type="checkbox" data-i="${i}"${an ? " checked" : ""}${reg && !an ? " disabled" : ""}>
-        <span><b>${esc(p.team)}</b><br>${esc(fmt(p.date))}${p.hora ? " " + esc(p.hora) : ""} · vs ${esc(p.rival)}${reg ? ' <em>✓ registrado</em>' : ""}${an ? ' <em class="anul-tag">ANULADO</em>' : ""}</span></label>`;
+        <span><b>${esc(p.team)}</b><br>${esc(fmt(p.date))}${p.hora ? " " + esc(p.hora) : ""} · vs ${esc(p.rival)}${reg ? ' <em>✓ registrado</em>' : ""}${an ? ' <em class="anul-tag">ANULADO</em>' : ""}${mot ? ' <span class="anul-motivo">' + esc(icoMotivo(mot) + " " + mot) + "</span>" : ""}</span></label>`;
     }).join("");
     box.querySelectorAll("input").forEach(inp => inp.addEventListener("change", () => {
       const p = lista[Number(inp.dataset.i)], anular = inp.checked;
-      aplicar({ tipo: "partido", team: p.team, date: p.date, rival: p.rival, anular });
-      anotar((anular ? "🚫 Partido anulado: " : "↩ Partido reactivado: ") + p.team + " · " + fmt(p.date) + " vs " + p.rival, { tipo: "partido", team: p.team, date: p.date, rival: p.rival, anular: !anular });
+      const previo = datos.partidos[pkey(p.team, p.date, p.rival)];
+      const motivo = anular ? motivoPartidos : ((previo && previo.motivo) || "");
+      aplicar({ tipo: "partido", team: p.team, date: p.date, rival: p.rival, anular, motivo });
+      anotar((anular ? "🚫 Partido anulado" + conMotivo(motivo) + ": " : "↩ Partido reactivado: ") + p.team + " · " + fmt(p.date) + " vs " + p.rival, { tipo: "partido", team: p.team, date: p.date, rival: p.rival, anular: !anular, motivo });
       pintarPartidos();
     }));
   }
-  window.openDeselPartidos = function () { semana = 0; document.getElementById("modalDeselPartidos").classList.add("active"); pintarPartidos(); };
+  window.openDeselPartidos = async function () {
+    const m = await elegirMotivo("deseleccionan estos partidos");
+    if (!m) return;
+    motivoPartidos = m; semana = 0;
+    document.getElementById("modalDeselPartidos").classList.add("active"); pintarPartidos();
+  };
+  window.anulCambiarMotivoPartidos = async function () {
+    const m = await elegirMotivo("deseleccionan estos partidos", motivoPartidos);
+    if (m) { motivoPartidos = m; pintarPartidos(); }
+  };
   window.closeDeselPartidos = function () { document.getElementById("modalDeselPartidos").classList.remove("active"); };
   window.anulSemana = function (s) { semana = s; pintarPartidos(); };
 

@@ -3,6 +3,8 @@
 //  · nvaAviso(texto)              → Promise (se resuelve al pulsar «Aceptar»)
 //  · nvaConfirmar(texto, opc)     → Promise<boolean>
 //  · nvaPreguntar(texto, valor)   → Promise<string|null> (null = Cancelar)
+//  · nvaElegir(texto, opciones)   → Promise<string|null>: un botón por opción
+//    (opciones: [{ valor, texto, ico }] o textos); null = Cancelar
 //  · window.alert también se sustituye: todas las llamadas existentes a
 //    alert() muestran esta ventana (no bloquea, el código sigue).
 //  Las ventanas se muestran de una en una, en el orden en que se piden.
@@ -63,6 +65,25 @@
         caja.appendChild(campo);
       }
 
+      // Elegir: un botón grande por opción; al tocarlo se cierra con su valor
+      const botonesOpc = [];
+      if (tipo === "elegir") {
+        const lista = document.createElement("div");
+        lista.className = "nva-dlg-opciones";
+        (opc.opciones || []).forEach(op => {
+          if (typeof op === "string") op = { valor: op, texto: op };
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "nva-dlg-opcion" + (opc.actual != null && opc.actual === op.valor ? " on" : "");
+          if (op.ico) { const i = document.createElement("span"); i.className = "nva-dlg-opcion-ico"; i.textContent = op.ico; b.appendChild(i); }
+          b.appendChild(document.createTextNode(op.texto));
+          b.onclick = () => cerrar(op.valor);
+          lista.appendChild(b);
+          botonesOpc.push(b);
+        });
+        caja.appendChild(lista);
+      }
+
       const fila = document.createElement("div");
       fila.className = "cp-modal-row nva-dlg-botones";
       let bNo = null;
@@ -73,12 +94,14 @@
         bNo.textContent = opc.no || "Cancelar";
         fila.appendChild(bNo);
       }
-      const bSi = document.createElement("button");
+      const bSi = tipo === "elegir" ? null : document.createElement("button");
+      if (bSi) {
       bSi.type = "button";
       const rojo = opc.peligro != null ? opc.peligro : (tipo === "confirmar" && PELIGRO.test(texto));
       bSi.className = "cp-modal-btn " + (rojo ? "cp-modal-stop" : "cp-modal-main") + " nva-dlg-si";
       bSi.textContent = opc.si || "Aceptar";
       fila.appendChild(bSi);
+      }
       caja.appendChild(fila);
       o.appendChild(caja);
 
@@ -90,19 +113,19 @@
         try { if (antes && antes.focus && antes.isConnected) antes.focus({ preventScroll: true }); } catch (e) {}
         resolver(valor);
       };
-      const aceptar = () => cerrar(tipo === "pregunta" ? campo.value : tipo === "confirmar" ? true : undefined);
-      const cancelar = () => cerrar(tipo === "pregunta" ? null : tipo === "confirmar" ? false : undefined);
+      const aceptar = () => { if (tipo !== "elegir") cerrar(tipo === "pregunta" ? campo.value : tipo === "confirmar" ? true : undefined); };
+      const cancelar = () => cerrar(tipo === "pregunta" || tipo === "elegir" ? null : tipo === "confirmar" ? false : undefined);
       function teclas(e) {
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelar(); }
-        else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); aceptar(); }
+        else if (e.key === "Enter" && !e.shiftKey && tipo !== "elegir") { e.preventDefault(); e.stopPropagation(); aceptar(); }
         else if (e.key === "Tab") {           // el foco no sale de la ventana
-          const f = [campo, bNo, bSi].filter(Boolean);
+          const f = [campo].concat(botonesOpc, [bNo, bSi]).filter(Boolean);
           const i = f.indexOf(document.activeElement);
           e.preventDefault();
           f[(i + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus();
         }
       }
-      bSi.onclick = aceptar;
+      if (bSi) bSi.onclick = aceptar;
       if (bNo) bNo.onclick = cancelar;
       // Tocar fuera solo cierra los avisos (en una pregunta podría ser un toque sin querer)
       o.addEventListener("click", e => { if (e.target === o && tipo === "aviso") aceptar(); });
@@ -125,5 +148,6 @@
   window.nvaAviso = (texto, opc) => enCola("aviso", texto, opc);
   window.nvaConfirmar = (texto, opc) => enCola("confirmar", texto, opc);
   window.nvaPreguntar = (texto, valor, opc) => enCola("pregunta", texto, Object.assign({}, opc, { valor }));
+  window.nvaElegir = (texto, opciones, opc) => enCola("elegir", texto, Object.assign({}, opc, { opciones }));
   window.alert = (texto) => { window.nvaAviso(texto); };
 })();

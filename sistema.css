@@ -511,6 +511,12 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .anul-part { border-color: var(--borde); background: var(--sf-fila); color: var(--txt-1); border-radius: var(--r-sm); }
 .anul-part em { color: var(--txt-ok); }
 .anul-part .anul-tag { color: var(--txt-mal); }
+/* Con «Cambiar motivo» y «Terminar», en el móvil los botones bajan a otra fila */
+.anul-barra { flex-wrap: wrap; }
+.anul-barra > span { flex: 1 1 240px; }
+.anul-motivo { color: var(--txt-aviso); font-weight: 700; }
+.anul-motivo-fila { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.anul-motivo-fila button { padding: 4px 10px; font-size: 0.78rem; }
 .anul-si { background: repeating-linear-gradient(45deg, rgba(214, 40, 57, 0.14), rgba(214, 40, 57, 0.14) 8px, rgba(233, 238, 250, 0.04) 8px, rgba(233, 238, 250, 0.04) 16px); }
 #btnDeselEntrenos.anul-on { outline: 3px solid var(--balon); outline-offset: 2px; }
 
@@ -760,6 +766,17 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .nva-dlg-campo { width: 100%; box-sizing: border-box; font-size: 1rem; }
 .nva-dlg-botones { margin-top: 2px; }
 .nva-dlg-botones .cp-modal-btn { min-height: 40px; font-size: 0.85rem; }
+.nva-dlg-opciones { display: flex; flex-direction: column; gap: 8px; }
+.nva-dlg-opcion {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: 46px; padding: 10px 14px; text-align: left;
+  font: 600 0.95rem var(--font-body); color: var(--txt-1);
+  background: var(--sf-fila); border: 1px solid var(--borde-fuerte); border-radius: var(--r-sm);
+  cursor: pointer; transition: background 150ms ease, border-color 150ms ease;
+}
+.nva-dlg-opcion:hover, .nva-dlg-opcion:focus-visible { background: var(--sf-fila-hover); border-color: rgba(var(--c-amarillo), 0.6); outline: none; }
+.nva-dlg-opcion.on { border-color: rgba(var(--c-amarillo), 0.85); box-shadow: inset 0 0 0 1px rgba(var(--c-amarillo), 0.6); }
+.nva-dlg-opcion-ico { font-size: 1.25rem; width: 1.6em; text-align: center; flex: none; }
 .nva-dlg-fuera { opacity: 0; transition: opacity 140ms ease; }
 @keyframes nvaDlgFondo { from { opacity: 0; } to { opacity: 1; } }
 @keyframes nvaDlgCaja { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
@@ -968,6 +985,8 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
   background: var(--sf-fila); border: 1px solid var(--borde);
 }
 .dlg-anulado:last-child { margin-bottom: 0; }
+.dlg-motivo { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; font-weight: 700; color: var(--txt-aviso); background: rgba(var(--c-amarillo), 0.12); border: 1px solid rgba(var(--c-amarillo), 0.4); }
+.dlg-anulado + .dlg-anulados-tit { margin-top: 12px; }
 .dlg-anulados-nada { margin: 0; color: var(--txt-2); text-align: center; }
 #btnPaginaDelegados[hidden] { display: none !important; }
 #secHead_dlgcal {

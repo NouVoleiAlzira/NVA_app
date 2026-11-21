@@ -4437,6 +4437,7 @@
       dayLabels,
       mark: x => wkMarkFor(x, mon, logSet, now),
       anulado: x => { const d = new Date(mon); d.setDate(mon.getDate() + x.day - 1); return wkAnulado(x.key, wkFmt(d)); },
+      motivo: x => { const d = new Date(mon); d.setDate(mon.getDate() + x.day - 1); return window.nvaMotivoEntreno ? window.nvaMotivoEntreno(x.key, wkFmt(d)) : ""; },
       diaAnulado: day => { const d = new Date(mon); d.setDate(mon.getDate() + day - 1); return !!(window.nvaDiaAnulado && window.nvaDiaAnulado(wkFmt(d))); },
       hits: [], dayHits: [],
       W: wkAnchoAmpliado(),
@@ -6222,6 +6223,9 @@
           // Entrenamiento anulado (anulaciones.js): rayas diagonales y sin marca
           const anul = opts.anulado ? opts.anulado(x) : false;
           if (anul) wkStripes(ctx, [[x0, yTL], [x1, yTR], [x1, yBR], [x0, yBL]]);
+          // …y su motivo debajo de la hora (Festivo, Alerta meteorológica…)
+          const motivo = anul && opts.motivo ? opts.motivo(x) : "";
+          if (motivo) parts.push({ text: motivo, mult: 0.62, weight: 800 });
 
           // Marca V / X / D (solo en el calendario semanal de la página principal)
           const markCh = opts.mark && !anul ? opts.mark(x) : null;

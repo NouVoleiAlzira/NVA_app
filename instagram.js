@@ -184,33 +184,12 @@
     }
   }
 
-  // Vídeos y canciones que ya se han bajado se guardan en el dispositivo (Cache Storage) para
-  // no volver a pedirlos a Supabase cada vez que se abre un borrador: eso gasta Egress.
-  // Sin prefijo «nva-»: sw.js no la borra al cambiar de versión.
-  const MEDIOS_CACHE = "medios-v1", MAX_MEDIOS = 12;
-  async function deCache(clave) {
-    try { const c = await caches.open(MEDIOS_CACHE); const r = await c.match(clave); return r ? await r.blob() : null; } catch (e) { return null; }
-  }
-  async function aCache(clave, blob) {
-    try {
-      const c = await caches.open(MEDIOS_CACHE);
-      await c.put(clave, new Response(blob));
-      const claves = await c.keys();   // por orden de llegada: se quitan los más antiguos
-      for (const k of claves.slice(0, Math.max(0, claves.length - MAX_MEDIOS))) await c.delete(k);
-    } catch (e) { /* sin caché: no pasa nada */ }
-  }
-
-  // version: si se pasa, el archivo se guarda en el dispositivo con esa versión
-  async function blobUrl(path, version) {
-    const clave = version && typeof caches !== "undefined"
-      ? `https://nva-cache.local/medios/${encodeURIComponent(path)}?v=${encodeURIComponent(version)}` : "";
-    let datos = clave ? await deCache(clave) : null;
-    if (!datos) {
-      const r = await fetch(api(path), { headers: hdr({ "Accept": "application/vnd.github.raw" }), cache: "no-store" });
-      if (!r.ok) throw new Error(`GitHub ${r.status}`);
-      datos = await r.blob();
-      if (clave) await aCache(clave, datos);
-    }
+  // Las copias en el dispositivo (para no volver a bajar vídeos, portadas y canciones) las
+  // gestiona nva-supabase.js por ruta y fecha de modificación.
+  async function blobUrl(path) {
+    const r = await fetch(api(path), { headers: hdr({ "Accept": "application/vnd.github.raw" }), cache: "no-store" });
+    if (!r.ok) throw new Error(`GitHub ${r.status}`);
+    const datos = await r.blob();
     // El tipo hace falta para que el móvil (sobre todo iPhone) reproduzca el vídeo
     const tipo = /\.mp4$/.test(path) ? "video/mp4" : /\.jpe?g$/.test(path) ? "image/jpeg" : "";
     const blob = tipo ? new Blob([datos], { type: tipo }) : datos;
@@ -344,7 +323,7 @@
       if (meta.estado === "previa") return abrirPrevia(id, meta, det);
       if (meta.videoBorrado) return verSinVideo(id, meta, det);
       const vk = id + "|" + (meta.version || "");   // al cambiar el estilo el vídeo es otro
-      if (!videos[vk]) videos[vk] = await blobUrl(`${DIR}/${id}/reel.mp4`, meta.version);
+      if (!videos[vk]) videos[vk] = await blobUrl(`${DIR}/${id}/reel.mp4`);
       videos[id] = videos[vk];
       const editable = meta.estado === "borrador";
       det.innerHTML = `
@@ -708,7 +687,7 @@
       parar();
       const est = m.querySelector("#igMuEstado");
       try {
-        if (!audios[archivo]) { est.textContent = "Descargando la canción…"; audios[archivo] = await blobUrl(`${DIR_M}/${archivo}`, "1"); }
+        if (!audios[archivo]) { est.textContent = "Descargando la canción…"; audios[archivo] = await blobUrl(`${DIR_M}/${archivo}`); }
         est.textContent = "";
         audio.src = audios[archivo];
         audio.currentTime = desde || 0;

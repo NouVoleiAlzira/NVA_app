@@ -2776,9 +2776,14 @@
     showScreen("screenCoachTeam");
     document.getElementById("btnBack").style.display = "none";
 
-    // Cada vez que se vuelve a la pantalla principal se sincroniza con
-    // GitHub (enviando antes lo pendiente) para ver lo que otro usuario
-    // haya modificado y guardado mientras tanto.
+    // Al volver a la pantalla principal se sincroniza con GitHub (enviando
+    // antes lo pendiente) para ver lo que otro usuario haya modificado y
+    // guardado mientras tanto. Como mucho una vez cada 2 minutos: antes se
+    // hacía en cada vuelta atrás y eso gastaba Egress de Supabase sin necesidad.
+    if (Date.now() - ultimaSincronizacion < SINCRONIZAR_CADA_MS) {
+      if (offlineQueue.length > 0 && navigator.onLine) await processOfflineQueue();
+      return;
+    }
     await fullSyncFromGitHub(true);
   }
 
@@ -3591,8 +3596,13 @@
   // categorías, de los que dependen los nombres de fichero) y por último
   // trae en paralelo entrenamientos, warnings, consultas y tablón.
   // Al terminar, refresca en pantalla lo que el usuario tenga abierto.
+  // Momento de la última sincronización completa (ver goBack)
+  const SINCRONIZAR_CADA_MS = 2 * 60 * 1000;
+  let ultimaSincronizacion = 0;
+
   async function fullSyncFromGitHub(silent = true) {
     if (!ghSettings.user || !ghSettings.repo || !navigator.onLine) return;
+    ultimaSincronizacion = Date.now();
 
     if (offlineQueue.length > 0) {
       await processOfflineQueue();

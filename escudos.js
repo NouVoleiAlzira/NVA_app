@@ -145,9 +145,10 @@
       const clave = f.path + "|" + f.sha;
       if (blobs[clave]) { nuevas[f.path] = blobs[clave]; return; }
       try {
-        const b = await fetch(f.download_url);
-        if (!b.ok) return;
-        blobs[clave] = URL.createObjectURL(await b.blob());
+        // Copia en el dispositivo por ruta y versión: no se vuelven a bajar si no han cambiado
+        const blob = window.nvaBinario ? await window.nvaBinario(f.path, f.sha, f.download_url)
+          : await (await fetch(f.download_url)).blob();
+        blobs[clave] = URL.createObjectURL(blob);
         nuevas[f.path] = blobs[clave];
       } catch (e) { console.warn("Escudo", f.path, e); }
     }));

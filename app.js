@@ -4360,6 +4360,7 @@
       anulado: x => { const d = new Date(mon); d.setDate(mon.getDate() + x.day - 1); return wkAnulado(x.key, wkFmt(d)); },
       diaAnulado: day => { const d = new Date(mon); d.setDate(mon.getDate() + day - 1); return !!(window.nvaDiaAnulado && window.nvaDiaAnulado(wkFmt(d))); },
       hits: [], dayHits: [],
+      W: wkAnchoAmpliado(),
       _mon: mon, _logSet: logSet, _now: now
     };
   }
@@ -4382,6 +4383,78 @@
     if (nMiss) nMiss.textContent = miss;
   }
   function wkMove(delta) { wkOffset += delta; renderWeekCalendar(); }
+
+  // ---------------------------------------------------------------------
+  //  Vista ampliada: el calendario ocupa todo el ancho de la pantalla.
+  //  Se mueve el contenido de la tarjeta a una capa fija y se redibuja el
+  //  horario más ancho (mismo alto lógico, columnas más anchas), así que
+  //  navegación, V/X, toques, pulsación larga y modo anulación siguen igual.
+  // ---------------------------------------------------------------------
+  let wkAmpliado = false, wkSitio = null;
+  const WK_ICO_AMPLIAR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const WK_ICO_REDUCIR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 7l5 5-5 5M20 7l-5 5 5 5M9 12H2M15 12h7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  // Ancho lógico del dibujo para que, a todo el ancho, quepa en el alto visible
+  function wkAnchoAmpliado() {
+    if (!wkAmpliado) return 0;
+    const caja = document.querySelector("#wkFull .wk-full-box");
+    const wrap = document.querySelector("#wkFull .wk-canvas-wrap");
+    if (!caja || !wrap) return 0;
+    const cs = getComputedStyle(caja);
+    const altoCaja = caja.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    let resto = 0;   // leyenda, barra de anulación… (todo lo que no es el horario)
+    Array.from(caja.children).forEach(el => { if (el !== wrap) resto += el.offsetHeight + parseFloat(getComputedStyle(el).marginTop || 0) + parseFloat(getComputedStyle(el).marginBottom || 0); });
+    const ancho = wrap.clientWidth, alto = Math.max(120, altoCaja - resto - 8);
+    return ancho > 0 ? 2100 * ancho / alto : 0;
+  }
+
+  function wkAmpliar(on) {
+    const body = document.getElementById("secBody_wk");
+    if (!body) return;
+    if (on === undefined) on = !wkAmpliado;
+    if (on === wkAmpliado) return;
+    wkAmpliado = on;
+    if (on) {
+      const ov = document.createElement("div");
+      ov.id = "wkFull"; ov.className = "wk-full";
+      ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-label", "Calendario semanal ampliado");
+      ov.innerHTML = `<div class="wk-full-box"></div>`;
+      const caja = ov.firstChild;
+      wkSitio = document.createComment("wkFull");
+      body.appendChild(wkSitio);
+      Array.from(body.childNodes).forEach(n => { if (n !== wkSitio) caja.appendChild(n); });
+      document.body.appendChild(ov);
+      document.body.classList.add("wk-full-abierta");
+    } else {
+      const ov = document.getElementById("wkFull");
+      if (ov && wkSitio && wkSitio.parentNode) {
+        const caja = ov.querySelector(".wk-full-box");
+        Array.from(caja.childNodes).forEach(n => wkSitio.parentNode.insertBefore(n, wkSitio));
+        wkSitio.remove();
+      }
+      wkSitio = null;
+      if (ov) ov.remove();
+      document.body.classList.remove("wk-full-abierta");
+    }
+    const btn = document.getElementById("wkBtnAmpliar");
+    if (btn) {
+      btn.innerHTML = on ? WK_ICO_REDUCIR : WK_ICO_AMPLIAR;
+      btn.title = on ? "Volver al tamaño normal" : "Ampliar a todo el ancho";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    renderWeekCalendar();
+  }
+  window.wkAmpliar = wkAmpliar;
+  let wkResizeT = null;
+  window.addEventListener("resize", () => {
+    if (!wkAmpliado) return;
+    clearTimeout(wkResizeT);
+    wkResizeT = setTimeout(renderWeekCalendar, 120);
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && wkAmpliado && !document.querySelector(".nva-dlg, .modal-backdrop.active")) wkAmpliar(false);
+  });
 
   function wkPointInPoly(px, py, pts) {
     let inside = false;
@@ -4462,6 +4535,7 @@
   // Abre la pantalla de registro del equipo en esa fecha (cargando el registro si ya existe)
   function wkOpenTraining(teamKey, dateStr) {
     if (isPdfMode) return;
+    if (wkAmpliado) wkAmpliar(false);   // se va a otra pantalla: la vista vuelve a su sitio
     const matches = ref => {
       if (ref === teamKey) return true;
       const t = appData.teams.find(x => getTeamKey(x) === ref || x.name === ref);
@@ -5891,7 +5965,8 @@
 
   function hzDrawSchedule(canvas, opts) {
     opts = opts || {};
-    const W = 2970, H = 2100, M = 70;   // A4 apaisado (297x210 mm) a 10 px/mm
+    // A4 apaisado (297x210 mm) a 10 px/mm; la vista ampliada pasa un ancho mayor (opts.W)
+    const W = Math.max(2970, Math.round(opts.W || 0)), H = 2100, M = 70;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     const model = hzBuildModel();

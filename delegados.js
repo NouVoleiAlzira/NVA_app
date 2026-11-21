@@ -66,12 +66,14 @@
     const motivoDe = (key, f) => window.nvaMotivoEntreno ? window.nvaMotivoEntreno(key, f) : "";
     const etiqueta = m => m ? ` <span class="dlg-motivo">${escapeHtml(((window.nvaIcoMotivo && window.nvaIcoMotivo(m)) || "") + " " + m)}</span>` : "";
     const mon = wkMonday(offset);
-    const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+    const dom = new Date(mon); dom.setDate(mon.getDate() + 6);
     const fecha = day => { const d = new Date(mon); d.setDate(mon.getDate() + day - 1); return wkFmt(d); };
+    const finde = partidosFinde(equipos, fecha(6), fecha(7));
     hzDrawSchedule(canvas, {
-      subtitle: `Semana del ${mon.getDate()} ${WK_MONTHS[mon.getMonth()]} al ${fri.getDate()} ${WK_MONTHS[fri.getMonth()]} ${fri.getFullYear()}`,
-      dayLabels: [0, 1, 2, 3, 4].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return String(d.getDate()); }),
+      subtitle: `Semana del ${mon.getDate()} ${WK_MONTHS[mon.getMonth()]} al ${dom.getDate()} ${WK_MONTHS[dom.getMonth()]} ${dom.getFullYear()}`,
+      dayLabels: [0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return String(d.getDate()); }),
       soloEquipos: equipos || undefined,
+      finde: finde.conHora,
       anulado: x => wkAnulado(x.key, fecha(x.day)),
       motivo: x => motivoDe(x.key, fecha(x.day)),
       diaAnulado: day => !!(window.nvaDiaAnulado && window.nvaDiaAnulado(fecha(day)))
@@ -82,14 +84,15 @@
       .filter(x => wkAnulado(x.key, fecha(x.day)))
       .sort((a, b) => a.day - b.day || a.s - b.s);
     // Partidos anulados de la semana (de lunes a domingo) de sus equipos
-    const dom = new Date(mon); dom.setDate(mon.getDate() + 6);
     const partidos = (window.nvaPartidosAnulados ? window.nvaPartidosAnulados(wkFmt(mon), wkFmt(dom)) : [])
       .filter(p => !equipos || equipos.indexOf(p.team) !== -1);
+    // Partidos del fin de semana que aún no tienen hora (no caben en el dibujo)
+    let html = finde.sinHora.length ? `<div class="dlg-anulados-tit">🕒 Partidos del fin de semana sin hora</div>` +
+      finde.sinHora.map(p => `<div class="dlg-anulado"><b>${DIAS_SEM[p.day - 1]} ${new Date(fecha(p.day) + "T12:00:00").getDate()}</b> · ${escapeHtml(nombreEquipo(p.key))}${p.rival ? " · vs " + escapeHtml(p.rival) : ""} · hora por confirmar</div>`).join("") : "";
     if (!anulados.length && !partidos.length) {
-      caja.innerHTML = `<p class="dlg-anulados-nada">✅ Esta semana no hay entrenamientos ni partidos anulados.</p>`;
+      caja.innerHTML = html + `<p class="dlg-anulados-nada">✅ Esta semana no hay entrenamientos ni partidos anulados.</p>`;
       return;
     }
-    let html = "";
     if (anulados.length) html += `<div class="dlg-anulados-tit">🚫 Entrenamientos anulados esta semana</div>` +
       anulados.map(x => {
         const d = new Date(fecha(x.day) + "T12:00:00");
@@ -102,6 +105,33 @@
         return `<div class="dlg-anulado"><b>${DIAS_SEM[(d.getDay() + 6) % 7]} ${d.getDate()}</b> · ${escapeHtml(p.team)}${p.rival ? " · vs " + escapeHtml(p.rival) : ""}${etiqueta(p.motivo)}</div>`;
       }).join("");
     caja.innerHTML = html;
+  }
+
+  // Partidos de sus equipos el sábado y el domingo de la semana mostrada
+  const DURACION_PARTIDO = 120;   // min, como en el Calendario de partidos
+  function partidosFinde(equipos, sab, domingo) {
+    const cp = (window.cpGetData && window.cpGetData()) || { teams: {} };
+    const L = window.nvaCalLectura || {};
+    const mapa = {};
+    (((datos() || {}).teams) || []).forEach(t => { mapa[getTeamKey(t)] = t; });
+    const anulados = window.nvaPartidosAnulados ? window.nvaPartidosAnulados(sab, domingo) : [];
+    const conHoraL = [], sinHora = [];
+    Object.keys(cp.teams || {}).forEach(key => {
+      if (equipos && equipos.indexOf(key) === -1) return;
+      ((cp.teams[key] || {}).matches || []).forEach(m => {
+        if ((m.date !== sab && m.date !== domingo) || /DESCANS/i.test(m.rival || "") || /\bDESCANSA\b/i.test(m.raw || "")) return;
+        const mk = L.moveKey ? L.moveKey(key, m) : "";
+        const casa = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
+        const anul = anulados.find(p => p.team === key && p.date === m.date && (p.rival || "") === (m.rival || ""));
+        const p = { day: m.date === sab ? 6 : 7, key, team: mapa[key], rival: m.rival || "", casa,
+          campo: campoDe(m) || (casa ? "Local" : "Visitante"), anulado: !!anul, motivo: anul ? anul.motivo || "" : "" };
+        if (!conHora(m)) { sinHora.push(p); return; }
+        p.s = hzT2M(m.time); p.e = p.s + DURACION_PARTIDO;
+        conHoraL.push(p);
+      });
+    });
+    sinHora.sort((a, b) => a.day - b.day);
+    return { conHora: conHoraL, sinHora };
   }
 
   // ---------- Partidos por jornada ----------
@@ -255,8 +285,14 @@
     if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
   }, 0));
 
+  let partidosPedidos = false;
   window.renderDelegados = function () {
     if (!document.documentElement.classList.contains("modo-delegados")) return;
+    // Los partidos del fin de semana salen del calendario de partidos: se traen al entrar
+    if (!partidosPedidos && window.cpRefreshFromGitHub && navigator.onLine && puedeVer("delegados.calendario")) {
+      partidosPedidos = true;
+      Promise.resolve(window.cpRefreshFromGitHub()).then(() => { renderCalendario(); renderPartidos(); }).catch(() => {});
+    }
     renderCalendario();
     renderPartidos();
     renderClasificacion();

@@ -37,6 +37,8 @@
     const yo = lista.find(x => x.usuario && x.usuario === perfil.id)
       || lista.find(x => !x.usuario && norm(x.name) && norm(x.name) === norm(perfil.nombre));
     if (!yo) return perfil.rol === "delegado" ? [] : null;
+    // Quien no es del rol Delegado y no tiene equipos marcados ve todos
+    if (perfil.rol !== "delegado" && !(yo.teams || []).length) return null;
     const equipos = d.teams || [];
     const claves = new Set();
     (yo.teams || []).forEach(ref => {

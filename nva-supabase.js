@@ -1132,14 +1132,24 @@
   // para el resto devuelve null.
   async function usuariosConRol(rol) {
     if (!sb || !perfil || perfil.rol !== "propietario") return null;
-    const { data, error } = await sb.from("perfiles").select("id,email,nombre").eq("rol", rol).eq("activo", true);
+    const roles = Array.isArray(rol) ? rol : [rol];
+    const { data, error } = await sb.from("perfiles").select("id,email,nombre").in("rol", roles).eq("activo", true);
     if (error || !data) return null;
     return data.map(x => ({ id: x.id, email: x.email, nombre: (x.nombre || "").trim() || x.email.split("@")[0] }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
   const entrenadores = () => usuariosConRol("entrenador");
-  const delegados = () => usuariosConRol("delegado");
+  // Delegados de Opciones: todos los usuarios cuyo rol puede ver la página de delegados
+  // (Permisos por rol › Página de delegados en «Ver» o «Editar»), no solo el rol Delegado
+  async function delegados() {
+    if (!sb || !perfil || perfil.rol !== "propietario") return null;
+    const { data, error } = await sb.from("permisos_rol").select("rol,acceso").eq("menu", "delegados");
+    if (error || !data) return null;
+    const roles = new Set(["propietario", "delegado"]);
+    data.forEach(x => { if (x.acceso !== "ninguno") roles.add(x.rol); else if (x.rol !== "propietario") roles.delete(x.rol); });
+    return usuariosConRol(Array.from(roles));
+  }
 
   window.nva = {
     get cliente() { return sb; },

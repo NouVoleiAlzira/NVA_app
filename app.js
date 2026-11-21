@@ -3065,7 +3065,7 @@
     document.getElementById("delegadoCountBadge").innerText = delegados.length;
     lista.innerHTML = delegados.length
       ? delegados.map(d => `<div class="item-row"><span><strong>${escapeHtml(coachLabel(d))}</strong> (${d.teams ? d.teams.length : 0} eq.)</span></div>`).join("")
-      : `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay delegados. Invítalos con el rol Delegado en «Usuarios y permisos».</p>`;
+      : `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay delegados. Invítalos con el rol Delegado o da a su rol acceso a la página de delegados en «Usuarios y permisos».</p>`;
     const elegido = sel.value;
     sel.innerHTML = "";
     delegados.forEach(d => {

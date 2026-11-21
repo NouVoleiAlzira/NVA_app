@@ -70,7 +70,9 @@
     const dom = new Date(mon); dom.setDate(mon.getDate() + 6);
     const fecha = day => { const d = new Date(mon); d.setDate(mon.getDate() + day - 1); return wkFmt(d); };
     const finde = partidosFinde(equipos, fecha(6), fecha(7));
+    dibujo = { hits: [], fecha };
     hzDrawSchedule(canvas, {
+      hits: dibujo.hits,
       subtitle: `Semana del ${mon.getDate()} ${WK_MONTHS[mon.getMonth()]} al ${dom.getDate()} ${WK_MONTHS[dom.getMonth()]} ${dom.getFullYear()}`,
       dayLabels: [0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(mon); d.setDate(mon.getDate() + i); return String(d.getDate()); }),
       soloEquipos: equipos || undefined,
@@ -108,6 +110,70 @@
     caja.innerHTML = html;
   }
 
+  // ---------- Tocar el calendario: tarjeta del entrenamiento o del partido ----------
+  let dibujo = { hits: [], fecha: () => "" };   // lo que se pintó en el último dibujo
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const diaLargo = f => { const d = new Date(f + "T12:00:00"); return `${DIAS_SEM[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MESES[d.getMonth()]}`; };
+
+  function tarjeta() {
+    const c = document.createElement("div");
+    c.className = "cp-ficha dlg-ficha";
+    const fila = (cls, txt) => { const x = document.createElement("div"); x.className = cls; x.textContent = txt; c.appendChild(x); return x; };
+    return { c, fila };
+  }
+  function cabecera(fila, izqTxt, derTxt) {
+    const cab = fila("cp-ficha-cab", "");
+    const izq = document.createElement("span"); izq.className = "cp-ficha-hora"; izq.textContent = izqTxt;
+    const der = document.createElement("span"); der.className = "cp-ficha-ent"; der.textContent = derTxt || "";
+    cab.append(izq, der);
+  }
+  function verEntreno(h) {
+    const x = h.sesion, f = dibujo.fecha(x.day);
+    const info = hzCourtInfo(x.courtId);
+    const campo = info ? info.venue.name + (info.venue.courts.length > 1 ? " · " + info.court.name : "") : "";
+    const { c, fila } = tarjeta();
+    cabecera(fila, diaLargo(f), "Entrenamiento");
+    fila("cp-ficha-eq dlg-ficha-equipo", nombreEquipo(x.key));
+    fila("dlg-ficha-hora", `🕒 De ${hzM2T(x.s)} a ${hzM2T(x.e)}`);
+    if (campo) fila("cp-ficha-campo", "📍 " + campo);
+    if (wkAnulado(x.key, f)) {
+      const mot = window.nvaMotivoEntreno ? window.nvaMotivoEntreno(x.key, f) : "";
+      fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 Anulado" + (mot ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(mot)) || "") + " " + mot).trim() : ""));
+    }
+    nvaAviso("", { nodo: c });
+  }
+  function verPartido(h) {
+    const p = h.partido, m = p.m || {};
+    const L = window.nvaCalLectura || {};
+    const nuestro = nombreEquipo(p.key), rival = p.rival || "?";
+    const jor = jornadaDe(m);
+    const { c, fila } = tarjeta();
+    cabecera(fila, diaLargo(m.date) + (conHora(m) ? " · " + m.time : ""), jor ? "Jornada " + jor : "Partido");
+    fila("cp-ficha-eq cp-ficha-local", p.casa ? nuestro : rival);
+    const res = L.parseResult ? L.parseResult(m.raw) : null;
+    fila("cp-ficha-vs", res ? `${res.setsL} - ${res.setsV}` : "VS");
+    fila("cp-ficha-eq", p.casa ? rival : nuestro);
+    if (res && res.sets && res.sets.length) fila("dlg-ficha-sets", res.sets.map((s, i) => `Set ${i + 1}: ${s.local}-${s.visitante}`).join(" · "));
+    fila("cp-ficha-campo", "📍 " + p.campo + (p.casa === true ? " (local)" : p.casa === false ? " (visitante)" : ""));
+    if (p.anulado) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 Anulado" + (p.motivo ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(p.motivo)) || "") + " " + p.motivo).trim() : ""));
+    nvaAviso("", { nodo: c });
+  }
+  (function () {
+    const canvas = document.getElementById("dlgCanvas");
+    if (!canvas) return;
+    canvas.addEventListener("click", ev => {
+      if (typeof nvaAviso !== "function") return;
+      const r = canvas.getBoundingClientRect();
+      const px = (ev.clientX - r.left) * canvas.width / r.width, py = (ev.clientY - r.top) * canvas.height / r.height;
+      for (let i = dibujo.hits.length - 1; i >= 0; i--) {
+        const h = dibujo.hits[i];
+        if (!wkPointInPoly(px, py, h.pts)) continue;
+        if (h.partido) verPartido(h); else if (h.sesion) verEntreno(h);
+        return;
+      }
+    });
+  })();
+
   // Partidos de sus equipos el sábado y el domingo de la semana mostrada
   const DURACION_PARTIDO = 120;   // min, como en el Calendario de partidos
   function partidosFinde(equipos, sab, domingo) {
@@ -124,7 +190,7 @@
         const mk = L.moveKey ? L.moveKey(key, m) : "";
         const casa = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
         const anul = anulados.find(p => p.team === key && p.date === m.date && (p.rival || "") === (m.rival || ""));
-        const p = { day: m.date === sab ? 6 : 7, key, team: mapa[key], rival: m.rival || "", casa,
+        const p = { day: m.date === sab ? 6 : 7, key, team: mapa[key], rival: m.rival || "", casa, m,
           campo: campoDe(m) || (casa ? "Local" : "Visitante"), anulado: !!anul, motivo: anul ? anul.motivo || "" : "" };
         if (!conHora(m)) { sinHora.push(p); return; }
         p.s = hzT2M(m.time); p.e = p.s + DURACION_PARTIDO;

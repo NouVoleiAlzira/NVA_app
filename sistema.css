@@ -976,7 +976,11 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
   text-align: center; margin: 2px 0 10px;
 }
 #dlgPagina .section-title { margin-top: 0; }
-.dlg-canvas { cursor: default; }
+.dlg-canvas { cursor: pointer; }
+.dlg-ficha-equipo { font-size: 1.1em; margin-bottom: 0.35em; }
+.dlg-ficha-hora { color: var(--txt-1); font-weight: 700; }
+.dlg-ficha-sets { color: var(--txt-2); font-size: 0.85em; margin-top: 0.35em; }
+.dlg-ficha-anulado { margin: 0.65em 0 0; }
 .dlg-vacio { color: var(--txt-2); font-size: 0.85rem; text-align: center; margin: 6px 0; }
 .dlg-anulados { margin-top: 10px; font-size: 0.82rem; color: var(--txt-1); }
 .dlg-anulados-tit { font-weight: 700; margin-bottom: 6px; }

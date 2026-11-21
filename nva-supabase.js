@@ -173,10 +173,78 @@
     return data ? data.signedUrl : null;
   }
 
+  // ------------------------------------------------------------------
+  // Copias en el dispositivo (Cache Storage) para gastar menos Egress de Supabase:
+  //  - textos: se guarda {version, actualizado, contenido}; al leer se pide solo la versión
+  //    y, si no ha cambiado, no se vuelve a bajar el contenido.
+  //  - binarios (imágenes, vídeos, PDF, música): por ruta y fecha de modificación.
+  // Sin prefijo «nva-»: sw.js no las borra al cambiar de versión. Se borran al cerrar sesión.
+  // ------------------------------------------------------------------
+  const CACHE_TEXTOS = "textos-v1", CACHE_BIN = "binarios-v1", MAX_BIN = 60;
+  const CACHES_PROPIAS = [CACHE_TEXTOS, CACHE_BIN, "medios-v1", "ghsha-v1"];
+  const hayCaches = typeof caches !== "undefined";
+  if (hayCaches) caches.delete("medios-v1").catch(() => {});   // la usó una versión anterior de instagram.js
+  const claveTexto = ruta => "https://nva-cache.local/t/" + encodeURIComponent(ruta);
+  const claveBin = (ruta, ver) => "https://nva-cache.local/b/" + encodeURIComponent(ruta) + "?v=" + encodeURIComponent(ver || "");
+
+  async function textoGuardado(ruta) {
+    if (!hayCaches) return null;
+    try { const r = await (await caches.open(CACHE_TEXTOS)).match(claveTexto(ruta)); return r ? await r.json() : null; } catch (e) { return null; }
+  }
+  async function guardarTexto(ruta, fila) {
+    if (!hayCaches) return;
+    try {
+      await (await caches.open(CACHE_TEXTOS)).put(claveTexto(ruta), new Response(JSON.stringify(
+        { version: fila.version, actualizado: fila.actualizado, contenido: fila.contenido }), { headers: { "Content-Type": "application/json" } }));
+    } catch (e) { /* sin copia: no pasa nada */ }
+  }
+  async function olvidarTexto(ruta) {
+    if (!hayCaches) return;
+    try { await (await caches.open(CACHE_TEXTOS)).delete(claveTexto(ruta)); } catch (e) {}
+  }
+
+  // Lee un archivo de texto: si la copia del dispositivo tiene la misma versión, solo se pide la versión.
+  async function filaTexto(ruta) {
+    const copia = await textoGuardado(ruta);
+    if (copia) {
+      const { data, error } = await sb.from("archivos").select("version, actualizado").eq("ruta", ruta).maybeSingle();
+      revisar(error);
+      if (!data) { await olvidarTexto(ruta); return null; }
+      if (data.version === copia.version && data.actualizado === copia.actualizado) return copia;
+    }
+    const { data, error } = await sb.from("archivos").select("contenido, version, actualizado").eq("ruta", ruta).maybeSingle();
+    revisar(error);
+    if (data) await guardarTexto(ruta, data);
+    return data;
+  }
+
+  // Binario por ruta y versión: de la copia del dispositivo o, si no hay, de la URL indicada.
+  async function binario(ruta, ver, url) {
+    const clave = hayCaches && ver ? claveBin(ruta, ver) : "";
+    if (clave) {
+      try { const hit = await (await caches.open(CACHE_BIN)).match(clave); if (hit) return await hit.blob(); } catch (e) {}
+    }
+    const r = await origFetch(typeof url === "function" ? await url() : url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const blob = await r.blob();
+    if (clave) {
+      try {
+        const c = await caches.open(CACHE_BIN);
+        const viejas = (await c.keys()).filter(k => k.url.startsWith(claveBin(ruta, "").replace(/v=$/, "")));
+        for (const k of viejas) await c.delete(k);   // otras versiones del mismo archivo
+        await c.put(clave, new Response(blob, { headers: { "Content-Type": blob.type || tipoMime(ruta) } }));
+        const todas = await c.keys();   // por orden de llegada: fuera las más antiguas
+        for (const k of todas.slice(0, Math.max(0, todas.length - MAX_BIN))) await c.delete(k);
+      } catch (e) { /* sin copia: no pasa nada */ }
+    }
+    return blob;
+  }
+  // Para otras partes de la app (escudos): blob de una ruta de Storage ya listada (ver = su sha)
+  window.nvaBinario = (ruta, ver, url) => binario(ruta, ver, url);
+
   async function leerArchivo(ruta, init) {
     if (TEXTO.test(ruta)) {
-      const { data, error } = await sb.from("archivos").select("contenido, version, actualizado").eq("ruta", ruta).maybeSingle();
-      revisar(error);
+      const data = await filaTexto(ruta);
       if (data) {
         if (/raw/.test(cabecera(init, "Accept"))) return new Response(data.contenido, { status: 200 });
         const b64 = textoAB64(data.contenido);
@@ -191,8 +259,13 @@
     const obj = await infoStorage(ruta);
     if (obj) {
       const size = (obj.metadata && obj.metadata.size) || 0;
+      if (/raw/.test(cabecera(init, "Accept"))) {
+        try {
+          const blob = await binario(ruta, "s" + (obj.updated_at || obj.id), () => urlFirmada(ruta));   // misma versión que el sha de las listas
+          return new Response(blob, { status: 200, headers: { "Content-Type": blob.type || tipoMime(ruta) } });
+        } catch (e) { return json(404, { message: "Not Found" }); }
+      }
       const url = await urlFirmada(ruta);
-      if (/raw/.test(cabecera(init, "Accept"))) return origFetch(url);
       let content = "", encoding = "none";
       if (size <= MAX_INLINE) {
         const { data, error } = await sb.storage.from(BUCKET).download(ruta);
@@ -210,7 +283,9 @@
   async function listarCarpeta(ruta) {
     const pref = ruta ? ruta.replace(/\/$/, "") + "/" : "";
     const items = new Map();
-    const { data: filas, error } = await sb.from("archivos").select("ruta, version, actualizado, contenido").like("ruta", pref.replace(/[%_]/g, "\\$&") + "%");
+    // Sin «contenido»: antes la lista traía todos los archivos enteros (Egress) aunque la app
+    // solo lee después los que han cambiado.
+    const { data: filas, error } = await sb.from("archivos").select("ruta, version, actualizado").like("ruta", pref.replace(/[%_]/g, "\\$&") + "%");
     revisar(error);
     (filas || []).forEach(f => {
       const resto = f.ruta.slice(pref.length);
@@ -221,8 +296,7 @@
       } else {
         items.set(resto, {
           type: "file", name: resto, path: f.ruta, sha: shaTexto(f.ruta, f.version, f.actualizado), url: urlApi(f.ruta),
-          size: new TextEncoder().encode(f.contenido).length,
-          download_url: "data:application/octet-stream;base64," + textoAB64(f.contenido)
+          size: 0, download_url: null
         });
       }
     });
@@ -509,6 +583,7 @@
     try {
       borrarSesionGuardada();
       ["NVA_IG_SETTINGS", "NVA_PERFIL", "NVA_PERMISOS"].forEach(k => localStorage.removeItem(k));
+      if (hayCaches) await conLimite(Promise.all(CACHES_PROPIAS.map(n => caches.delete(n))), 2000);
       // Una renovación del token que termine justo ahora podría volver a
       // guardar la sesión antes de recargar: al arrancar se borra otra vez.
       localStorage.setItem(SALIENDO, "1");

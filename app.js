@@ -5990,6 +5990,33 @@
     return { days, sessions, rangeStart, rangeEnd };
   }
 
+  // Añade sábado y domingo al modelo con los partidos dados
+  // ({ day: 6|7, key, team, s, e, campo, rival, casa, anulado, motivo }): una columna por campo.
+  function hzAddFinde(model, partidos) {
+    [6, 7].forEach(day => {
+      const del = partidos.filter(p => p.day === day).sort((a, b) => a.s - b.s);
+      const cols = [];
+      del.forEach(p => {
+        const nombre = p.campo || "Campo por confirmar";
+        let c = cols.find(x => x.venue.name === nombre);
+        if (!c) {
+          c = { venue: { id: "finde-" + day + "-" + nombre, name: nombre, courts: [{}] }, court: { name: "" }, avail: [], sessions: [], partidos: [], finde: true };
+          cols.push(c);
+        }
+        c.partidos.push(p);
+      });
+      model.days.push({ day, cols, finde: true });
+    });
+    if (!partidos.length) return;
+    let minS = model.sessions.length ? model.rangeStart : Infinity, maxE = model.sessions.length ? model.rangeEnd : -Infinity;
+    partidos.forEach(p => { minS = Math.min(minS, p.s); maxE = Math.max(maxE, p.e); });
+    if (!model.sessions.length && model.days.some(d => !d.finde && d.cols.length)) {
+      minS = Math.min(minS, model.rangeStart); maxE = Math.max(maxE, model.rangeEnd);
+    }
+    model.rangeStart = Math.floor(minS / 30) * 30;
+    model.rangeEnd = Math.max(Math.ceil(maxE / 30) * 30, model.rangeStart + 60);
+  }
+
   // Geometría de cada sesión de una columna: si hay solape con otra sesión de la
   // misma pista, el espacio solapado se divide con una diagonal entre ambos equipos.
   function hzSessionPolys(list) {
@@ -6078,6 +6105,8 @@
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     const model = hzBuildModel(opts.soloEquipos);
+    if (Array.isArray(opts.finde)) hzAddFinde(model, opts.finde);
+    const nombresDia = HZ_DAYS.concat(["Sábado", "Domingo"]);
 
     // Fondo: gradiente de azules
     const bg = ctx.createLinearGradient(0, 0, W, H);
@@ -6130,12 +6159,12 @@
     model.days.forEach((d, di) => {
       const n = colsPerDay[di], x0 = xOfCol(ci), w = n * colW;
       cell(x0, tableY, w, hDay, "#a6a6a6");
-      cellText(HZ_DAYS[di].toUpperCase() + (opts.dayLabels ? " " + opts.dayLabels[di] : ""), x0, tableY, w, hDay, 46, 800);
+      cellText(nombresDia[di].toUpperCase() + (opts.dayLabels ? " " + opts.dayLabels[di] : ""), x0, tableY, w, hDay, 46, 800);
       if (opts.dayHits) opts.dayHits.push({ x: x0, y: tableY, w, h: hDay, day: di + 1 });
       if (opts.diaAnulado && opts.diaAnulado(di + 1)) wkStripes(ctx, [[x0, tableY], [x0 + w, tableY], [x0 + w, tableY + hDay], [x0, tableY + hDay]]);
       if (!d.cols.length) {
         cell(x0, tableY + hDay, w, hVen + hCrt, "#cfcfcf");
-        cellText("SIN PISTA", x0, tableY + hDay, w, hVen + hCrt, 26, 700);
+        cellText(d.finde ? "SIN PARTIDOS" : "SIN PISTA", x0, tableY + hDay, w, hVen + hCrt, 26, 700);
         hzHatch(ctx, x0, bodyY, w, tableH - headH);
       } else {
         let k = 0;
@@ -6164,6 +6193,7 @@
     ci = 0;
     model.days.forEach((d, di) => {
       d.cols.forEach((c, q) => {
+        if (c.finde) return;   // sábado y domingo: solo partidos, sin disponibilidad de pista
         const x = xOfCol(ci + q);
         let cursor = model.rangeStart;
         const gray = (a, b) => {
@@ -6247,6 +6277,41 @@
               ctx.fillText(markCh, bx, by + mr * 0.06);
             }
           }
+        });
+      });
+      ci += colsPerDay[di];
+    });
+
+    // Partidos del fin de semana (solo si se piden, p. ej. la página de delegados)
+    ci = 0;
+    model.days.forEach((d, di) => {
+      d.cols.forEach((c, q) => {
+        if (!c.finde) return;
+        const cx0 = xOfCol(ci + q);
+        // Partidos solapados en el mismo campo: se reparte el ancho de la columna
+        const carriles = [];
+        const L = c.partidos.slice().sort((a, b) => a.s - b.s);
+        L.forEach(p => {
+          let i = carriles.findIndex(fin => fin <= p.s);
+          if (i === -1) { i = carriles.length; carriles.push(0); }
+          carriles[i] = p.e; p.carril = i;
+        });
+        const lw = colW / Math.max(1, carriles.length);
+        L.forEach(p => {
+          const x0 = cx0 + p.carril * lw, x1 = x0 + lw, y0 = yOf(p.s), y1 = yOf(p.e);
+          const pts = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+          ctx.fillStyle = hz.teamColors[p.key] || "#dddddd"; ctx.fillRect(x0, y0, lw, y1 - y0);
+          ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, lw, y1 - y0);
+          if (p.anulado) wkStripes(ctx, pts);
+          const parts = [];
+          const lp = p.team ? hzLabelParts(p.team, p.key) : { cat: p.key, suf: "" };
+          if (lp.cat) parts.push({ text: lp.cat, mult: 1, weight: 800 });
+          if (lp.suf) parts.push({ text: lp.suf, mult: 1.3, weight: 800 });
+          if (p.rival) parts.push({ text: "vs " + p.rival, mult: 0.62, weight: 700 });
+          parts.push({ text: `(${hzM2T(p.s)}${p.casa === true ? " · Local" : p.casa === false ? " · Visitante" : ""})`, mult: 0.62, weight: 700 });
+          if (p.anulado && p.motivo) parts.push({ text: p.motivo, mult: 0.6, weight: 800 });
+          const fit = hzFitText(ctx, parts, lw - 16, y1 - y0 - 8, 44, 10);
+          hzDrawLines(ctx, fit, (x0 + x1) / 2, y0 + 4, y1 - y0 - 8);
         });
       });
       ci += colsPerDay[di];

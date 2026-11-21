@@ -971,10 +971,23 @@ body.wk-full-abierta { overflow: hidden; }
 html:not(.modo-delegados) #dlgPagina { display: none !important; }
 html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !important; }
 .dlg-cabecera {
-  font-family: var(--font-display); font-size: 0.78rem; font-weight: 700;
-  letter-spacing: 0.14em; text-transform: uppercase; color: var(--txt-2);
-  text-align: center; margin: 2px 0 10px;
+  font-family: var(--font-display); font-size: 1.55rem; font-weight: 800; font-style: italic;
+  letter-spacing: 0.16em; text-transform: uppercase; color: #fff;
+  text-align: center; margin: 6px 0 16px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  /* resplandor azul que late despacio */
+  text-shadow: 0 0 8px rgba(140, 180, 255, 0.9), 0 0 20px rgba(79, 123, 255, 0.65), 0 2px 0 rgba(0, 10, 50, 0.6);
+  animation: dlgBrillo 3.5s ease-in-out infinite;
 }
+.dlg-cabecera svg {
+  width: 30px; height: 30px; color: #fde68a; flex: none;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.75));
+}
+@keyframes dlgBrillo {
+  0%, 100% { text-shadow: 0 0 8px rgba(140, 180, 255, 0.9), 0 0 20px rgba(79, 123, 255, 0.65), 0 2px 0 rgba(0, 10, 50, 0.6); }
+  50% { text-shadow: 0 0 12px rgba(190, 215, 255, 1), 0 0 34px rgba(79, 123, 255, 0.9), 0 2px 0 rgba(0, 10, 50, 0.6); }
+}
+@media (prefers-reduced-motion: reduce) { .dlg-cabecera { animation: none; } }
 #dlgPagina .section-title { margin-top: 0; }
 .dlg-canvas { cursor: pointer; }
 .dlg-ficha-equipo { font-size: 1.1em; margin-bottom: 0.35em; }
@@ -1072,4 +1085,3 @@ button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
 
 /* Iconos dibujados del botón y la cabecera de la página de delegados */
 #btnPaginaDelegados svg { display: block; margin: auto; }
-.dlg-cabecera svg { vertical-align: -3px; margin-right: 4px; }

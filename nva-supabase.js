@@ -68,6 +68,16 @@
   };
   // Secciones de la página principal (si el rol no ve ninguna, entra directo en la de delegados)
   const MENUS_PRINCIPAL = ["inicio", "informes", "tablon", "otros", "calendario", "direccion", "instagram"];
+  // Al abrir la app, antes de comprobar la sesión, se usa la página que tocaba la
+  // última vez (permisos guardados en este dispositivo). Así un delegado no ve
+  // un instante la página principal. Al cargar los permisos se confirma.
+  try {
+    const guardados = JSON.parse(localStorage.getItem("NVA_PERMISOS") || "null");
+    if (guardados) {
+      const ver = m => (guardados[m] || (m.includes(".") ? guardados[m.split(".")[0]] : "") || "ninguno") !== "ninguno";
+      if (ver("delegados") && !MENUS_PRINCIPAL.some(ver)) document.documentElement.classList.add("modo-delegados");
+    }
+  } catch (e) {}
 
   const origFetch = window.fetch.bind(window);
   const esInvitacion = /type=(invite|recovery)/.test(location.hash);
@@ -843,7 +853,7 @@
   function mostrarPagina(cual) {
     if (cual === "delegados" && !paginas.delegados) cual = "principal";
     const enDelegados = cual === "delegados";
-    document.body.classList.toggle("modo-delegados", enDelegados);
+    document.documentElement.classList.toggle("modo-delegados", enDelegados);
     const btn = document.getElementById("btnPaginaDelegados");
     if (btn) {
       btn.innerHTML = enDelegados ? "🏠" : "🪪";
@@ -859,7 +869,7 @@
     // Si se está en otra pantalla (registro, partido…), se vuelve antes a la principal
     const inicio = document.getElementById("screenCoachTeam");
     if (inicio && !inicio.classList.contains("active") && typeof window.goBack === "function") window.goBack();
-    mostrarPagina(document.body.classList.contains("modo-delegados") ? "principal" : "delegados");
+    mostrarPagina(document.documentElement.classList.contains("modo-delegados") ? "principal" : "delegados");
     window.scrollTo(0, 0);
   };
 

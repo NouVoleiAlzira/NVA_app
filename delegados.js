@@ -78,7 +78,7 @@
   }
 
   window.renderDelegados = function () {
-    if (!document.body.classList.contains("modo-delegados")) return;
+    if (!document.documentElement.classList.contains("modo-delegados")) return;
     renderCalendario();
   };
   window.dlgMove = function (delta) { offset += delta; renderCalendario(); };

@@ -62,8 +62,12 @@
     "instagram.eventos": ["#igSubHead_eventos", "#igSub_eventos"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],
     "opciones.equipos": [".tab-btn[onclick=\"switchTab(2)\"]", "#tabContent2"],
-    "opciones.escudos": [".tab-btn[onclick=\"switchTab(6)\"]", "#tabContent6"]
+    "opciones.escudos": [".tab-btn[onclick=\"switchTab(6)\"]", "#tabContent6"],
+    // Página de delegados: sus bloques (la página en sí la decide nvaPaginas)
+    "delegados.calendario": ["#secHead_dlgcal", "#secBody_dlgcal"]
   };
+  // Secciones de la página principal (si el rol no ve ninguna, entra directo en la de delegados)
+  const MENUS_PRINCIPAL = ["inicio", "informes", "tablon", "otros", "calendario", "direccion", "instagram"];
 
   const origFetch = window.fetch.bind(window);
   const esInvitacion = /type=(invite|recovery)/.test(location.hash);
@@ -742,7 +746,47 @@
     const tabUsuarios = document.querySelector("[data-nva-tab=\"usuarios\"]");
     if (tabUsuarios) tabUsuarios.hidden = perfil.rol !== "propietario";
     pintarUsuarioCabecera();
+    aplicarPaginas();
   }
+
+  // ------------------------------------------------------------------
+  // Página principal / página de delegados
+  // · Quien solo ve la de delegados entra directo en ella.
+  // · Quien ve las dos entra en la principal y tiene un botón en la
+  //   cabecera para pasar de una a otra.
+  // ------------------------------------------------------------------
+  let paginas = { principal: true, delegados: false };
+  function aplicarPaginas() {
+    paginas = {
+      principal: MENUS_PRINCIPAL.some(m => acceso(m) !== "ninguno"),
+      delegados: acceso("delegados") !== "ninguno"
+    };
+    const btn = document.getElementById("btnPaginaDelegados");
+    if (btn) btn.hidden = !(paginas.principal && paginas.delegados);
+    mostrarPagina(paginas.delegados && !paginas.principal ? "delegados" : "principal");
+  }
+  function mostrarPagina(cual) {
+    if (cual === "delegados" && !paginas.delegados) cual = "principal";
+    const enDelegados = cual === "delegados";
+    document.body.classList.toggle("modo-delegados", enDelegados);
+    const btn = document.getElementById("btnPaginaDelegados");
+    if (btn) {
+      btn.innerHTML = enDelegados ? "🏠" : "🪪";
+      btn.title = enDelegados ? "Ir a la página principal" : "Ir a la página de delegados";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", enDelegados ? "true" : "false");
+    }
+    if (enDelegados && typeof window.renderDelegados === "function") {
+      try { window.renderDelegados(); } catch (e) { console.error(e); }
+    }
+  }
+  window.nvaCambiarPagina = () => {
+    // Si se está en otra pantalla (registro, partido…), se vuelve antes a la principal
+    const inicio = document.getElementById("screenCoachTeam");
+    if (inicio && !inicio.classList.contains("active") && typeof window.goBack === "function") window.goBack();
+    mostrarPagina(document.body.classList.contains("modo-delegados") ? "principal" : "delegados");
+    window.scrollTo(0, 0);
+  };
 
   // Si la pestaña activa de Opciones está oculta para el rol, se abre la primera visible
   function abrirPrimeraPestana() {
@@ -771,7 +815,7 @@
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
 
   let rolPermisosElegido = null;
-  const ROLES_BASE = ["propietario", "administrador", "entrenador", "lectura"];
+  const ROLES_BASE = ["propietario", "administrador", "entrenador", "delegado", "lectura"];
   async function pintarPanelUsuarios() {
     const caja = document.getElementById("nvaPanelUsuarios");
     if (!caja) return;
@@ -838,7 +882,7 @@
       seccion("usuarios", "Usuarios", `
         <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
-        <p class="nva-nota">Los usuarios con rol Entrenador son los entrenadores de la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre.</p>
+        <p class="nva-nota">Los usuarios con rol Entrenador o Delegado salen en la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre.</p>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
@@ -996,19 +1040,24 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "NVA_SUPABASE_AUTH" }
     });
   }
-  // Usuarios con rol Entrenador (son los entrenadores de Opciones › Entrenadores y equipos).
-  // Solo el propietario ve todos los perfiles; para el resto devuelve null.
-  async function entrenadores() {
+  // Usuarios con rol Entrenador o Delegado (son los entrenadores y los delegados de
+  // Opciones › Entrenadores y equipos). Solo el propietario ve todos los perfiles;
+  // para el resto devuelve null.
+  async function usuariosConRol(rol) {
     if (!sb || !perfil || perfil.rol !== "propietario") return null;
-    const { data, error } = await sb.from("perfiles").select("id,email,nombre").eq("rol", "entrenador").eq("activo", true);
+    const { data, error } = await sb.from("perfiles").select("id,email,nombre").eq("rol", rol).eq("activo", true);
     if (error || !data) return null;
     return data.map(x => ({ id: x.id, email: x.email, nombre: (x.nombre || "").trim() || x.email.split("@")[0] }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }
 
+  const entrenadores = () => usuariosConRol("entrenador");
+  const delegados = () => usuariosConRol("delegado");
+
   window.nva = {
     get cliente() { return sb; },
     entrenadores,
+    delegados,
     get perfil() { return perfil; },
     acceso,
     listo,

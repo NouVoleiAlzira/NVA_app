@@ -1042,3 +1042,19 @@ html.modo-delegados #screenCoachTeam > :not(#dlgPagina) { display: none !importa
 .dlg-cla tr.propio td { background: rgba(var(--c-amarillo), 0.26); font-weight: 800; color: #fff; }
 .dlg-cla tr.propio td.pos { color: rgb(var(--c-amarillo)); }
 .dlg-cla-fecha { color: var(--txt-2); font-size: 0.7rem; margin-top: 6px; text-align: right; }
+/* Resultado que se toca para ver los sets */
+button.dlg-par-res { font: inherit; font-weight: 800; color: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button.dlg-par-res::after { content: " ▾"; font-size: 0.7em; opacity: 0.8; }
+button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
+.dlg-par-sets {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--borde); animation: nvaDlgSets 180ms ease both;
+}
+.dlg-par-sets[hidden] { display: none; }
+.dlg-par-sets span {
+  display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 3px 8px;
+  border-radius: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--borde);
+}
+.dlg-par-sets small { color: var(--txt-2); font-size: 0.66rem; }
+@keyframes nvaDlgSets { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dlg-par-sets { animation: none; } }

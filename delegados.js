@@ -9,6 +9,10 @@
 //     motivo (Festivo, Alerta meteorológica…), y debajo la lista de los
 //     entrenamientos y partidos anulados de la semana. Solo se ve: no se
 //     puede tocar nada.
+//   · Partidos (delegados.partidos): sección plegada; al abrirla, los
+//     partidos de sus equipos por jornada (CalendarioPartidos.json):
+//       1.ª línea: jornada · día y hora · campo
+//       2.ª línea: equipo de casa · resultado («X - X» o «-») · visitante
 // Los equipos de cada delegado se asignan en Opciones › Entrenadores y
 // equipos (configuracion.json → delegados[].teams). Quien no es delegado
 // (p. ej. el propietario) ve todos los equipos.
@@ -94,9 +98,96 @@
     caja.innerHTML = html;
   }
 
+  // ---------- Partidos por jornada ----------
+  const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const pad = n => String(n).padStart(2, "0");
+  // Jornada: la del PDF o el número de la primera columna de la fila (como calendario-partidos.js)
+  const jornadaDe = m => String(m.jornada || (((m.raw || "").match(/^\s*(\d{1,2})\s+\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/) || [])[1] || ""));
+  const campoDe = m => String(m.venue || "").replace(/([A-Za-zÀ-ÿ]),(?=[A-Za-zÀ-ÿ])/g, "$1'").trim();
+  const conHora = m => !!m.time && m.time !== "00:00";
+  function nombreEquipo(key) {
+    const t = ((datos() || {}).teams || []).find(x => getTeamKey(x) === key);
+    return t ? `${t.name} (${t.category})` : key;
+  }
+
+  function renderPartidos() {
+    const caja = document.getElementById("dlgPartidos");
+    const body = document.getElementById("secBody_dlgpar");
+    if (!caja || !body || body.classList.contains("collapsed") || !puedeVer("delegados.partidos")) return;
+    const equipos = misEquipos();
+    if (Array.isArray(equipos) && !equipos.length) {
+      caja.innerHTML = `<p class="dlg-vacio">Todavía no tienes equipos asignados. Pídelo en el club (Opciones › Entrenadores y equipos).</p>`;
+      return;
+    }
+    const cp = (window.cpGetData && window.cpGetData()) || { teams: {} };
+    const L = window.nvaCalLectura || {};
+    const orden = ((datos() || {}).teams || []).map(getTeamKey);
+    const claves = Object.keys(cp.teams || {})
+      .filter(k => !equipos || equipos.indexOf(k) !== -1)
+      .sort((a, b) => (orden.indexOf(a) + 1 || 999) - (orden.indexOf(b) + 1 || 999) || a.localeCompare(b));
+    const anuladoDe = (key, m) => (window.nvaPartidosAnulados ? window.nvaPartidosAnulados(m.date, m.date) : [])
+      .find(p => p.team === key && (p.rival || "") === (m.rival || ""));
+
+    let html = "";
+    claves.forEach(key => {
+      const lista = ((cp.teams[key] || {}).matches || [])
+        .filter(m => m.date && !/DESCANS/i.test(m.rival || "") && !/\bDESCANSA\b/i.test(m.raw || ""))
+        .sort((a, b) => (parseInt(jornadaDe(a), 10) || 999) - (parseInt(jornadaDe(b), 10) || 999)
+          || (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+      if (!lista.length) return;
+      if (claves.length > 1 || !equipos) html += `<div class="dlg-par-equipo">${escapeHtml(nombreEquipo(key))}</div>`;
+      html += lista.map(m => {
+        const mk = L.moveKey ? L.moveKey(key, m) : "";
+        const enCasa = cp.homeOv && mk in cp.homeOv ? cp.homeOv[mk] : m.home !== false;
+        const nuestro = nombreEquipo(key), rival = m.rival || "?";
+        const res = L.parseResult ? L.parseResult(m.raw) : null;
+        const d = new Date(m.date + "T12:00:00");
+        const dia = `${DIAS_CORTO[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        const jor = jornadaDe(m);
+        const campo = campoDe(m) || (enCasa ? "Local" : "Visitante");
+        const anul = anuladoDe(key, m);
+        const lado = (txt, nva, cls) => `<span class="${cls}${nva ? " nva" : ""}">${escapeHtml(txt)}</span>`;
+        return `<div class="dlg-par${anul ? " anulado" : ""}">
+          <div class="dlg-par-l1"><b>${jor ? "Jornada " + escapeHtml(jor) : "Jornada —"}</b><span>${escapeHtml(dia)}${conHora(m) ? " · " + escapeHtml(m.time) : " · hora por confirmar"}</span><span>📍 ${escapeHtml(campo)}</span></div>
+          <div class="dlg-par-l2">${lado(enCasa ? nuestro : rival, enCasa, "loc")}<span class="dlg-par-res${res ? " jugado" : ""}">${res ? `${res.setsL} - ${res.setsV}` : "-"}</span>${lado(enCasa ? rival : nuestro, !enCasa, "vis")}</div>
+          ${anul ? `<span class="dlg-motivo">🚫 Anulado${anul.motivo ? " · " + escapeHtml(((window.nvaIcoMotivo && window.nvaIcoMotivo(anul.motivo)) || "") + " " + anul.motivo) : ""}</span>` : ""}
+        </div>`;
+      }).join("");
+    });
+    caja.innerHTML = html || `<p class="dlg-vacio">Todavía no hay partidos de ${equipos && equipos.length === 1 ? "tu equipo" : "tus equipos"}. Salen cuando el club sube el calendario de la federación.</p>`;
+  }
+
+  // Secciones plegables propias (empiezan plegadas); se recuerda en cada dispositivo
+  const PLEGADO = "NVA_DLG_SECCIONES";
+  function estado() { try { return JSON.parse(localStorage.getItem(PLEGADO)) || {}; } catch (e) { return {}; } }
+  function aplicar(id, abierta) {
+    const head = document.getElementById("secHead_" + id), body = document.getElementById("secBody_" + id);
+    if (!head || !body) return;
+    head.classList.toggle("collapsed", !abierta);
+    body.classList.toggle("collapsed", !abierta);
+    head.setAttribute("aria-expanded", abierta ? "true" : "false");
+  }
+  window.dlgToggleSeccion = function (id) {
+    const st = estado();
+    st[id] = !st[id];
+    try { localStorage.setItem(PLEGADO, JSON.stringify(st)); } catch (e) {}
+    aplicar(id, st[id]);
+    if (id === "dlgpar" && st[id]) {
+      renderPartidos();
+      // Al abrir se traen los partidos y resultados más recientes
+      if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
+    }
+  };
+  aplicar("dlgpar", !!estado().dlgpar);
+  // Si se dejó abierta, al entrar también se traen los partidos más recientes
+  if (estado().dlgpar && window.nva && window.nva.listo) window.nva.listo.then(() => setTimeout(() => {
+    if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
+  }, 0));
+
   window.renderDelegados = function () {
     if (!document.documentElement.classList.contains("modo-delegados")) return;
     renderCalendario();
+    renderPartidos();
   };
   window.dlgMove = function (delta) { offset += delta; renderCalendario(); };
 })();

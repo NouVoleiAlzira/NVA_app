@@ -1069,3 +1069,7 @@ button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
 .dlg-par-sets small { color: var(--txt-2); font-size: 0.66rem; }
 @keyframes nvaDlgSets { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .dlg-par-sets { animation: none; } }
+
+/* Iconos dibujados del botón y la cabecera de la página de delegados */
+#btnPaginaDelegados svg { display: block; margin: auto; }
+.dlg-cabecera svg { vertical-align: -3px; margin-right: 4px; }

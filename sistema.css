@@ -918,3 +918,49 @@ select.nva-sel-abierta { border-color: var(--balon, #F5C518) !important; box-sha
 .esc-patro-mini { flex: none; display: inline-flex; }
 .esc-patro-mini .esc-img { width: 34px; height: 34px; border-radius: 8px; padding: 2px; }
 .esc-editando .app-select { margin: 0; }
+
+/* ---------------------------------------------------------------------
+   Calendario semanal › botón «Ampliar a todo el ancho» y vista ampliada
+   --------------------------------------------------------------------- */
+.wk-legend { position: relative; padding: 0 40px; flex-wrap: wrap; row-gap: 4px; }
+.wk-ampliar {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0;
+  border-radius: var(--r-sm); border: 1px solid var(--borde-fuerte);
+  background: var(--sf-fila); color: var(--balon); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .wk-ampliar:hover { background: var(--sf-fila-hover); border-color: rgba(245, 197, 24, 0.55); }
+}
+.wk-ampliar:active { transform: translateY(-50%) scale(0.94); }
+.wk-ampliar[aria-pressed="true"] { background: rgba(245, 197, 24, 0.16); border-color: rgba(245, 197, 24, 0.55); }
+
+/* Capa a toda la pantalla: por encima de la cabecera, por debajo de las ventanas */
+.wk-full {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(7, 15, 43, 0.94);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  animation: nvaDlgFondo 160ms ease both;
+}
+.wk-full-box {
+  position: absolute; inset: 0; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.wk-full .wk-canvas-wrap { flex: none; width: 100%; }
+.wk-full .wk-canvas {
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(233, 238, 250, 0.12), 0 14px 30px -12px rgba(0, 0, 0, 0.75);
+}
+.wk-full .wk-nav-btn {
+  border-radius: 50%; width: 40px; height: 40px;
+  background: rgba(13, 27, 69, 0.55); border-color: rgba(233, 238, 250, 0.3);
+  text-shadow: none;
+}
+.wk-full .wk-legend { flex: none; margin-top: 12px; font-size: 0.85rem; }
+.wk-full .wk-legend span { display: inline-flex; align-items: center; }
+.wk-full .anul-barra { flex: none; }
+body.wk-full-abierta { overflow: hidden; }

@@ -6248,7 +6248,7 @@
           if (lp.cat) parts.push({ text: lp.cat, mult: 1, weight: 800 });
           if (lp.suf) parts.push({ text: lp.suf, mult: 1.45, weight: 800 });
           parts.push({ text: `(${hzM2T(x.s)}-${hzM2T(x.e)})`, mult: 0.72, weight: 700 });
-          if (opts.hits) opts.hits.push({ pts: [[x0, yTL], [x1, yTR], [x1, yBR], [x0, yBL]], key: x.key, day: x.day });
+          if (opts.hits) opts.hits.push({ pts: [[x0, yTL], [x1, yTR], [x1, yBR], [x0, yBL]], key: x.key, day: x.day, sesion: x });
 
           // Entrenamiento anulado (anulaciones.js): rayas diagonales y sin marca
           const anul = opts.anulado ? opts.anulado(x) : false;
@@ -6303,6 +6303,7 @@
           ctx.fillStyle = hz.teamColors[p.key] || "#dddddd"; ctx.fillRect(x0, y0, lw, y1 - y0);
           ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, lw, y1 - y0);
           if (p.anulado) wkStripes(ctx, pts);
+          if (opts.hits) opts.hits.push({ pts, key: p.key, day: p.day, partido: p });
           const parts = [];
           const lp = p.team ? hzLabelParts(p.team, p.key) : { cat: p.key, suf: "" };
           if (lp.cat) parts.push({ text: lp.cat, mult: 1, weight: 800 });

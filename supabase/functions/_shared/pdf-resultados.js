@@ -73,7 +73,9 @@
         const m = t.match(/^(\d+)\s+(.+?)((?:\s+-?\d+){11})$/);
         if (!m) return;
         const n = m[3].trim().split(/\s+/).map(Number);
-        res.clasificacion.push({ pos: +m[1], nombre: m[2].trim(), pj: n[0], pg: n[1] + n[2], pp: n[3] + n[4], sf: n[6], sc: n[7], pts: n[10] });
+        // pg3/pg2/pp1/pp0: ganados 3-0 o 3-1 / 3-2 y perdidos 2-3 / 0-3 o 1-3 (página de delegados)
+        res.clasificacion.push({ pos: +m[1], nombre: m[2].trim(), pj: n[0], pg: n[1] + n[2], pp: n[3] + n[4], sf: n[6], sc: n[7], pts: n[10],
+          pg3: n[1], pg2: n[2], pp1: n[3], pp0: n[4] });
       }
     });
     const nombres = res.clasificacion.map(c => c.nombre);
@@ -241,5 +243,5 @@
     return pdf;
   }
 
-  raiz.nvaPdfResultados = { banda, pies, analizar, dibujar, pdfDeEquipo };
+  raiz.nvaPdfResultados = { banda, pies, analizar, dibujar, pdfDeEquipo, equipoPropio };
 })(typeof window !== "undefined" ? window : globalThis);

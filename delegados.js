@@ -13,6 +13,10 @@
 //     partidos de sus equipos por jornada (CalendarioPartidos.json):
 //       1.ª línea: jornada · día y hora · campo
 //       2.ª línea: equipo de casa · resultado («X - X» o «-») · visitante
+//   · Clasificación (delegados.clasificacion): sección plegada; al abrirla,
+//     la tabla de la liga de cada uno de sus equipos, leída del PDF de la
+//     federación (Calendarios/<equipo>.pdf): Pos, Equipo, Pj, PG3, PG2,
+//     PP1, PP0 y Ptos. Su equipo sale resaltado.
 // Los equipos de cada delegado se asignan en Opciones › Entrenadores y
 // equipos (configuracion.json → delegados[].teams). Quien no es delegado
 // (p. ej. el propietario) ve todos los equipos.
@@ -157,6 +161,56 @@
     caja.innerHTML = html || `<p class="dlg-vacio">Todavía no hay partidos de ${equipos && equipos.length === 1 ? "tu equipo" : "tus equipos"}. Salen cuando el club sube el calendario de la federación.</p>`;
   }
 
+  // ---------- Clasificación ----------
+  const clasif = {};   // clave del equipo -> { d, cuando } o { error }
+  let leyendo = false;
+  async function cargarClasificaciones(claves, forzar) {
+    if (leyendo || !window.nvaCuadrante || !window.nvaCuadrante.leerEquipo) return;
+    leyendo = true;
+    try {
+      for (const key of claves) {
+        if (clasif[key] && !forzar) continue;
+        try { clasif[key] = { d: await window.nvaCuadrante.leerEquipo(key) }; }
+        catch (e) { clasif[key] = { error: e && e.message || String(e) }; }
+        renderClasificacion();
+      }
+    } finally { leyendo = false; renderClasificacion(); }
+  }
+  function equiposClasif() {
+    const equipos = misEquipos();
+    const orden = ((datos() || {}).teams || []).map(getTeamKey);
+    return (equipos || orden).slice().sort((a, b) => (orden.indexOf(a) + 1 || 999) - (orden.indexOf(b) + 1 || 999));
+  }
+  function renderClasificacion() {
+    const caja = document.getElementById("dlgClasificacion");
+    const body = document.getElementById("secBody_dlgcla");
+    if (!caja || !body || body.classList.contains("collapsed") || !puedeVer("delegados.clasificacion")) return;
+    const claves = equiposClasif();
+    if (!claves.length) {
+      caja.innerHTML = `<p class="dlg-vacio">Todavía no tienes equipos asignados. Pídelo en el club (Opciones › Entrenadores y equipos).</p>`;
+      return;
+    }
+    const COLS = [["pj", "Pj"], ["pg3", "PG3"], ["pg2", "PG2"], ["pp1", "PP1"], ["pp0", "PP0"], ["pts", "Ptos"]];
+    caja.innerHTML = claves.map(key => {
+      const c = clasif[key];
+      let cuerpo;
+      if (!c) cuerpo = `<p class="dlg-vacio">Cargando la clasificación…</p>`;
+      else if (c.error) cuerpo = `<p class="dlg-vacio">No hay clasificación de este equipo todavía (${escapeHtml(/no hay PDF/i.test(c.error) ? "el club aún no ha subido su calendario de la federación" : c.error)}).</p>`;
+      else {
+        const filas = c.d.clasificacion.filter(f => f.nombre !== "DESCANSA");
+        cuerpo = !filas.length ? `<p class="dlg-vacio">El PDF de la federación aún no trae la clasificación.</p>` :
+          `${c.d.titulo ? `<div class="dlg-cla-liga">${escapeHtml(c.d.titulo)}</div>` : ""}
+          <div class="dlg-cla-wrap"><table class="dlg-cla">
+            <thead><tr><th>Pos.</th><th class="eq">Equipo</th>${COLS.map(([, t]) => `<th>${t}</th>`).join("")}</tr></thead>
+            <tbody>${filas.map(f => `<tr${f.nombre === c.d.propio ? ` class="propio"` : ""}><td class="pos">${f.pos}</td><td class="eq">${escapeHtml(f.nombre)}</td>${COLS.map(([k]) => `<td${k === "pts" ? ` class="pts"` : ""}>${f[k] != null && !isNaN(f[k]) ? f[k] : "-"}</td>`).join("")}</tr>`).join("")}</tbody>
+          </table></div>
+          ${c.d.impreso ? `<div class="dlg-cla-fecha">Datos de fvbcv.com del ${escapeHtml(c.d.impreso)}</div>` : ""}`;
+      }
+      return `<div class="dlg-cla-bloque">${claves.length > 1 || !misEquipos() ? `<div class="dlg-par-equipo">${escapeHtml(nombreEquipo(key))}</div>` : ""}${cuerpo}</div>`;
+    }).join("");
+    if (claves.some(k => !clasif[k])) cargarClasificaciones(claves);
+  }
+
   // Secciones plegables propias (empiezan plegadas); se recuerda en cada dispositivo
   const PLEGADO = "NVA_DLG_SECCIONES";
   function estado() { try { return JSON.parse(localStorage.getItem(PLEGADO)) || {}; } catch (e) { return {}; } }
@@ -172,6 +226,7 @@
     st[id] = !st[id];
     try { localStorage.setItem(PLEGADO, JSON.stringify(st)); } catch (e) {}
     aplicar(id, st[id]);
+    if (id === "dlgcla" && st[id]) { renderClasificacion(); cargarClasificaciones(equiposClasif(), true); }
     if (id === "dlgpar" && st[id]) {
       renderPartidos();
       // Al abrir se traen los partidos y resultados más recientes
@@ -179,6 +234,7 @@
     }
   };
   aplicar("dlgpar", !!estado().dlgpar);
+  aplicar("dlgcla", !!estado().dlgcla);
   // Si se dejó abierta, al entrar también se traen los partidos más recientes
   if (estado().dlgpar && window.nva && window.nva.listo) window.nva.listo.then(() => setTimeout(() => {
     if (window.cpRefreshFromGitHub && navigator.onLine) Promise.resolve(window.cpRefreshFromGitHub()).then(renderPartidos).catch(() => {});
@@ -188,6 +244,7 @@
     if (!document.documentElement.classList.contains("modo-delegados")) return;
     renderCalendario();
     renderPartidos();
+    renderClasificacion();
   };
   window.dlgMove = function (delta) { offset += delta; renderCalendario(); };
 })();

@@ -327,6 +327,11 @@
       <div class="section-body collapsed" id="secBody_dlgpar">
         <div id="dlgPartidos" class="dlg-partidos"></div>
       </div>
+      <!-- Clasificación de la liga de cada uno de sus equipos (empieza plegada; delegados.js) -->
+      <div class="section-title section-toggle collapsed" id="secHead_dlgcla" role="button" tabindex="0" aria-expanded="false" aria-controls="secBody_dlgcla" style="margin-top:20px;" onclick="dlgToggleSeccion('dlgcla')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();dlgToggleSeccion('dlgcla');}">Clasificación <span class="sec-arrow">▾</span></div>
+      <div class="section-body collapsed" id="secBody_dlgcla">
+        <div id="dlgClasificacion" class="dlg-clasif"></div>
+      </div>
     </div>
   </div>
 

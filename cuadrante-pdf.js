@@ -192,5 +192,14 @@
     return R.pdfDeEquipo(window.jspdf.jsPDF, key, lines, logo, info(key)).output("blob");
   }
 
-  window.nvaCuadrante = { analizar, dibujar, generar, pdfDeEquipo };
+  // Clasificación y partidos de un equipo leídos de su PDF de la federación
+  // (página de delegados). Devuelve lo de analizar() más el equipo propio.
+  async function leerEquipo(key) {
+    const d = analizar(await lineasPdf(await leerPdfGitHub(key)));
+    const i = info(key);
+    d.propio = R.equipoPropio ? R.equipoPropio(key, d.clasificacion.map(c => c.nombre), i.fed, i.team) : "";
+    return d;
+  }
+
+  window.nvaCuadrante = { analizar, dibujar, generar, pdfDeEquipo, leerEquipo };
 })();

@@ -920,50 +920,33 @@ select.nva-sel-abierta { border-color: var(--balon, #F5C518) !important; box-sha
 .esc-editando .app-select { margin: 0; }
 
 /* ---------------------------------------------------------------------
-   Calendario semanal › botón «Ampliar a todo el ancho» y vista ampliada
+   Calendario semanal › botón de pantalla completa (mismo que la Línea
+   temporal, .cp-tl-expand) y ventana horizontal (.cp-tl-full)
    --------------------------------------------------------------------- */
 .wk-legend { position: relative; padding: 0 40px; flex-wrap: wrap; row-gap: 4px; }
-.wk-ampliar {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; padding: 0;
-  border-radius: var(--r-sm); border: 1px solid var(--borde-fuerte);
-  background: var(--sf-fila); color: var(--balon); cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 150ms ease, border-color 150ms ease;
-}
-@media (hover: hover) and (pointer: fine) {
-  .wk-ampliar:hover { background: var(--sf-fila-hover); border-color: rgba(245, 197, 24, 0.55); }
-}
-.wk-ampliar:active { transform: translateY(-50%) scale(0.94); }
-.wk-ampliar[aria-pressed="true"] { background: rgba(245, 197, 24, 0.16); border-color: rgba(245, 197, 24, 0.55); }
-
-/* Capa a toda la pantalla: por encima de la cabecera, por debajo de las ventanas */
-.wk-full {
-  position: fixed; inset: 0; z-index: 90;
-  background: rgba(7, 15, 43, 0.94);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  animation: nvaDlgFondo 160ms ease both;
-}
-.wk-full-box {
-  position: absolute; inset: 0; box-sizing: border-box;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-}
+.wk-legend .wk-ampliar { position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin: 0; }
+/* por debajo de las ventanas (.modal-backdrop, z 100) para que el borrado salga encima */
+.wk-full { z-index: 90; }
+.wk-full-body { display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
 .wk-full .wk-canvas-wrap { flex: none; width: 100%; }
 .wk-full .wk-canvas {
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: 0 0 0 1px rgba(233, 238, 250, 0.12), 0 14px 30px -12px rgba(0, 0, 0, 0.75);
 }
 .wk-full .wk-nav-btn {
-  border-radius: 50%; width: 40px; height: 40px;
+  border-radius: 50%; width: 38px; height: 38px;
   background: rgba(13, 27, 69, 0.55); border-color: rgba(233, 238, 250, 0.3);
   text-shadow: none;
 }
-.wk-full .wk-legend { flex: none; margin-top: 12px; font-size: 0.85rem; }
+.wk-full .wk-legend { flex: none; margin-top: 8px; }
 .wk-full .wk-legend span { display: inline-flex; align-items: center; }
 .wk-full .anul-barra { flex: none; }
 body.wk-full-abierta { overflow: hidden; }
+/* Móvil en vertical sin giro automático (iPhone): ventanas encima giradas también */
+@media (orientation: portrait) and (max-width: 900px) {
+  body.wk-full-abierta .modal-backdrop .modal-box,
+  body.wk-full-abierta .nva-dlg-box { rotate: 90deg; max-width: min(420px, 90vh); }
+}
 
 /* ---------- Página de delegados (delegados.js) ----------
    Vive dentro de #screenCoachTeam para heredar el aspecto de la principal.

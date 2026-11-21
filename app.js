@@ -4442,6 +4442,8 @@
     wkHits = opts.hits;
     wkDayHits = opts.dayHits;
     wkShownMonday = opts._mon;
+    const rango = document.getElementById("wkFullRango");
+    if (rango) rango.textContent = opts.subtitle;
     let ok = 0, miss = 0;
     hzBuildModel().sessions.forEach(x => {
       const m = wkMarkFor(x, opts._mon, opts._logSet, opts._now);
@@ -4456,30 +4458,39 @@
   function wkMove(delta) { wkOffset += delta; renderWeekCalendar(); }
 
   // ---------------------------------------------------------------------
-  //  Vista ampliada: el calendario ocupa todo el ancho de la pantalla.
-  //  Se mueve el contenido de la tarjeta a una capa fija y se redibuja el
-  //  horario más ancho (mismo alto lógico, columnas más anchas), así que
-  //  navegación, V/X, toques, pulsación larga y modo anulación siguen igual.
+  //  Vista ampliada (como la Línea temporal): el calendario pasa a una
+  //  ventana a pantalla completa y en horizontal. En el móvil se pide
+  //  pantalla completa + giro a apaisado; si el móvil no deja girar
+  //  (iPhone), la ventana se gira 90° con CSS. El horario se redibuja más
+  //  ancho (mismo alto lógico, columnas más anchas) y, como es el mismo
+  //  canvas, navegación, V/X, toques, pulsación larga y anulación siguen igual.
   // ---------------------------------------------------------------------
-  let wkAmpliado = false, wkSitio = null;
-  const WK_ICO_AMPLIAR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const WK_ICO_REDUCIR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 7l5 5-5 5M20 7l-5 5 5 5M9 12H2M15 12h7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  let wkAmpliado = false, wkSitio = null, wkPantalla = false;
+  const WK_GIRO_CSS = "(orientation: portrait) and (max-width: 900px)";
+  const wkGirada = () => wkAmpliado && window.matchMedia && matchMedia(WK_GIRO_CSS).matches;
+  const WK_ICO_AMPLIAR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const WK_ICO_REDUCIR = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  // Punto de la pantalla -> coordenadas del dibujo (también con la ventana girada 90°)
+  function wkPuntoCanvas(canvas, clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    if (wkGirada()) return { x: (clientY - r.top) * canvas.width / r.height, y: (r.right - clientX) * canvas.height / r.width };
+    return { x: (clientX - r.left) * canvas.width / r.width, y: (clientY - r.top) * canvas.height / r.height };
+  }
 
   // Ancho lógico del dibujo para que, a todo el ancho, quepa en el alto visible
   function wkAnchoAmpliado() {
     if (!wkAmpliado) return 0;
-    const caja = document.querySelector("#wkFull .wk-full-box");
+    const cuerpo = document.querySelector("#wkFull .wk-full-body");
     const wrap = document.querySelector("#wkFull .wk-canvas-wrap");
-    if (!caja || !wrap) return 0;
-    const cs = getComputedStyle(caja);
-    const altoCaja = caja.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (!cuerpo || !wrap) return 0;
     let resto = 0;   // leyenda, barra de anulación… (todo lo que no es el horario)
-    Array.from(caja.children).forEach(el => { if (el !== wrap) resto += el.offsetHeight + parseFloat(getComputedStyle(el).marginTop || 0) + parseFloat(getComputedStyle(el).marginBottom || 0); });
-    const ancho = wrap.clientWidth, alto = Math.max(120, altoCaja - resto - 8);
+    Array.from(cuerpo.children).forEach(el => { if (el !== wrap) { const cs = getComputedStyle(el); resto += el.offsetHeight + parseFloat(cs.marginTop || 0) + parseFloat(cs.marginBottom || 0); } });
+    const ancho = wrap.clientWidth, alto = Math.max(120, cuerpo.clientHeight - resto - 4);
     return ancho > 0 ? 2100 * ancho / alto : 0;
   }
 
-  function wkAmpliar(on) {
+  async function wkAmpliar(on) {
     const body = document.getElementById("secBody_wk");
     if (!body) return;
     if (on === undefined) on = !wkAmpliado;
@@ -4487,20 +4498,21 @@
     wkAmpliado = on;
     if (on) {
       const ov = document.createElement("div");
-      ov.id = "wkFull"; ov.className = "wk-full";
-      ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-label", "Calendario semanal ampliado");
-      ov.innerHTML = `<div class="wk-full-box"></div>`;
-      const caja = ov.firstChild;
+      ov.id = "wkFull"; ov.className = "cp-tl-full wk-full";
+      ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-label", "Calendario semanal");
+      ov.innerHTML = `<div class="cp-tl-full-box"><div class="cp-tl-full-head"><b>📅 Calendario semanal</b><span id="wkFullRango"></span>
+        <button type="button" class="cp-tl-full-x" onclick="wkAmpliar(false)" aria-label="Cerrar">✕</button></div><div class="cp-tl-full-body wk-full-body"></div></div>`;
+      const cuerpo = ov.querySelector(".wk-full-body");
       wkSitio = document.createComment("wkFull");
       body.appendChild(wkSitio);
-      Array.from(body.childNodes).forEach(n => { if (n !== wkSitio) caja.appendChild(n); });
+      Array.from(body.childNodes).forEach(n => { if (n !== wkSitio) cuerpo.appendChild(n); });
       document.body.appendChild(ov);
       document.body.classList.add("wk-full-abierta");
     } else {
       const ov = document.getElementById("wkFull");
       if (ov && wkSitio && wkSitio.parentNode) {
-        const caja = ov.querySelector(".wk-full-box");
-        Array.from(caja.childNodes).forEach(n => wkSitio.parentNode.insertBefore(n, wkSitio));
+        const cuerpo = ov.querySelector(".wk-full-body");
+        Array.from(cuerpo.childNodes).forEach(n => wkSitio.parentNode.insertBefore(n, wkSitio));
         wkSitio.remove();
       }
       wkSitio = null;
@@ -4510,11 +4522,22 @@
     const btn = document.getElementById("wkBtnAmpliar");
     if (btn) {
       btn.innerHTML = on ? WK_ICO_REDUCIR : WK_ICO_AMPLIAR;
-      btn.title = on ? "Volver al tamaño normal" : "Ampliar a todo el ancho";
-      btn.setAttribute("aria-label", btn.title);
-      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.title = on ? "Cerrar pantalla completa" : "Ver en pantalla completa (horizontal)";
+      btn.setAttribute("aria-label", on ? "Cerrar pantalla completa" : "Ver en pantalla completa");
     }
     renderWeekCalendar();
+    if (on) {
+      try {
+        const de = document.documentElement;
+        if (de.requestFullscreen && !document.fullscreenElement) { await de.requestFullscreen({ navigationUI: "hide" }); wkPantalla = true; }
+        if (screen.orientation && screen.orientation.lock) await screen.orientation.lock("landscape");
+      } catch (e) { /* sin bloqueo de giro: se gira con CSS */ }
+      if (wkAmpliado) setTimeout(renderWeekCalendar, 250);   // tras el giro cambia el tamaño
+    } else {
+      try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+      if (wkPantalla && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      wkPantalla = false;
+    }
   }
   window.wkAmpliar = wkAmpliar;
   let wkResizeT = null;
@@ -4523,6 +4546,8 @@
     clearTimeout(wkResizeT);
     wkResizeT = setTimeout(renderWeekCalendar, 120);
   });
+  // Salir de pantalla completa (botón atrás, Esc) cierra también la ventana
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && wkPantalla && wkAmpliado) { wkPantalla = false; wkAmpliar(false); } });
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && wkAmpliado && !document.querySelector(".nva-dlg, .modal-backdrop.active")) wkAmpliar(false);
   });
@@ -4540,9 +4565,7 @@
   function wkHitFromPoint(clientX, clientY) {
     const canvas = document.getElementById("wkCanvas");
     if (!canvas || !wkShownMonday) return null;
-    const r = canvas.getBoundingClientRect();
-    const px = (clientX - r.left) * canvas.width / r.width;
-    const py = (clientY - r.top) * canvas.height / r.height;
+    const { x: px, y: py } = wkPuntoCanvas(canvas, clientX, clientY);
     for (let i = wkHits.length - 1; i >= 0; i--) {
       if (wkPointInPoly(px, py, wkHits[i].pts)) {
         const d = new Date(wkShownMonday); d.setDate(d.getDate() + wkHits[i].day - 1);
@@ -4560,8 +4583,7 @@
     // Modo «Deselección entrenamientos» (anulaciones.js): toque = anular / reactivar
     if (window.nvaModoAnular && window.nvaModoAnular()) {
       const canvas = document.getElementById("wkCanvas");
-      const r = canvas.getBoundingClientRect();
-      const px = (ev.clientX - r.left) * canvas.width / r.width, py = (ev.clientY - r.top) * canvas.height / r.height;
+      const { x: px, y: py } = wkPuntoCanvas(canvas, ev.clientX, ev.clientY);
       const dh = wkDayHits.find(h => px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h);
       if (dh) { const d = new Date(wkShownMonday); d.setDate(d.getDate() + dh.day - 1); window.nvaToggleDia(wkFmt(d)); return; }
       const hit = wkHitFromPoint(ev.clientX, ev.clientY);

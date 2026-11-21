@@ -94,6 +94,16 @@
         bNo.textContent = opc.no || "Cancelar";
         fila.appendChild(bNo);
       }
+      // opc.extra: otro botón junto a «Aceptar» que no cierra la ventana ({ texto, clase, titulo, accion })
+      if (opc.extra) {
+        const bx = document.createElement("button");
+        bx.type = "button";
+        bx.className = "cp-modal-btn nva-dlg-extra " + (opc.extra.clase || "");
+        bx.textContent = opc.extra.texto || "";
+        if (opc.extra.titulo) { bx.title = opc.extra.titulo; bx.setAttribute("aria-label", opc.extra.titulo); }
+        bx.onclick = () => { try { opc.extra.accion && opc.extra.accion(); } catch (e) { console.error(e); } };
+        fila.appendChild(bx);
+      }
       const bSi = tipo === "elegir" ? null : document.createElement("button");
       if (bSi) {
       bSi.type = "button";

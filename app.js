@@ -3047,6 +3047,59 @@
       selectCoach.appendChild(opt);
     });
     renderCoachAssignments();
+    renderDelegadosConfig();
+  }
+
+  // --- Delegados: usuarios con rol Delegado. Se les asignan uno o varios equipos
+  //     y en su página (delegados.js) solo ven esos equipos. ---
+  function renderDelegadosConfig() {
+    const lista = document.getElementById("configDelegadosList");
+    const sel = document.getElementById("selectDelegadoAssign");
+    if (!lista || !sel) return;
+    const delegados = Array.isArray(appData.delegados) ? appData.delegados : [];
+    document.getElementById("delegadoCountBadge").innerText = delegados.length;
+    lista.innerHTML = delegados.length
+      ? delegados.map(d => `<div class="item-row"><span><strong>${escapeHtml(coachLabel(d))}</strong> (${d.teams ? d.teams.length : 0} eq.)</span></div>`).join("")
+      : `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay delegados. Invítalos con el rol Delegado en «Usuarios y permisos».</p>`;
+    const elegido = sel.value;
+    sel.innerHTML = "";
+    delegados.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d.id;
+      opt.innerText = coachLabel(d);
+      sel.appendChild(opt);
+    });
+    if (delegados.some(d => String(d.id) === elegido)) sel.value = elegido;
+    document.getElementById("grpDelegadoAssign").hidden = !delegados.length;
+    renderDelegadoAssignments();
+  }
+
+  function renderDelegadoAssignments() {
+    const container = document.getElementById("delegadoTeamsCheckboxes");
+    if (!container) return;
+    container.innerHTML = "";
+    const id = Number(document.getElementById("selectDelegadoAssign").value);
+    const del = (appData.delegados || []).find(d => d.id === id);
+    if (!del) return;
+    appData.teams.forEach(t => {
+      const key = getTeamKey(t);
+      const label = document.createElement("label");
+      label.style.cssText = "font-size:0.8rem; display:flex; align-items:center; gap:6px;";
+      const marcado = (del.teams || []).includes(key) || (del.teams || []).includes(t.name);
+      label.innerHTML = `<input type="checkbox" ${marcado ? "checked" : ""} onchange="toggleTeamDelegado(${Number(del.id)}, ${jsArg(key)})"> ${escapeHtml(t.name)} (${escapeHtml(t.category)})`;
+      container.appendChild(label);
+    });
+  }
+
+  function toggleTeamDelegado(id, teamKey) {
+    const del = (appData.delegados || []).find(d => d.id === id);
+    if (!del) return;
+    if (!del.teams) del.teams = [];
+    const teamObj = appData.teams.find(t => getTeamKey(t) === teamKey);
+    const simpleName = teamObj ? teamObj.name : teamKey;
+    if (del.teams.includes(teamKey) || del.teams.includes(simpleName)) del.teams = del.teams.filter(t => t !== teamKey && t !== simpleName);
+    else del.teams.push(teamKey);
+    saveDataAndSyncGitHub();
   }
 
   function coachLabel(c) { return c.email ? `${c.name} (${c.email})` : c.name; }
@@ -3059,6 +3112,22 @@
     try { users = window.nva && window.nva.entrenadores ? await window.nva.entrenadores() : null; } catch (e) {}
     if (!users) return;
     const norm = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+    // Delegados: igual que los entrenadores, conservando los equipos de cada uno
+    let cambiaDelegados = false;
+    try {
+      const dUsers = window.nva && window.nva.delegados ? await window.nva.delegados() : null;
+      if (dUsers) {
+        const previos = Array.isArray(appData.delegados) ? appData.delegados : [];
+        const usadosD = new Set();
+        const delegados = dUsers.map((u, i) => {
+          const prev = previos.find(d => d.usuario === u.id && !usadosD.has(d))
+            || previos.find(d => !d.usuario && norm(d.name) === norm(u.nombre) && !usadosD.has(d));
+          if (prev) usadosD.add(prev);
+          return { id: prev ? prev.id : Date.now() + 1000 + i, name: u.nombre, email: u.email, usuario: u.id, teams: prev ? prev.teams || [] : [] };
+        });
+        if (JSON.stringify(delegados) !== JSON.stringify(previos)) { appData.delegados = delegados; cambiaDelegados = true; }
+      }
+    } catch (e) { console.warn("Delegados:", e); }
     const usados = new Set();
     const coaches = users.map((u, i) => {
       const prev = appData.coaches.find(c => c.usuario === u.id && !usados.has(c))
@@ -3066,7 +3135,7 @@
       if (prev) usados.add(prev);
       return { id: prev ? prev.id : Date.now() + i, name: u.nombre, email: u.email, usuario: u.id, teams: prev ? prev.teams || [] : [] };
     });
-    if (JSON.stringify(coaches) === JSON.stringify(appData.coaches)) return;
+    if (JSON.stringify(coaches) === JSON.stringify(appData.coaches) && !cambiaDelegados) return;
     appData.coaches = coaches;
     saveDataAndSyncGitHub();
   }
@@ -4383,6 +4452,8 @@
     const nOk = document.getElementById("wkCountV"), nMiss = document.getElementById("wkCountX");
     if (nOk) nOk.textContent = ok;
     if (nMiss) nMiss.textContent = miss;
+    // La página de delegados usa los mismos datos: se redibuja a la vez
+    if (typeof window.renderDelegados === "function") { try { window.renderDelegados(); } catch (e) { console.error(e); } }
   }
   function wkMove(delta) { wkOffset += delta; renderWeekCalendar(); }
 
@@ -4583,7 +4654,7 @@
   //  desplegadas.
   // =====================================================================
   const SECTIONS_KEY = "NVA_SECTIONS_STATE";
-  const SECTION_IDS = ["wk", "trainings", "tablon", "direccion", "instagram"];
+  const SECTION_IDS = ["wk", "trainings", "tablon", "direccion", "instagram", "dlgcal"];
 
   function loadSectionsState() {
     try { return JSON.parse(localStorage.getItem(SECTIONS_KEY)) || {}; } catch (e) { return {}; }
@@ -5870,12 +5941,16 @@
   // =====================================================================
   //  SECCIÓN 3: HORARIO SEMANAL (canvas A4 apaisado)
   // =====================================================================
-  function hzBuildModel() {
+  // soloEquipos (opcional): claves de equipo a dibujar; entonces solo salen las
+  // pistas donde entrenan esos equipos (página de delegados)
+  function hzBuildModel(soloEquipos) {
     const teamMap = hzTeamsMap();
     const sessions = [];
+    const filtro = Array.isArray(soloEquipos) ? new Set(soloEquipos) : null;
     Object.keys(hz.trainings).forEach(key => {
       const team = teamMap[key];
       if (!team) return;
+      if (filtro && !filtro.has(key)) return;
       (hz.trainings[key] || []).forEach(tr => {
         if (!hzCourtInfo(tr.courtId)) return;
         const s = hzT2M(tr.start), e = hzT2M(tr.end), day = Number(tr.day);
@@ -5889,7 +5964,7 @@
       hz.venues.forEach(v => v.courts.forEach(c => {
         const avail = hzAvail(c, d);
         const own = sessions.filter(x => x.day === d && x.courtId === c.id);
-        if (avail.length || own.length) cols.push({ venue: v, court: c, avail, sessions: own });
+        if (filtro ? own.length : (avail.length || own.length)) cols.push({ venue: v, court: c, avail, sessions: own });
       }));
       days.push({ day: d, cols });
     }
@@ -5991,7 +6066,7 @@
     const W = Math.max(2970, Math.round(opts.W || 0)), H = 2100, M = 70;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
-    const model = hzBuildModel();
+    const model = hzBuildModel(opts.soloEquipos);
 
     // Fondo: gradiente de azules
     const bg = ctx.createLinearGradient(0, 0, W, H);

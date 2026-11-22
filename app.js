@@ -3405,7 +3405,11 @@
     try { return JSON.parse(localStorage.getItem("NVA_PERFIL") || "null"); } catch (e) { return null; }
   }
   function nombreEquipo(equipo) {
-    const t = (appData.teams || []).find(x => getTeamKey(x) === equipo || x.name === equipo);
+    const teams = appData.teams || [];
+    // Por clave exacta; por nombre solo si no hay dos equipos con ese nombre
+    // (p. ej. «NVA» existe en varias categorías y no debe confundirse)
+    const porNombre = teams.filter(x => x.name === equipo);
+    const t = teams.find(x => getTeamKey(x) === equipo) || (porNombre.length === 1 ? porNombre[0] : null);
     return t ? `${t.name} (${t.category})` : equipo;
   }
   function entrenadoresDelEquipo(equipo) {
@@ -3540,6 +3544,7 @@
     if (revisandoPropuestas || !ghSettings.user || !ghSettings.repo || !ghSettings.token || !navigator.onLine) return;
     const yo = perfilConectado();
     if (!yo || !yo.id) return;
+    if (!(appData.coaches || []).length) return;   // sin la configuración cargada no se sabe a quién le toca
     const mio = (appData.coaches || []).find(c => c.usuario === yo.id);
     revisandoPropuestas = true;
     try {
@@ -3573,8 +3578,12 @@
         if (esMia) continue;
         const equipo = p.registro.equipo;
         const suyos = entrenadoresDelEquipo(equipo);
-        // Decide el entrenador del equipo; si el equipo no tiene, el propietario
-        const meToca = mio ? suyos.includes(mio) : (!suyos.length && yo.rol === "propietario");
+        // Decide el entrenador del equipo (un usuario con rol Entrenador); si el
+        // equipo no tiene entrenador, el propietario. Ni el propietario ni los
+        // administradores la ven si el equipo tiene entrenador, aunque su usuario
+        // figure también como entrenador.
+        const esEntrenador = yo.rol === "entrenador";
+        const meToca = esEntrenador ? !!mio && suyos.includes(mio) : (!suyos.length && yo.rol === "propietario");
         if (!meToca) continue;
         propuestasVistas.add(f.path + f.sha);
 

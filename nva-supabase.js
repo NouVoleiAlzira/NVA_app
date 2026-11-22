@@ -945,6 +945,17 @@
 
     const normNombre = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
     const opcRol = sel => roles.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(x.nombre)}</option>`).join("");
+    // Usuarios ordenados por rol, de más permisos a menos (el propietario primero),
+    // y dentro de cada rol por nombre. Permisos = suma de «Ver» (1) y «Editar» (2) en cada sección.
+    const PUNTOS = { escritura: 2, lectura: 1 };
+    const puntosRol = id => id === "propietario" ? Infinity
+      : p.data.filter(x => x.rol === id).reduce((n, x) => n + (PUNTOS[x.acceso] || 0), 0);
+    const rangoRol = new Map(roles.slice()
+      .sort((a, b) => puntosRol(b.id) - puntosRol(a.id) || b.nivel - a.nivel || a.nombre.localeCompare(b.nombre, "es"))
+      .map((x, i) => [x.id, i]));
+    const nombreDe = x => ((x.nombre || "").trim() || x.email || "");
+    u.data.sort((a, b) => (rangoRol.has(a.rol) ? rangoRol.get(a.rol) : 999) - (rangoRol.has(b.rol) ? rangoRol.get(b.rol) : 999)
+      || nombreDe(a).localeCompare(nombreDe(b), "es", { sensitivity: "base" }));
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
         <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><div class="nva-email" hidden><span>${esc(x.email)}</span>${x.rol !== "propietario" && x.id !== perfil.id ? `<button type="button" class="nva-quitar" title="Quitar usuario" aria-label="Quitar usuario">🗑️ Quitar usuario</button>` : ""}</div></td>

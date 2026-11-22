@@ -3471,6 +3471,18 @@
       "Se guardará en la nube cuando lo acepte.";
   }
 
+  // Un registro rechazado deja de verse en el dispositivo de quien lo hizo
+  // (si existía antes en la nube, vuelve a aparecer al sincronizar).
+  function quitarRegistroLocal(p) {
+    const r = p.registro;
+    const esPartido = p.tipo === "partido";
+    const lista = esPartido ? allMatchLogs : allTrainingLogs;
+    const i = lista.findIndex(l => l.equipo === r.equipo && l.fecha === r.fecha && (!esPartido || matchNum(l) === matchNum(r)));
+    if (i < 0) return;
+    lista.splice(i, 1);
+    localStorage.setItem(esPartido ? "NVA_MATCH_LOGS" : "NVA_TRAINING_LOGS", JSON.stringify(lista));
+  }
+
   // Avisa al entrenador conectado de las propuestas de sus equipos (una vez
   // por sesión cada una si elige «Más tarde»).
   const propuestasVistas = new Set();
@@ -3490,7 +3502,25 @@
         if (!f.name || !f.name.endsWith(".json") || propuestasVistas.has(f.path + f.sha)) continue;
         const p = await readListedGitHubJson(f, auth);
         if (!p || !p.registro || !p.archivo || !esRutaDeRegistro(p.archivo)) continue;
-        if (p.autor && p.autor.id === yo.id) continue;
+        const esMia = p.autor && p.autor.id === yo.id;
+        if (p.estado) {
+          // Ya resuelta: se avisa a quien la envió y se borra
+          if (!esMia) continue;
+          propuestasVistas.add(f.path + f.sha);
+          const queR = p.tipo === "partido" ? "el partido" : "el entrenamiento";
+          const acep = p.estado === "aceptada";
+          await window.nvaAviso(`${acep ? "✅" : "❌"} ${p.resueltaPor || "El entrenador del equipo"} ha ${acep ? "aceptado" : "rechazado"} ` +
+            `${queR} de ${nombreEquipo(p.registro.equipo)} del ${fechaCorta(p.registro.fecha)} que ${p.accion === "modificar" ? "modificaste" : "registraste"}. ` +
+            (acep ? "Ya está guardado en la nube." : "No se ha guardado."), { titulo: acep ? "Registro aceptado" : "Registro rechazado" });
+          if (!acep) quitarRegistroLocal(p);
+          await fetch(`https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${f.path}`, {
+            method: "DELETE", headers: { ...auth, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: "Propuesta vista por su autor", sha: f.sha })
+          });
+          aceptadas++;   // refresca lo que se ve
+          continue;
+        }
+        if (esMia) continue;
         const equipo = p.registro.equipo;
         const suyos = entrenadoresDelEquipo(equipo);
         // Decide el entrenador del equipo; si el equipo no tiene, el propietario
@@ -3518,6 +3548,10 @@
         const g = await fetch(url, { headers: auth, cache: "no-store" });
         if (!g.ok) { if (g.status === 404) alert("Esta propuesta ya la ha resuelto otro entrenador."); continue; }
         const gj = await g.json();
+        let actual = null;
+        try { actual = JSON.parse(b64_to_utf8(gj.content)); } catch (e) {}
+        if (!actual || actual.estado) { alert("Esta propuesta ya la ha resuelto otro entrenador."); continue; }
+        if (actual.enviada !== p.enviada) { propuestasVistas.delete(f.path + f.sha); continue; }   // la han cambiado: se preguntará de nuevo
         if (r === "si") {
           const registro = Object.assign({}, p.registro);
           delete registro.propuestoPor;
@@ -3527,9 +3561,11 @@
           if (!ok) { alert("No se ha podido guardar el registro. Se volverá a preguntar más tarde."); propuestasVistas.delete(f.path + f.sha); continue; }
           aceptadas++;
         }
+        // Se marca como resuelta para que su autor reciba el aviso (y la borre)
+        const resuelta = Object.assign({}, p, { estado: r === "si" ? "aceptada" : "rechazada", resueltaPor: yo.nombre || yo.email || "", resuelta: new Date().toISOString() });
         await fetch(url, {
-          method: "DELETE", headers: { ...auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: `Propuesta ${r === "si" ? "aceptada" : "rechazada"}`, sha: gj.sha })
+          method: "PUT", headers: { ...auth, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: `Propuesta ${resuelta.estado}`, content: utf8_to_b64(JSON.stringify(resuelta, null, 2)), sha: gj.sha })
         });
       }
       if (aceptadas) {

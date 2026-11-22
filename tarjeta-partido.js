@@ -122,9 +122,26 @@
     if (!a.logo) return;
     ctx.save(); ctx.globalAlpha = alfa; encajar(ctx, a.logo, x - lado / 2, y - lado / 2, lado, lado); ctx.restore();
   }
+  // Quita los márgenes transparentes de un logo (para que llegue de verdad a la esquina)
+  function recortar(img) {
+    try {
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+      const px = g.getImageData(0, 0, c.width, c.height).data;
+      let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+        if (px[(y * c.width + x) * 4 + 3] > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0 || (x0 === 0 && y0 === 0 && x1 === c.width - 1 && y1 === c.height - 1)) return img;
+      const r = document.createElement("canvas"); r.width = x1 - x0 + 1; r.height = y1 - y0 + 1;
+      r.getContext("2d").drawImage(c, -x0, -y0);
+      return r;
+    } catch (e) { return img; }
+  }
   // Capa del patrocinador (por debajo de los textos)
   function patrocinador(ctx, img, x, y, w, h, opc) {
     if (!img) return;
+    if (opc && opc.esquina) img = recortar(img);
     opc = opc || {};
     ctx.save();
     if (opc.placa) {
@@ -132,7 +149,11 @@
       ctx.fillStyle = opc.placa; ctx.fill();
     }
     ctx.globalAlpha = opc.alfa == null ? 1 : opc.alfa;
-    encajar(ctx, img, x, y, w, h);
+    if (opc.esquina) {   // pegado a la esquina inferior derecha de la caja
+      const r = Math.min(w / img.width, h / img.height), iw = img.width * r, ih = img.height * r;
+      ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4;
+      ctx.drawImage(img, x + w - iw, y + h - ih, iw, ih);
+    } else encajar(ctx, img, x, y, w, h);
     ctx.restore();
   }
   function sello(ctx, motivo, x, y) {   // partido anulado
@@ -167,7 +188,7 @@
     if (mezcla) {
       // Cabecera y campo como el rótulo de TV: jornada y fecha arriba a la izquierda,
       // campo abajo a la izquierda y patrocinador abajo a la derecha
-      patrocinador(ctx, d.patro, W - 360, H - 150, 280, 90, { placa: "rgba(255,255,255,0.92)" });
+      patrocinador(ctx, d.patro, W - 500, H - 230, 480, 210, { esquina: true });
       ctx.fillStyle = NAR; ctx.fillRect(0, 0, W, 14);
       ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.font = `700 28px ${F_TXT}`; ctx.fillStyle = NAR2;
@@ -207,7 +228,7 @@
     // campo
     if (mezcla) {
       ctx.textAlign = "left"; ctx.font = `600 32px ${F_TXT}`; ctx.fillStyle = BLANCO;
-      ajustar(ctx, campoTxt(d), d.patro ? W - 560 : W - 200, 32, 600, F_TXT);
+      ajustar(ctx, campoTxt(d), d.patro ? W - 660 : W - 200, 32, 600, F_TXT);
       const cw = ctx.measureText(campoTxt(d)).width;   // píldora oscura: se lee igual sobre azul y naranja
       redondo(ctx, 56, H - 134, cw + 48, 60, 30); ctx.fillStyle = "rgba(6,26,82,0.88)"; ctx.fill();
       ctx.fillStyle = BLANCO; ctx.fillText(campoTxt(d), 80, H - 104);

@@ -134,6 +134,20 @@
         filas.push(Object.assign(f, viejas.get(f.id) ? pick(viejas.get(f.id)) : {}));
       });
     });
+    // Sustituciones: los partidos de otros entrenadores que registró el
+    // entrenador del reporte salen solos (también los pendientes de aceptar)
+    const yo = appData.coaches.find(x => String(x.id) === String(st.coaches[0]));
+    if (yo && window.nvaPartidoHechoPor) {
+      appData.coaches.forEach(c => {
+        if (st.coaches.includes(String(c.id))) return;
+        partidosDe(c, false).forEach(f => {
+          if (filas.some(x => x.id === f.id)) return;
+          const hp = window.nvaPartidoHechoPor(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival), true);
+          if (!esDe(hp, yo)) return;
+          filas.push(Object.assign(f, viejas.get(f.id) ? pick(viejas.get(f.id)) : {}));
+        });
+      });
+    }
     // Otros eventos añadidos a mano (solo los de las fechas elegidas)
     (st.filas || []).forEach(f => { if (f.evento && dentro(f.date)) filas.push(f); });
     filas.sort((a, b) => (a.date + (a.time || "99:99")).localeCompare(b.date + (b.time || "99:99")));
@@ -288,10 +302,13 @@
   // del reporte. Devuelve "" si lo hizo él, o quién lo hizo ("otro entrenador"
   // si no consta).
   const normNombre = (t) => String(t || "").trim().replace(/\s+/g, " ").toLowerCase();
+  function esDe(hp, c) {
+    return !!(c && hp && ((hp.id && c.usuario && hp.id === c.usuario) || (hp.nombre && normNombre(hp.nombre) === normNombre(c.name))));
+  }
   function registroAjeno(f) {
     const c = appData.coaches.find(x => String(x.id) === st.coaches[0]);
     const hp = window.nvaPartidoHechoPor ? window.nvaPartidoHechoPor(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival)) : null;
-    if (c && hp && ((hp.id && c.usuario && hp.id === c.usuario) || (hp.nombre && normNombre(hp.nombre) === normNombre(c.name)))) return "";
+    if (esDe(hp, c)) return "";
     return (hp && hp.nombre) || "otro entrenador";
   }
   function calcular() {
@@ -568,7 +585,7 @@
     o.querySelector(".cp-modal-main").onclick = () => guardarPdf();
     if (seguir) { cargar(); pintar(o); cargarTomados().then(() => { if (o.isConnected) pintar(o); }); } else recargar(true);
     // Registros de partido al día (por si se hicieron desde otro dispositivo)
-    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) pintar(o); }).catch(() => {});
+    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) { cargar(); pintar(o); } }).catch(() => {});
   };
 
   // ---------- PDF (jsPDF, A4 vertical) ----------

@@ -4261,9 +4261,9 @@
   };
   // Quién hizo el registro del partido: { id, nombre } o null si no consta
   // (registros anteriores a que se guardase). Mismas reglas que nvaPartidoRegistrado.
-  window.nvaPartidoHechoPor = function (equipo, fecha, n) {
+  window.nvaPartidoHechoPor = function (equipo, fecha, n, conPendientes) {
     const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
-    const l = allMatchLogs.find(l => l && !l.pendienteAceptar && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0 &&
+    const l = allMatchLogs.find(l => l && (conPendientes || !l.pendienteAceptar) && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0 &&
       (alevin || matchNum(l) === matchNum({ partido: n })));
     if (!l) return null;
     if (l.hechoPor && (l.hechoPor.id || l.hechoPor.nombre)) return l.hechoPor;

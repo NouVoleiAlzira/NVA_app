@@ -3490,6 +3490,15 @@
     localStorage.setItem(esPartido ? "NVA_MATCH_LOGS" : "NVA_TRAINING_LOGS", JSON.stringify(lista));
   }
 
+  // Antes de sacar una propuesta se espera a que el aviso de arranque
+  // (registros pendientes) se haya mostrado y a que no haya otra ventana
+  // abierta, para que no se pongan unas encima de otras.
+  async function esperarSinVentanas() {
+    try { if (window.nvaAvisoAlAbrir) await window.nvaAvisoAlAbrir; } catch (e) {}
+    const abierta = () => document.querySelector(".modal-backdrop.active, .cp-modal, .nva-dlg");
+    while (abierta()) await new Promise(r => setTimeout(r, 700));
+  }
+
   // Un registro rechazado deja de verse en el dispositivo de quien lo hizo
   // (si existía antes en la nube, vuelve a aparecer al sincronizar).
   function quitarRegistroLocal(p) {
@@ -3526,6 +3535,7 @@
           // Ya resuelta: se avisa a quien la envió y se borra
           if (!esMia) continue;
           propuestasVistas.add(f.path + f.sha);
+          await esperarSinVentanas();
           const queR = p.tipo === "partido" ? "el partido" : "el entrenamiento";
           const acep = p.estado === "aceptada";
           await window.nvaAviso(`${acep ? "✅" : "❌"} ${p.resueltaPor || "El entrenador del equipo"} ha ${acep ? "aceptado" : "rechazado"} ` +
@@ -3556,6 +3566,7 @@
           `${que} de ${nombreEquipo(equipo)} del ${fechaCorta(p.registro.fecha)}` +
           (jug.length ? ` (${pres} de ${jug.length} presentes)` : "") + ".\n\n¿Aceptas que se guarde?";
         if (typeof ocultarCargando === "function") ocultarCargando();
+        await esperarSinVentanas();
         const r = await window.nvaElegir(texto, [
           { valor: "si", texto: "✅ Aceptar y guardar" },
           { valor: "no", texto: "❌ Rechazar" }

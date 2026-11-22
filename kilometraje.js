@@ -134,6 +134,20 @@
         filas.push(Object.assign(f, viejas.get(f.id) ? pick(viejas.get(f.id)) : {}));
       });
     });
+    // Sustituciones: los partidos de otros entrenadores que registró el
+    // entrenador del reporte salen solos (también los pendientes de aceptar)
+    const yo = appData.coaches.find(x => String(x.id) === String(st.coaches[0]));
+    if (yo && window.nvaPartidoHechoPor) {
+      appData.coaches.forEach(c => {
+        if (st.coaches.includes(String(c.id))) return;
+        partidosDe(c, false).forEach(f => {
+          if (filas.some(x => x.id === f.id)) return;
+          const hp = window.nvaPartidoHechoPor(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival), true);
+          if (!esDe(hp, yo)) return;
+          filas.push(Object.assign(f, viejas.get(f.id) ? pick(viejas.get(f.id)) : {}));
+        });
+      });
+    }
     // Otros eventos añadidos a mano (solo los de las fechas elegidas)
     (st.filas || []).forEach(f => { if (f.evento && dentro(f.date)) filas.push(f); });
     filas.sort((a, b) => (a.date + (a.time || "99:99")).localeCompare(b.date + (b.time || "99:99")));
@@ -145,7 +159,7 @@
   const claveLocal = () => "NVA_KM_" + archivo();
   function datosGuardar() {
     return { coaches: st.coaches.slice(), desde: st.desde, hasta: st.hasta, guardado: new Date().toISOString(),
-      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), f._tomado ? { sel: false, chain: false } : {}, { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
+      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), f._tomado || f._ajeno ? { sel: false, chain: false } : {}, { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
   }
   function aplicar(d) {
     if (!d || !Array.isArray(d.filas)) return false;
@@ -284,11 +298,25 @@
     if (!window.nvaPartidoRegistrado) return false;
     return window.nvaPartidoRegistrado(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
   }
+  // Sustitución: solo cuenta si el registro del partido lo hizo el entrenador
+  // del reporte. Devuelve "" si lo hizo él, o quién lo hizo ("otro entrenador"
+  // si no consta).
+  const normNombre = (t) => String(t || "").trim().replace(/\s+/g, " ").toLowerCase();
+  function esDe(hp, c) {
+    return !!(c && hp && ((hp.id && c.usuario && hp.id === c.usuario) || (hp.nombre && normNombre(hp.nombre) === normNombre(c.name))));
+  }
+  function registroAjeno(f) {
+    const c = appData.coaches.find(x => String(x.id) === st.coaches[0]);
+    const hp = window.nvaPartidoHechoPor ? window.nvaPartidoHechoPor(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival)) : null;
+    if (esDe(hp, c)) return "";
+    return (hp && hp.nombre) || "otro entrenador";
+  }
   function calcular() {
     st.filas.forEach(f => {
       f._tomado = !f.evento && !f.sust ? (tomados.get(f.id) || "") : "";
-      f._lock = !!f._tomado || !tieneRegistro(f);
-      f._pend = f._lock && !f._tomado && !f.evento && !!window.nvaPartidoPendiente &&
+      f._ajeno = !f._tomado && f.sust && !f.evento && tieneRegistro(f) ? registroAjeno(f) : "";
+      f._lock = !!f._tomado || !!f._ajeno || !tieneRegistro(f);
+      f._pend = f._lock && !f._tomado && !f._ajeno && !f.evento && !!window.nvaPartidoPendiente &&
         window.nvaPartidoPendiente(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
     });
     const s = st.filas.filter(f => f.sel && !f._lock);
@@ -357,11 +385,11 @@
     if (!st.filas.length) { list.innerHTML = `<div class="cp-modal-txt">No hay partidos de estos equipos ${mesCompleto() ? "en " : ""}${etiquetaRango()}. Revisa que los calendarios estén cargados en «Equipos · PDF Competición».</div>`; }
     else list.innerHTML = st.filas.map((f, i) => {
       if (f._lock) return `<div class="km-row km-lock" data-i="${i}">
-        <span title="${f._tomado ? "Lo ha incluido otro entrenador" : f._pend ? "Pendiente de aceptar" : "Sin registro del partido"}">${f._tomado ? "🔁" : f._pend ? "⏳" : "🔒"}</span>
+        <span title="${f._tomado ? "Lo ha incluido otro entrenador" : f._ajeno ? "Registro hecho por otro entrenador" : f._pend ? "Pendiente de aceptar" : "Sin registro del partido"}">${f._tomado ? "🔁" : f._ajeno ? "👤" : f._pend ? "⏳" : "🔒"}</span>
         <div>
           <div class="km-t"><b>${esc(fmtDia(f.date))}${f.time ? " · " + esc(f.time) : ""}</b> · ${esc(f.equipo)}</div>
           <div class="km-t">${(f.local ?? f.home) ? "🏠 vs " : "🚌 en "}${esc(f.rival)}${f.sust ? ` (sustituyendo a ${esc(f.coach)})` : ""}</div>
-          ${f._tomado ? `<div class="km-s">Lo ha incluido ${esc(f._tomado)} en su kilometraje (sustitución): sus km no cuentan aquí.</div>` : f._pend ? `<div class="km-s">Registro pendiente de que lo acepte el entrenador del equipo: sus km no cuentan todavía.</div>` : `<div class="km-s">Sin registro del partido: sus km no cuentan.</div>
+          ${f._ajeno ? `<div class="km-s">El registro del partido lo hizo ${esc(f._ajeno)}: en una sustitución solo cuenta si lo registraste tú.</div>` : f._tomado ? `<div class="km-s">Lo ha incluido ${esc(f._tomado)} en su kilometraje (sustitución): sus km no cuentan aquí.</div>` : f._pend ? `<div class="km-s">Registro pendiente de que lo acepte el entrenador del equipo: sus km no cuentan todavía.</div>` : `<div class="km-s">Sin registro del partido: sus km no cuentan.</div>
           <button type="button" class="km-reg">📝 Hacer registro</button>`}
         </div>
         <div class="km-k">–<small>km</small></div>
@@ -557,7 +585,7 @@
     o.querySelector(".cp-modal-main").onclick = () => guardarPdf();
     if (seguir) { cargar(); pintar(o); cargarTomados().then(() => { if (o.isConnected) pintar(o); }); } else recargar(true);
     // Registros de partido al día (por si se hicieron desde otro dispositivo)
-    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) pintar(o); }).catch(() => {});
+    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) { cargar(); pintar(o); } }).catch(() => {});
   };
 
   // ---------- PDF (jsPDF, A4 vertical) ----------

@@ -231,7 +231,15 @@
   };
 
   // ---------- Al abrir la app: aviso al entrenador del usuario que ha entrado ----------
+  // window.nvaAvisoAlAbrir se resuelve cuando ya se ha comprobado (y, si
+  // había que avisar, ya está abierta la ventana): así otros avisos de
+  // arranque (p. ej. propuestas de registro) esperan y no se ponen encima.
+  let finAviso;
+  window.nvaAvisoAlAbrir = new Promise(r => { finAviso = r; setTimeout(r, 30000); });
   async function comprobarAlAbrir() {
+    try { await comprobarAlAbrirInner(); } finally { finAviso(); }
+  }
+  async function comprobarAlAbrirInner() {
     try { if (sessionStorage.getItem("nvaAvisoVisto")) return; } catch (e) {}
     const g = gh();
     if (!navigator.onLine || !g || !g.user || !g.token) return;

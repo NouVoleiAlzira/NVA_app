@@ -1653,5 +1653,5 @@
     cargarPartidos(m);
   }
 
-  window.nvaSemana = { abrir, dibujarPagina, prepararPartido, cargarFichas, fuentes, prepararLogo, ESTILOS, grupo, ajusteGrupo };
+  window.nvaSemana = { abrir, dibujarPagina, prepararPartido, cargarFichas, buscarFicha, limpiarClub, fuentes, prepararLogo, ESTILOS, grupo, ajusteGrupo };
 })();

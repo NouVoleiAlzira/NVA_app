@@ -112,6 +112,7 @@
 
   // ---------- Tocar el calendario: tarjeta del entrenamiento o del partido ----------
   let dibujo = { hits: [], fecha: () => "" };   // lo que se pintó en el último dibujo
+  const ESTILO_TARJETA = "mezcla";    // diseño de la imagen al «Enviar imagen» (tarjeta-partido.js)
   const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const diaLargo = f => { const d = new Date(f + "T12:00:00"); return `${DIAS_SEM[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MESES[d.getMonth()]}`; };
 
@@ -141,6 +142,26 @@
       fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 Anulado" + (mot ? " · " + (((window.nvaIcoMotivo && window.nvaIcoMotivo(mot)) || "") + " " + mot).trim() : ""));
     }
     nvaAviso("", { nodo: c });
+  }
+  // Escudos y patrocinador del partido (Configuración › Escudos, como las Stories)
+  const imagen = src => !src ? Promise.resolve(null) : new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+  async function escudosPartido(p) {
+    const t = ((datos() || {}).teams || []).find(x => getTeamKey(x) === p.key) || { name: p.key, category: "" };
+    const nva = { nombre: t.name, logo: null, club: true }, rival = { nombre: p.rival || "?", logo: null };
+    let patro = null;
+    const S = window.nvaSemana;
+    try {
+      if (S && S.cargarFichas) {
+        const f = await S.cargarFichas();
+        const fn = f.nva.find(x => x.key === p.key) || S.buscarFicha(f.nva, t.name, t.category);
+        const nombreRival = S.limpiarClub ? S.limpiarClub(p.rival || "") : p.rival;
+        const fr = S.buscarFicha(f.otros, nombreRival, t.category) || S.buscarFicha(f.nva.filter(x => x !== fn), nombreRival, t.category);
+        if (fn) { nva.nombre = fn.equipo || nva.nombre; nva.logo = await imagen(fn.logo); patro = await imagen(fn.patro); }
+        if (fr) rival.logo = await imagen(fr.logo);
+      }
+    } catch (e) { console.warn("Escudos:", e); }
+    if (!nva.logo) nva.logo = await imagen("LOGOs/LOGO NVA 800x800.png");
+    return { nva, rival, patro, categoria: t.category || "" };
   }
   function verPartido(h) {
     const p = h.partido, m = p.m || {};
@@ -184,7 +205,36 @@
       "📍 " + p.campo + (mapa ? "\n" + mapa : ""),
       motivo ? "🚫 " + motivo : ""
     ].filter(Boolean).join("\n");
-    nvaAviso("", { nodo: c, extra: {
+    // Imagen de la tarjeta: se prepara al abrir para compartirla dentro del mismo toque
+    let archivo = null;
+    const nombreImg = ("partido-" + (m.date || "") + "-" + nuestro).replace(/[^\w.-]+/g, "_").slice(0, 80) + ".png";
+    if (window.nvaTarjetaPartido) {
+      escudosPartido(p).then(e => window.nvaTarjetaPartido.dibujar({
+        cuando, jornada: jor || "", categoria: e.categoria,
+        local: p.casa ? e.nva : e.rival, visitante: p.casa ? e.rival : e.nva,
+        res: res ? { l: res.setsL, v: res.setsV } : null, sets,
+        campo: p.campo || "", patro: e.patro, anulado: !!p.anulado, motivo: p.motivo || ""
+      }, ESTILO_TARJETA))
+        .then(cv => new Promise(ok => cv.toBlob(ok, "image/png")))
+        .then(b => { if (b) archivo = new File([b], nombreImg, { type: "image/png" }); })
+        .catch(e => console.error("tarjeta-partido", e));
+    }
+    // En el cuerpo del mensaje va el enlace del campo
+    const cuerpo = "📍 " + p.campo + (mapa ? "\n" + mapa : "");
+    const enviarImagen = () => {
+      if (archivo && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        navigator.share({ files: [archivo], text: cuerpo }).catch(e => { if (e && e.name !== "AbortError") console.error(e); });
+        return;
+      }
+      // Sin compartir archivos (p. ej. ordenador): se descarga la imagen y se abre WhatsApp con el texto
+      if (archivo) {
+        const u = URL.createObjectURL(archivo), a = document.createElement("a");
+        a.href = u; a.download = nombreImg; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 4000);
+      }
+      window.open("https://wa.me/?text=" + encodeURIComponent(cuerpo), "_blank", "noopener");
+    };
+    nvaAviso("", { nodo: c, si: "Enviar imagen", alAceptar: enviarImagen, extra: {
       texto: "Enviar", clase: "dlg-btn-whatsapp", titulo: "Enviar por WhatsApp",
       accion: () => window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener")
     } });

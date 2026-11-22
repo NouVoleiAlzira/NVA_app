@@ -94,14 +94,14 @@
         bNo.textContent = opc.no || "Cancelar";
         fila.appendChild(bNo);
       }
-      // opc.extra: otro botón junto a «Aceptar» que no cierra la ventana ({ texto, clase, titulo, accion })
+      // opc.extra: otro botón junto a «Aceptar» ({ texto, clase, titulo, accion }); al tocarlo hace su acción y cierra
       if (opc.extra) {
         const bx = document.createElement("button");
         bx.type = "button";
         bx.className = "cp-modal-btn nva-dlg-extra " + (opc.extra.clase || "");
         bx.textContent = opc.extra.texto || "";
         if (opc.extra.titulo) { bx.title = opc.extra.titulo; bx.setAttribute("aria-label", opc.extra.titulo); }
-        bx.onclick = () => { try { opc.extra.accion && opc.extra.accion(); } catch (e) { console.error(e); } };
+        bx.onclick = () => { try { opc.extra.accion && opc.extra.accion(); } catch (e) { console.error(e); } cancelar(); };
         fila.appendChild(bx);
       }
       const bSi = tipo === "elegir" ? null : document.createElement("button");
@@ -135,7 +135,8 @@
           f[(i + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus();
         }
       }
-      if (bSi) bSi.onclick = aceptar;
+      // opc.alAceptar: acción solo del botón «Aceptar» (dentro del toque, p. ej. para compartir)
+      if (bSi) bSi.onclick = () => { if (opc.alAceptar) { try { opc.alAceptar(); } catch (e) { console.error(e); } } aceptar(); };
       if (bNo) bNo.onclick = cancelar;
       // Tocar fuera solo cierra los avisos (en una pregunta podría ser un toque sin querer)
       o.addEventListener("click", e => { if (e.target === o && tipo === "aviso") aceptar(); });

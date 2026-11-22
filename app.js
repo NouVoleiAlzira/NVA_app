@@ -3536,6 +3536,111 @@
     localStorage.setItem(esPartido ? "NVA_MATCH_LOGS" : "NVA_TRAINING_LOGS", JSON.stringify(lista));
   }
 
+  // Acepta (guarda el registro) o rechaza una propuesta y la deja marcada
+  // como resuelta para que su autor reciba el aviso. Devuelve "ok", "ya"
+  // (ya la resolvió otro), "cambiada" (el autor la ha vuelto a enviar) o "error".
+  async function resolverPropuesta(path, p, aceptar, yo) {
+    const auth = { "Authorization": `token ${ghSettings.token}` };
+    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${path}`;
+    const g = await fetch(url, { headers: auth, cache: "no-store" });
+    if (!g.ok) return g.status === 404 ? "ya" : "error";
+    const gj = await g.json();
+    let actual = null;
+    try { actual = JSON.parse(b64_to_utf8(gj.content)); } catch (e) {}
+    if (!actual || actual.estado) return "ya";
+    if (actual.enviada !== p.enviada) return "cambiada";
+    if (aceptar) {
+      const registro = Object.assign({}, p.registro);
+      delete registro.propuestoPor;
+      registro.registradoPor = (p.autor && p.autor.nombre) || "";
+      if (p.autor && (p.autor.id || p.autor.nombre)) registro.hechoPor = { id: p.autor.id || "", nombre: p.autor.nombre || "" };
+      registro.aceptadoPor = yo.nombre || yo.email || "";
+      const ok = await writeGitHubFile(p.archivo, registro, `Registro ${p.tipo} ${registro.equipo} - ${registro.fecha} (aceptado)`);
+      if (!ok) return "error";
+    }
+    const resuelta = Object.assign({}, p, { estado: aceptar ? "aceptada" : "rechazada", resueltaPor: yo.nombre || yo.email || "", resuelta: new Date().toISOString() });
+    const put = await fetch(url, {
+      method: "PUT", headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `Propuesta ${resuelta.estado}`, content: utf8_to_b64(JSON.stringify(resuelta, null, 2)), sha: gj.sha })
+    });
+    return put.ok ? "ok" : "error";
+  }
+
+  function textoPropuesta(p) {
+    const jug = Array.isArray(p.registro.jugadores) ? p.registro.jugadores : [];
+    const pres = jug.filter(isPlayerPresent).length;
+    const que = p.tipo === "partido"
+      ? `el partido${matchNum(p.registro) > 1 ? ` (${matchNumLabel(p.registro.partido)})` : ""}`
+      : "el entrenamiento";
+    return `${(p.autor && p.autor.nombre) || "Otro entrenador"} ha ${p.accion === "modificar" ? "modificado" : "registrado"} ` +
+      `${que} de ${nombreEquipo(p.registro.equipo)} del ${fechaCorta(p.registro.fecha)}` +
+      (jug.length ? ` (${pres} de ${jug.length} presentes)` : "") + ".";
+  }
+
+  // ---------------------------------------------------------------------
+  //  CONTROL DE REGISTROS › REGISTROS PENDIENTES
+  //  Lista todas las propuestas sin resolver (de cualquier equipo) con
+  //  Aceptar / Rechazar en cada una.
+  // ---------------------------------------------------------------------
+  window.openRegistrosPendientes = async function () {
+    const yo = perfilConectado() || {};
+    const o = document.createElement("div");
+    o.className = "modal-backdrop active";
+    o.id = "modalRegPendientes";
+    o.innerHTML = `<div class="modal-box hist-box">
+      <div class="modal-header"><div class="modal-title">📥 Registros pendientes</div><button class="hist-cerrar" aria-label="Cerrar">✕</button></div>
+      <div class="hist-list rp-list"><div class="hist-estado">Buscando…</div></div></div>`;
+    const cerrar = () => o.remove();
+    o.addEventListener("click", e => { if (e.target === o) cerrar(); });
+    o.querySelector(".hist-cerrar").onclick = cerrar;
+    document.body.appendChild(o);
+    const lista = o.querySelector(".rp-list");
+    if (!ghSettings.user || !ghSettings.repo || !ghSettings.token || !navigator.onLine) { lista.innerHTML = `<div class="hist-estado">Sin conexión.</div>`; return; }
+    const auth = { "Authorization": `token ${ghSettings.token}` };
+    const files = (await listGitHubFolder(PROPUESTAS_FOLDER)) || [];
+    const items = [];
+    for (const f of files) {
+      if (!f.name || !f.name.endsWith(".json")) continue;
+      const p = await readListedGitHubJson(f, auth);
+      if (p && !p.estado && p.registro && p.archivo && esRutaDeRegistro(p.archivo)) items.push({ f, p });
+    }
+    items.sort((a, b) => (a.p.registro.fecha || "").localeCompare(b.p.registro.fecha || ""));
+    const pintar = () => {
+      if (!items.length) { lista.innerHTML = `<div class="hist-estado">No hay registros pendientes de aceptar.</div>`; return; }
+      lista.innerHTML = items.map((it, i) => {
+        const para = entrenadoresDelEquipo(it.p.registro.equipo).map(c => c.name);
+        const cuando = it.p.enviada && !isNaN(new Date(it.p.enviada)) ? new Date(it.p.enviada).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+        return `<div class="rp-item" data-i="${i}" style="border:1px solid var(--linea);border-radius:10px;padding:8px 10px;margin-bottom:8px;">
+          <div style="font-size:0.85rem;line-height:1.35">${escapeHtml(textoPropuesta(it.p))}</div>
+          <div style="font-size:0.7rem;color:var(--niebla);margin-top:2px">${para.length ? "Entrenador del equipo: " + escapeHtml(para.join(", ")) : "El equipo no tiene entrenador asignado"}${cuando ? " · enviado el " + escapeHtml(cuando) : ""}</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn-pdf-mode2 rp-si" style="flex:1;margin:0">✅ Aceptar</button>
+            <button class="btn-pdf-mode2 rp-no" style="flex:1;margin:0">❌ Rechazar</button>
+          </div></div>`;
+      }).join("");
+    };
+    pintar();
+    lista.addEventListener("click", async (e) => {
+      const b = e.target.closest(".rp-si, .rp-no");
+      if (!b || b.disabled) return;
+      const it = items[+b.closest(".rp-item").dataset.i];
+      const aceptar = b.classList.contains("rp-si");
+      if (!await window.nvaConfirmar(`${aceptar ? "¿Aceptar y guardar" : "¿Rechazar"} este registro?\n\n${textoPropuesta(it.p)}`, { peligro: !aceptar })) return;
+      b.closest(".rp-item").querySelectorAll("button").forEach(x => { x.disabled = true; });
+      const res = await resolverPropuesta(it.f.path, it.p, aceptar, yo);
+      if (res === "error") { alert("No se ha podido guardar. Inténtalo de nuevo."); pintar(); return; }
+      if (res === "ya") alert("Esta propuesta ya estaba resuelta.");
+      if (res === "cambiada") alert("Quien la envió la ha cambiado: vuelve a abrir la lista para ver la versión nueva.");
+      items.splice(items.indexOf(it), 1);
+      pintar();
+      if (res === "ok" && aceptar) {
+        await fetchTrainingLogsFromGitHub();
+        if (typeof fetchMatchLogsFromGitHub === "function") await fetchMatchLogsFromGitHub();
+        refreshActiveScreenUI();
+      }
+    });
+  };
+
   // Avisa al entrenador conectado de las propuestas de sus equipos (una vez
   // por sesión cada una si elige «Más tarde»).
   const propuestasVistas = new Set();
@@ -3587,14 +3692,7 @@
         if (!meToca) continue;
         propuestasVistas.add(f.path + f.sha);
 
-        const jug = Array.isArray(p.registro.jugadores) ? p.registro.jugadores : [];
-        const pres = jug.filter(isPlayerPresent).length;
-        const que = p.tipo === "partido"
-          ? `el partido${matchNum(p.registro) > 1 ? ` (${matchNumLabel(p.registro.partido)})` : ""}`
-          : "el entrenamiento";
-        const texto = `${(p.autor && p.autor.nombre) || "Otro entrenador"} ha ${p.accion === "modificar" ? "modificado" : "registrado"} ` +
-          `${que} de ${nombreEquipo(equipo)} del ${fechaCorta(p.registro.fecha)}` +
-          (jug.length ? ` (${pres} de ${jug.length} presentes)` : "") + ".\n\n¿Aceptas que se guarde?";
+        const texto = textoPropuesta(p) + "\n\n¿Aceptas que se guarde?";
         if (typeof ocultarCargando === "function") ocultarCargando();
         await esperarSinVentanas();
         const r = await window.nvaElegir(texto, [
@@ -3603,31 +3701,11 @@
         ], { titulo: "Registro de otro entrenador", no: "Más tarde" });
         if (r !== "si" && r !== "no") continue;
 
-        // Puede que otro entrenador del equipo ya la haya resuelto
-        const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${f.path}`;
-        const g = await fetch(url, { headers: auth, cache: "no-store" });
-        if (!g.ok) { if (g.status === 404) alert("Esta propuesta ya la ha resuelto otro entrenador."); continue; }
-        const gj = await g.json();
-        let actual = null;
-        try { actual = JSON.parse(b64_to_utf8(gj.content)); } catch (e) {}
-        if (!actual || actual.estado) { alert("Esta propuesta ya la ha resuelto otro entrenador."); continue; }
-        if (actual.enviada !== p.enviada) { propuestasVistas.delete(f.path + f.sha); continue; }   // la han cambiado: se preguntará de nuevo
-        if (r === "si") {
-          const registro = Object.assign({}, p.registro);
-          delete registro.propuestoPor;
-          registro.registradoPor = (p.autor && p.autor.nombre) || "";
-          if (p.autor && (p.autor.id || p.autor.nombre)) registro.hechoPor = { id: p.autor.id || "", nombre: p.autor.nombre || "" };
-          registro.aceptadoPor = yo.nombre || yo.email || "";
-          const ok = await writeGitHubFile(p.archivo, registro, `Registro ${p.tipo} ${equipo} - ${registro.fecha} (aceptado)`);
-          if (!ok) { alert("No se ha podido guardar el registro. Se volverá a preguntar más tarde."); propuestasVistas.delete(f.path + f.sha); continue; }
-          aceptadas++;
-        }
-        // Se marca como resuelta para que su autor reciba el aviso (y la borre)
-        const resuelta = Object.assign({}, p, { estado: r === "si" ? "aceptada" : "rechazada", resueltaPor: yo.nombre || yo.email || "", resuelta: new Date().toISOString() });
-        await fetch(url, {
-          method: "PUT", headers: { ...auth, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: `Propuesta ${resuelta.estado}`, content: utf8_to_b64(JSON.stringify(resuelta, null, 2)), sha: gj.sha })
-        });
+        const res = await resolverPropuesta(f.path, p, r === "si", yo);
+        if (res === "ya") alert("Esta propuesta ya la ha resuelto otro entrenador.");
+        else if (res === "cambiada") propuestasVistas.delete(f.path + f.sha);   // se preguntará de nuevo
+        else if (res === "error") { alert("No se ha podido guardar el registro. Se volverá a preguntar más tarde."); propuestasVistas.delete(f.path + f.sha); }
+        else if (res === "ok" && r === "si") aceptadas++;
       }
       if (aceptadas) {
         await fetchTrainingLogsFromGitHub();

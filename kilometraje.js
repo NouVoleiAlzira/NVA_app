@@ -231,7 +231,11 @@
     return window.nvaPartidoRegistrado(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
   }
   function calcular() {
-    st.filas.forEach(f => { f._lock = !tieneRegistro(f); });
+    st.filas.forEach(f => {
+      f._lock = !tieneRegistro(f);
+      f._pend = f._lock && !f.evento && !!window.nvaPartidoPendiente &&
+        window.nvaPartidoPendiente(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
+    });
     const s = st.filas.filter(f => f.sel && !f._lock);
     s.forEach((f, i) => {
       const prev = i > 0 && s[i - 1].chain ? s[i - 1] : null;
@@ -298,12 +302,12 @@
     if (!st.filas.length) { list.innerHTML = `<div class="cp-modal-txt">No hay partidos de estos equipos ${mesCompleto() ? "en " : ""}${etiquetaRango()}. Revisa que los calendarios estén cargados en «Equipos · PDF Competición».</div>`; }
     else list.innerHTML = st.filas.map((f, i) => {
       if (f._lock) return `<div class="km-row km-lock" data-i="${i}">
-        <span title="Sin registro del partido">🔒</span>
+        <span title="${f._pend ? "Pendiente de aceptar" : "Sin registro del partido"}">${f._pend ? "⏳" : "🔒"}</span>
         <div>
           <div class="km-t"><b>${esc(fmtDia(f.date))}${f.time ? " · " + esc(f.time) : ""}</b> · ${esc(f.equipo)}</div>
           <div class="km-t">${(f.local ?? f.home) ? "🏠 vs " : "🚌 en "}${esc(f.rival)}${f.sust ? ` (sustituyendo a ${esc(f.coach)})` : ""}</div>
-          <div class="km-s">Sin registro del partido: sus km no cuentan.</div>
-          <button type="button" class="km-reg">📝 Hacer registro</button>
+          ${f._pend ? `<div class="km-s">Registro pendiente de que lo acepte el entrenador del equipo: sus km no cuentan todavía.</div>` : `<div class="km-s">Sin registro del partido: sus km no cuentan.</div>
+          <button type="button" class="km-reg">📝 Hacer registro</button>`}
         </div>
         <div class="km-k">–<small>km</small></div>
       </div>`;

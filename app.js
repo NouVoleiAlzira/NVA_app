@@ -3420,7 +3420,9 @@
       registro: Object.assign({}, registro, { propuestoPor: yo.nombre || yo.email || "" })
     };
     const st = await ponerJson(rutaPropuesta(fileName), propuesta, `Propuesta ${propuesta.tipo} ${registro.equipo} - ${registro.fecha}`);
-    return st >= 200 && st < 300 ? para : null;
+    if (!(st >= 200 && st < 300)) return null;
+    marcarPendienteLocal(esPartido, registro, true);
+    return para;
   }
 
   async function writeGitHubFile(fileName, dataObject, commitMessage) {
@@ -3469,6 +3471,17 @@
     const quien = para && para.length ? para.join(" o ") : "el entrenador del equipo";
     return `Este equipo no es tuyo, así que el ${tipo} se ha enviado a ${quien} para que lo acepte. ` +
       "Se guardará en la nube cuando lo acepte.";
+  }
+
+  // La copia del dispositivo de quien propone queda «pendiente de aceptar»:
+  // no cuenta como registrado (p. ej. en el Reporte Kilometraje) hasta que
+  // la nube tenga el registro aceptado (al sincronizar se sustituye).
+  function marcarPendienteLocal(esPartido, r, pendiente) {
+    const lista = esPartido ? allMatchLogs : allTrainingLogs;
+    const l = lista.find(x => x.equipo === r.equipo && x.fecha === r.fecha && (!esPartido || matchNum(x) === matchNum(r)));
+    if (!l) return;
+    if (pendiente) l.pendienteAceptar = true; else delete l.pendienteAceptar;
+    localStorage.setItem(esPartido ? "NVA_MATCH_LOGS" : "NVA_TRAINING_LOGS", JSON.stringify(lista));
   }
 
   // Un registro rechazado deja de verse en el dispositivo de quien lo hizo
@@ -4234,9 +4247,14 @@
   };
   // ¿Está hecho el registro (con jugadores/as) de ese partido? Los alevines juegan varios
   // partidos seguidos un mismo día y un solo registro vale para todo el día.
+  window.nvaPartidoPendiente = function (equipo, fecha, n) {
+    const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
+    return allMatchLogs.some(l => l && l.pendienteAceptar && l.equipo === equipo && l.fecha === fecha && (alevin || matchNum(l) === matchNum({ partido: n })));
+  };
   window.nvaPartidoRegistrado = function (equipo, fecha, n, logs) {
     logs = logs || allMatchLogs;
-    const conJug = l => l && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0;
+    // Un registro pendiente de que lo acepte el entrenador del equipo no cuenta
+    const conJug = l => l && !l.pendienteAceptar && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0;
     const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
     return logs.some(l => conJug(l) && (alevin || matchNum(l) === matchNum({ partido: n })));
   };

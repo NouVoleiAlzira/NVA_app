@@ -159,7 +159,7 @@
   const claveLocal = () => "NVA_KM_" + archivo();
   function datosGuardar() {
     return { coaches: st.coaches.slice(), desde: st.desde, hasta: st.hasta, guardado: new Date().toISOString(),
-      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), f._tomado || f._ajeno ? { sel: false, chain: false } : {}, { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
+      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), f._lock ? { sel: false, chain: false } : {}, { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
   }
   function aplicar(d) {
     if (!d || !Array.isArray(d.filas)) return false;
@@ -248,6 +248,12 @@
     const r = /_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.json$/.exec(n);
     return r ? [r[1], r[2]] : null;
   };
+  // ¿Sigue existiendo el registro del partido? (id = equipo|fecha|hora|rival)
+  function registroVigente(id) {
+    const [key, date, time, rival] = String(id).split("|");
+    if (!window.nvaPartidoRegistrado) return true;
+    return window.nvaPartidoRegistrado(key, date, window.nvaNumPartidoCalendario(key, date, time, rival));
+  }
   async function cargarTomados() {
     const yo = appData.coaches.find(x => String(x.id) === st.coaches[0]);
     const miPref = `km_${sanitizeFileName(yo ? yo.name : st.coaches[0])}_`;
@@ -280,6 +286,7 @@
       d.filas.forEach(f => {
         if (!f || f.evento || !f.id) return;
         if (suyos.has(String(f.id).split("|")[0])) return;   // solo cuenta si lo hizo como sustituto
+        if (!registroVigente(f.id)) return;                      // registro borrado: ya no cuenta
         const k = c.id + "|" + f.id, prev = ultimo.get(k);
         if (!prev || (d.guardado || "") > prev.guardado) ultimo.set(k, { guardado: d.guardado || "", sel: !!f.sel, nombre: c.name, id: f.id });
       });
@@ -316,6 +323,7 @@
       f._tomado = !f.evento && !f.sust ? (tomados.get(f.id) || "") : "";
       f._ajeno = !f._tomado && f.sust && !f.evento && tieneRegistro(f) ? registroAjeno(f) : "";
       f._lock = !!f._tomado || !!f._ajeno || !tieneRegistro(f);
+      if (f._lock) { f.sel = false; f.chain = false; }   // sin registro (o borrado): vuelve a su estado inicial
       f._pend = f._lock && !f._tomado && !f._ajeno && !f.evento && !!window.nvaPartidoPendiente &&
         window.nvaPartidoPendiente(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
     });
@@ -585,7 +593,7 @@
     o.querySelector(".cp-modal-main").onclick = () => guardarPdf();
     if (seguir) { cargar(); pintar(o); cargarTomados().then(() => { if (o.isConnected) pintar(o); }); } else recargar(true);
     // Registros de partido al día (por si se hicieron desde otro dispositivo)
-    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) { cargar(); pintar(o); } }).catch(() => {});
+    if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => cargarTomados()).then(() => { if (o.isConnected) { cargar(); pintar(o); } }).catch(() => {});
   };
 
   // ---------- PDF (jsPDF, A4 vertical) ----------

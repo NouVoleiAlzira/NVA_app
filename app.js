@@ -4062,11 +4062,13 @@
       }
     }));
 
+    const vistos = new Set();
     results.forEach(parsed => {
       if (!parsed) return;
       const entries = Array.isArray(parsed) ? parsed : [parsed];
       entries.forEach(remoteLog => {
         if (!remoteLog || !remoteLog.equipo || !remoteLog.fecha) return;
+        vistos.add(remoteLog.equipo + "|" + remoteLog.fecha);
         if (isLogPendingDelete(remoteLog.equipo, remoteLog.fecha)) return;   // borrado pendiente de enviar a GitHub
         const idx = allTrainingLogs.findIndex(l => l.equipo === remoteLog.equipo && l.fecha === remoteLog.fecha);
         if (idx >= 0) {
@@ -4077,6 +4079,12 @@
       });
     });
 
+    // Borrados en la nube: fuera también de este dispositivo (ver partidos)
+    if (results.every(Boolean)) {
+      const porEnviar = new Set(offlineQueue.filter(op => !op.deleteLog).map(op => op.fileName));
+      allTrainingLogs = allTrainingLogs.filter(l => !l || l.pendienteAceptar || vistos.has(l.equipo + "|" + l.fecha) ||
+        porEnviar.has(`${TRAINING_LOGS_FOLDER}/Entrenamientos_${sanitizeFileName(l.equipo)}_${l.fecha}.json`));
+    }
     localStorage.setItem("NVA_TRAINING_LOGS", JSON.stringify(allTrainingLogs));
   }
 
@@ -5272,11 +5280,13 @@
       }
     }));
 
+    const vistos = new Set();
     matchResults.forEach(parsed => {
       if (!parsed) return;
       const entries = Array.isArray(parsed) ? parsed : [parsed];
       entries.forEach(remoteLog => {
         if (!remoteLog || !remoteLog.equipo || !remoteLog.fecha) return;
+        vistos.add(remoteLog.equipo + "|" + remoteLog.fecha + "|" + matchNum(remoteLog));
         const idx = allMatchLogs.findIndex(l => isSameMatchLog(l, remoteLog.equipo, remoteLog.fecha, remoteLog.partido));
         if (idx >= 0) {
           allMatchLogs[idx] = remoteLog;
@@ -5285,6 +5295,14 @@
         }
       });
     });
+    // Lo que se borró en la nube (p. ej. lo borra el entrenador del equipo o
+    // un administrador) se quita también de este dispositivo, salvo lo que
+    // este dispositivo aún tiene por enviar o pendiente de aceptar.
+    if (matchResults.every(Boolean)) {
+      const porEnviar = new Set(offlineQueue.filter(op => !op.deleteLog).map(op => op.fileName));
+      allMatchLogs = allMatchLogs.filter(l => !l || l.pendienteAceptar || vistos.has(l.equipo + "|" + l.fecha + "|" + matchNum(l)) ||
+        porEnviar.has(matchLogFileName(l.equipo, l.fecha, l.partido)));
+    }
     localStorage.setItem("NVA_MATCH_LOGS", JSON.stringify(allMatchLogs));
   }
 

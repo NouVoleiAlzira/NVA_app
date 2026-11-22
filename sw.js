@@ -66,6 +66,12 @@ self.addEventListener("install", (event) => {
   );
 });
 
+// La app pide activar ya una versión nueva que se haya quedado esperando
+// (al recargar desde el encabezado, animaciones.js)
+self.addEventListener("message", (event) => {
+  if (event.data === "skipWaiting") self.skipWaiting();
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()

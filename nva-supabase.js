@@ -855,6 +855,8 @@
   //   cabecera para pasar de una a otra.
   // ------------------------------------------------------------------
   let paginas = { principal: true, delegados: false };
+  let paginaTrasRecarga = "";
+  try { paginaTrasRecarga = sessionStorage.getItem("nvaPaginaTrasRecarga") || ""; sessionStorage.removeItem("nvaPaginaTrasRecarga"); } catch (e) { /* sin sessionStorage */ }
   function aplicarPaginas() {
     paginas = {
       principal: MENUS_PRINCIPAL.some(m => acceso(m) !== "ninguno"),
@@ -862,6 +864,9 @@
     };
     const btn = document.getElementById("btnPaginaDelegados");
     if (btn) btn.hidden = !(paginas.principal && paginas.delegados);
+    // Tras recargar desde el encabezado se vuelve a la página en la que se estaba
+    const recordada = paginaTrasRecarga; paginaTrasRecarga = "";
+    if (recordada && paginas[recordada]) return mostrarPagina(recordada);
     mostrarPagina(paginas.delegados && !paginas.principal ? "delegados" : "principal");
   }
   // Iconos dibujados (el emoji 🪪 no existe en algunos móviles y salía un cuadrado)

@@ -112,6 +112,7 @@
 
   // ---------- Tocar el calendario: tarjeta del entrenamiento o del partido ----------
   let dibujo = { hits: [], fecha: () => "" };   // lo que se pintó en el último dibujo
+  const ESTILO_TARJETA = "marcador";   // diseño de la imagen al «Enviar imagen» (tarjeta-partido.js)
   const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const diaLargo = f => { const d = new Date(f + "T12:00:00"); return `${DIAS_SEM[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MESES[d.getMonth()]}`; };
 
@@ -184,7 +185,35 @@
       "📍 " + p.campo + (mapa ? "\n" + mapa : ""),
       motivo ? "🚫 " + motivo : ""
     ].filter(Boolean).join("\n");
-    nvaAviso("", { nodo: c, extra: {
+    // Imagen de la tarjeta: se prepara al abrir para compartirla dentro del mismo toque
+    let archivo = null;
+    const nombreImg = ("partido-" + (m.date || "") + "-" + nuestro).replace(/[^\w.-]+/g, "_").slice(0, 80) + ".png";
+    if (window.nvaTarjetaPartido) {
+      window.nvaTarjetaPartido.dibujar({
+        cuando, jornada: jor || "", local, visitante, nvaLocal: !!p.casa,
+        res: res ? { l: res.setsL, v: res.setsV } : null, sets,
+        campo: p.campo || "", anulado: !!p.anulado, motivo: p.motivo || ""
+      }, ESTILO_TARJETA)
+        .then(cv => new Promise(ok => cv.toBlob(ok, "image/png")))
+        .then(b => { if (b) archivo = new File([b], nombreImg, { type: "image/png" }); })
+        .catch(e => console.error("tarjeta-partido", e));
+    }
+    // En el cuerpo del mensaje va el enlace del campo
+    const cuerpo = "📍 " + p.campo + (mapa ? "\n" + mapa : "");
+    const enviarImagen = () => {
+      if (archivo && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        navigator.share({ files: [archivo], text: cuerpo }).catch(e => { if (e && e.name !== "AbortError") console.error(e); });
+        return;
+      }
+      // Sin compartir archivos (p. ej. ordenador): se descarga la imagen y se abre WhatsApp con el texto
+      if (archivo) {
+        const u = URL.createObjectURL(archivo), a = document.createElement("a");
+        a.href = u; a.download = nombreImg; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 4000);
+      }
+      window.open("https://wa.me/?text=" + encodeURIComponent(cuerpo), "_blank", "noopener");
+    };
+    nvaAviso("", { nodo: c, si: "Enviar imagen", alAceptar: enviarImagen, extra: {
       texto: "Enviar", clase: "dlg-btn-whatsapp", titulo: "Enviar por WhatsApp",
       accion: () => window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener")
     } });

@@ -1126,3 +1126,6 @@ button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
 .dlg-visor-hojas { width: 100%; margin: 0 auto; }
 .dlg-visor-hojas img { display: block; width: 100%; height: auto; margin-bottom: 10px; border-radius: 4px; background: #fff; user-select: none; -webkit-user-select: none; }
 .dlg-visor-pie { margin: 0; padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid var(--borde); }
+
+/* Página de delegados: «Enviar al grupo» mientras se crea la imagen */
+.nva-dlg-si.dlg-btn-espera { opacity: .6; cursor: progress; }

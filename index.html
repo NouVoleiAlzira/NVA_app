@@ -461,6 +461,30 @@
     </div>
   </div>
 
+  <!-- VENTANA «Carga automática» de avisos desde un Excel (Nombre, Apellidos, Equipos) -->
+  <div class="modal-backdrop" id="modalCargaAvisos">
+    <div class="modal-box" style="max-width: 360px;">
+      <div class="modal-header">
+        <div class="modal-title">Carga automática</div>
+        <button class="btn-close-modal" onclick="caCerrar()">✕</button>
+      </div>
+      <button class="btn-pdf-mode2" id="caBtnExcel" style="margin-bottom:6px;" onclick="caElegirExcel()">📎 Adjuntar Excel</button>
+      <div id="caEstado" class="ca-estado">Columnas: Nombre, Apellidos y Equipos.</div>
+      <input type="file" id="caExcelInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none" onchange="caLeerExcel(this)">
+      <input type="text" id="caMotivoInput" class="app-input" value="NO PAGADO" style="margin-bottom: 8px; font-weight:bold; color:#ef4444;">
+
+      <div style="font-size:0.75rem; color:#64748b; text-align:center; font-weight:600;">Selecciona un color de aviso:</div>
+      <div class="color-picker-container" id="caColorPicker">
+        <div class="color-circle selected" data-color="#ef4444" style="background:#ef4444;" title="Rojo"></div>
+        <div class="color-circle" data-color="#0284c7" style="background:#0284c7;" title="Azul"></div>
+        <div class="color-circle" data-color="#22c55e" style="background:#22c55e;" title="Verde"></div>
+        <div class="color-circle" data-color="#eab308" style="background:#eab308;" title="Amarillo"></div>
+      </div>
+
+      <button class="btn-save-session" onclick="caGuardar()">💾 Guardar Motivo</button>
+    </div>
+  </div>
+
   <!-- VENTANA «Otras INFOs»: botones de información e instrucciones -->
   <div class="modal-backdrop" id="modalOtros" onclick="if(event.target===this)closeOtros()">
     <div class="modal-box otros-box">
@@ -1056,6 +1080,7 @@
 <script src="calendario-partidos.js" defer></script>
 <script src="escudos.js" defer></script>
 <script src="importar-datos.js" defer></script>
+<script src="carga-avisos.js" defer></script>
 <script src="partidos-semana.js" defer></script>
 <script src="calendario-ics.js" defer></script>
 <script src="cuadrante-pdf.js" defer></script>

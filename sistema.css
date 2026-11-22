@@ -1145,3 +1145,9 @@ button.asig-fila {
 button.asig-fila.asig-sel { border-color: var(--balon); background: rgba(245, 197, 24, 0.12); }
 button.asig-fila.asig-sel .asig-punto { background: var(--balon); border-color: var(--balon); box-shadow: 0 0 8px rgba(245, 197, 24, 0.7); }
 @media (hover: hover) and (pointer: fine) { button.asig-fila:hover { border-color: rgba(245, 197, 24, 0.5); } }
+
+/* Gestión y Avisos Individuales › «Carga automática» (carga-avisos.js) */
+.team-btn.ca-btn { border: 2px solid var(--balon); font-weight: 800; }
+.ca-estado { font-size: 0.78rem; color: #94a3b8; text-align: center; margin: 0 0 10px; line-height: 1.35; }
+.ca-estado.ca-ok { color: #4ade80; }
+.ca-estado.ca-mal { color: #f87171; }

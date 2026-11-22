@@ -343,6 +343,13 @@
     
     if (isDireccionExpanded) {
       container.innerHTML = "";
+      // Primera posición: «Carga automática» de avisos desde un Excel (carga-avisos.js)
+      const auto = document.createElement("button");
+      auto.className = "team-btn ca-btn";
+      auto.innerHTML = `<span>📥 Carga automática</span><span>➤</span>`;
+      auto.onclick = () => { if (typeof caAbrir === "function") caAbrir(); };
+      container.appendChild(auto);
+
       appData.teams.forEach(team => {
         const displayName = `${team.name} (${team.category})`;
         const teamKey = getTeamKey(team);

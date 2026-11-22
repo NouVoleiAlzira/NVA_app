@@ -359,4 +359,5 @@
 
   window.impPickExcel = () => document.getElementById("impExcelInput").click();
   window.impHandleExcel = handleExcel;
+  window.impEnsureXlsx = ensureXlsx;
 })();

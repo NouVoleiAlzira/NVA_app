@@ -172,6 +172,52 @@
     alert(ok ? "Reporte de kilometraje guardado y sincronizado." : "Guardado en este dispositivo. Se sincronizará cuando haya conexión.");
   }
 
+  // ---------- Cargar el último guardado del entrenador (cualquier rango de fechas) ----------
+  // Busca sus reportes en el navegador y en Kilometraje/ y se queda con el más reciente.
+  async function ultimoGuardado() {
+    const c = appData.coaches.find(x => String(x.id) === st.coaches[0]);
+    const pref = `km_${sanitizeFileName(c ? c.name : st.coaches[0])}_`;
+    const valido = (n) => n.startsWith(pref) && /^(\d{4}-\d{2}|\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2})\.json$/.test(n.slice(pref.length));
+    const ok = (d) => d && Array.isArray(d.filas) && /^\d{4}-\d{2}-\d{2}$/.test(d.desde || "") && /^\d{4}-\d{2}-\d{2}$/.test(d.hasta || "");
+    const hallados = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith("NVA_KM_Kilometraje/") || !valido(k.slice(19))) continue;
+        try { const d = JSON.parse(localStorage.getItem(k)); if (ok(d)) hallados.push(d); } catch (e) {}
+      }
+    } catch (e) {}
+    if (ghSettings.user && ghSettings.repo && ghSettings.token && navigator.onLine) {
+      const base = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/Kilometraje`;
+      const h = { "Authorization": `token ${ghSettings.token}` };
+      try {
+        const r = await fetch(base, { cache: "no-store", headers: h });
+        const lista = r.ok ? await r.json() : [];
+        const nombres = (Array.isArray(lista) ? lista : []).filter(f => f.type === "file" && valido(f.name)).map(f => f.name);
+        const leidos = await Promise.all(nombres.map(n => fetch(`${base}/${encodeURIComponent(n)}`, { cache: "no-store", headers: Object.assign({ "Accept": "application/vnd.github.raw" }, h) })
+          .then(x => x.ok ? x.json() : null).catch(() => null)));
+        leidos.forEach(d => { if (ok(d)) hallados.push(d); });
+      } catch (e) {}
+    }
+    hallados.sort((a, b) => (b.guardado || "").localeCompare(a.guardado || ""));
+    return { coach: c ? c.name : "este entrenador", d: hallados[0] || null };
+  }
+  async function cargarGuardado(o, boton) {
+    const txt = boton.innerHTML;
+    boton.disabled = true; boton.textContent = "⏳ Buscando…";
+    let r;
+    try { r = await ultimoGuardado(); } finally { boton.disabled = false; boton.innerHTML = txt; }
+    if (!r.d) { await nvaAviso(`No hay ningún reporte guardado de ${r.coach}.`); return; }
+    const d = r.d;
+    const rango = `del ${fmtCorta(d.desde)} al ${fmtCorta(d.hasta)}`;
+    const cuando = d.guardado ? new Date(d.guardado).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+    if (!await nvaConfirmar(`Último guardado de ${r.coach}: ${rango}${cuando ? ` (guardado el ${cuando})` : ""}. Las fechas cambiarán a ese rango y se perderá lo que no hayas guardado. ¿Cargarlo?`)) return;
+    st.desde = d.desde; st.hasta = d.hasta;
+    o.querySelector(".km-desde").value = d.desde; o.querySelector(".km-hasta").value = d.hasta;
+    st.filas = [];
+    aplicar(d); cargar(); pintar(o);
+  }
+
   const datosEvento = (f) => ({ evento: true, date: f.date, time: f.time, concepto: f.concepto, ciudad: f.ciudad, equipo: "Otro evento", rival: f.concepto, venue: f.ciudad, home: false, coach: f.coach, sust: false });
   const pick = (o) => ({ sel: o.sel, chain: o.chain, salida: o.salida, campo: o.campo, kmMano: o.kmMano });
 
@@ -369,7 +415,7 @@
     o.innerHTML = `<div class="cp-modal-box km-box">
       <div class="cp-modal-title">🚗 Reporte Kilometraje</div>
       <div class="km-top km-fechas"><select class="km-coach" title="Entrenador">${optsCoach(primero)}</select><span class="km-rango"><input type="date" class="km-desde" value="${st.desde}" title="Desde"><span>al</span><input type="date" class="km-hasta" value="${st.hasta}" title="Hasta"></span></div>
-      <div class="km-top"><button type="button" class="cp-modal-btn km-otro" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Partidos de otro entrenador</button><button type="button" class="cp-modal-btn km-evento" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Otro evento</button><span class="km-chips"></span></div>
+      <div class="km-top"><button type="button" class="cp-modal-btn km-otro" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Partidos de otro entrenador</button><button type="button" class="cp-modal-btn km-evento" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Otro evento</button><span class="km-chips"></span><button type="button" class="cp-modal-btn km-cargar" style="flex:none;margin-left:auto;font-size:0.72rem;padding:5px 8px;" title="Carga el último reporte guardado de este entrenador">📂 Cargar guardado</button></div>
       <div class="km-list"></div>
       <div class="km-total"><span>TOTAL <small class="km-num" style="font-size:0.8rem;color:var(--niebla)"></small></span><b class="km-sum"></b></div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -417,6 +463,7 @@
     const lista = o.querySelector(".km-list");
     const fila = (e) => st.filas[+e.target.closest(".km-row").dataset.i];
     o.querySelector(".km-evento").onclick = () => nuevoEvento(o);
+    o.querySelector(".km-cargar").onclick = (e) => cargarGuardado(o, e.currentTarget);
     lista.addEventListener("click", async (e) => {
       if (e.target.classList.contains("km-ev-del")) { const f = fila(e); if (await nvaConfirmar(`¿Quitar el evento «${f.concepto}»?`)) { st.filas = st.filas.filter(x => x !== f); pintar(o); } return; }
       if (e.target.classList.contains("km-flecha")) { const f = fila(e); f.chain = !f.chain; pintar(o); }

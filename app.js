@@ -3374,6 +3374,12 @@
   function esRutaDeRegistro(fileName) {
     return fileName.startsWith(TRAINING_LOGS_FOLDER + "/") || fileName.startsWith(MATCH_LOGS_FOLDER + "/");
   }
+  // Usuario que hace el registro (el que ha iniciado sesión): el Reporte
+  // Kilometraje solo deja a un sustituto incluir los partidos que registró él.
+  function quienGuarda() {
+    const p = perfilConectado();
+    return p ? { id: p.id || "", nombre: p.nombre || p.email || "" } : null;
+  }
   function perfilConectado() {
     try { return JSON.parse(localStorage.getItem("NVA_PERFIL") || "null"); } catch (e) { return null; }
   }
@@ -3569,6 +3575,7 @@
           const registro = Object.assign({}, p.registro);
           delete registro.propuestoPor;
           registro.registradoPor = (p.autor && p.autor.nombre) || "";
+          if (p.autor && (p.autor.id || p.autor.nombre)) registro.hechoPor = { id: p.autor.id || "", nombre: p.autor.nombre || "" };
           registro.aceptadoPor = yo.nombre || yo.email || "";
           const ok = await writeGitHubFile(p.archivo, registro, `Registro ${p.tipo} ${equipo} - ${registro.fecha} (aceptado)`);
           if (!ok) { alert("No se ha podido guardar el registro. Se volverá a preguntar más tarde."); propuestasVistas.delete(f.path + f.sha); continue; }
@@ -3938,6 +3945,7 @@
       fecha: dateVal,
       equipo: currentTeam,
       entrenador: currentCoach ? currentCoach.name : "",
+      hechoPor: quienGuarda(),
       jugadores: playersForSave(sessionData)
     };
     stampLogDates(logEntry, allTrainingLogs.find(l => l.equipo === currentTeam && l.fecha === dateVal));
@@ -4250,6 +4258,16 @@
   window.nvaPartidoPendiente = function (equipo, fecha, n) {
     const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
     return allMatchLogs.some(l => l && l.pendienteAceptar && l.equipo === equipo && l.fecha === fecha && (alevin || matchNum(l) === matchNum({ partido: n })));
+  };
+  // Quién hizo el registro del partido: { id, nombre } o null si no consta
+  // (registros anteriores a que se guardase). Mismas reglas que nvaPartidoRegistrado.
+  window.nvaPartidoHechoPor = function (equipo, fecha, n) {
+    const alevin = window.cpIsAlevin ? window.cpIsAlevin(equipo) : /ALEV/i.test(equipo);
+    const l = allMatchLogs.find(l => l && !l.pendienteAceptar && l.equipo === equipo && l.fecha === fecha && Array.isArray(l.jugadores) && l.jugadores.length > 0 &&
+      (alevin || matchNum(l) === matchNum({ partido: n })));
+    if (!l) return null;
+    if (l.hechoPor && (l.hechoPor.id || l.hechoPor.nombre)) return l.hechoPor;
+    return l.registradoPor ? { id: "", nombre: l.registradoPor } : null;
   };
   window.nvaPartidoRegistrado = function (equipo, fecha, n, logs) {
     logs = logs || allMatchLogs;
@@ -5190,6 +5208,7 @@
       equipo: currentTeam,
       ...(n > 1 && { partido: n }),
       entrenador: currentCoach ? currentCoach.name : "",
+      hechoPor: quienGuarda(),
       jugadores: playersForSave(matchData),
       marcador: marcador
     };

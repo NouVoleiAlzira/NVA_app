@@ -197,7 +197,8 @@
     if (motivo) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 " + motivo);
 
     // Imagen de la tarjeta: se prepara al abrir para compartirla dentro del mismo toque
-    let archivo = null;
+    let archivo = null, avisarLista = null;
+    const lista = new Promise(ok => { avisarLista = ok; });   // se cumple cuando la imagen está hecha (o ha fallado)
     const nombreImg = ("partido-" + (m.date || "") + "-" + nuestro).replace(/[^\w.-]+/g, "_").slice(0, 80) + ".png";
     if (window.nvaTarjetaPartido) {
       escudosPartido(p).then(e => window.nvaTarjetaPartido.dibujar({
@@ -208,8 +209,9 @@
       }, ESTILO_TARJETA))
         .then(cv => new Promise(ok => cv.toBlob(ok, "image/png")))
         .then(b => { if (b) archivo = new File([b], nombreImg, { type: "image/png" }); })
-        .catch(e => console.error("tarjeta-partido", e));
-    }
+        .catch(e => console.error("tarjeta-partido", e))
+        .finally(() => avisarLista());
+    } else avisarLista();
     // En el cuerpo del mensaje va el enlace del campo
     const cuerpo = "📍 " + p.campo + (mapa ? "\n" + mapa : "");
     const enviarImagen = () => {
@@ -226,6 +228,18 @@
       window.open("https://wa.me/?text=" + encodeURIComponent(cuerpo), "_blank", "noopener");
     };
     nvaAviso("", { nodo: c, si: "Enviar al grupo", alAceptar: enviarImagen });
+    // El botón no se puede pulsar hasta que la imagen esté creada (si no, solo se enviaría el texto)
+    let hecha = false;
+    lista.then(() => { hecha = true; });
+    const bloquear = (intentos) => {
+      if (hecha) return;
+      let n = c; while (n && !(n.querySelector && n.querySelector(".nva-dlg-si"))) n = n.parentElement;
+      const b = n && n.querySelector(".nva-dlg-si");
+      if (!b) { if (intentos > 0) requestAnimationFrame(() => bloquear(intentos - 1)); return; }
+      b.disabled = true; b.classList.add("dlg-btn-espera"); b.textContent = "Preparando imagen…";
+      lista.then(() => { b.disabled = false; b.classList.remove("dlg-btn-espera"); b.textContent = "Enviar al grupo"; });
+    };
+    bloquear(120);
   }
   (function () {
     const canvas = document.getElementById("dlgCanvas");

@@ -1072,52 +1072,8 @@
 <script src="eventos-cartel.js" defer></script>
 
 
-<!-- Botón ATRÁS: vuelve a la pantalla principal y, ya en ella, dos pulsaciones seguidas mandan la app a segundo plano -->
-<script>
-(function () {
-  var st = history.state || {};
-  if (st.nva === "root") {
-    history.pushState({ nva: "guard" }, "");
-  } else if (st.nva !== "guard") {
-    history.replaceState({ nva: "root" }, "");
-    history.pushState({ nva: "guard" }, "");
-  }
-
-  function pantallaActiva() {
-    var a = document.querySelector(".screen.active");
-    return a ? a.id : "screenCoachTeam";
-  }
-
-  // Una web no puede cerrarse ni minimizarse por código. En la pantalla principal,
-  // la primera pulsación de ATRÁS quita (sin mostrar nada) el control de ATRÁS durante
-  // unos segundos: si se vuelve a pulsar, la gestiona el sistema y manda la app a
-  // segundo plano. Si no se pulsa, el control se vuelve a activar.
-  var VENTANA_SALIR_MS = 2500, temporizador = null;
-  function rearmar() {
-    temporizador = null;
-    var st = history.state || {};
-    if (st.nva === "root") history.pushState({ nva: "guard" }, "");
-    window.addEventListener("popstate", onPop);
-  }
-
-  function onPop(e) {
-    if (!e.state || e.state.nva !== "root") return;
-
-    var modal = document.querySelector(".modal-backdrop.active");
-    if (modal) { history.pushState({ nva: "guard" }, ""); modal.classList.remove("active"); return; }
-    if (pantallaActiva() !== "screenCoachTeam") {
-      history.pushState({ nva: "guard" }, "");
-      if (typeof goBack === "function") goBack();
-      return;
-    }
-    // Pantalla principal: primera pulsación. Se queda en la entrada inicial sin control.
-    window.removeEventListener("popstate", onPop);
-    if (temporizador) clearTimeout(temporizador);
-    temporizador = setTimeout(rearmar, VENTANA_SALIR_MS);
-  }
-  window.addEventListener("popstate", onPop);
-})();
-</script>
+<!-- Botón ATRÁS del móvil: cierra la ventana abierta, luego vuelve atrás; solo sale de la app desde la pantalla principal -->
+<script src="atras.js" defer></script>
 
 <!-- Registro del Service Worker (PWA) -->
 <script>

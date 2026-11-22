@@ -216,12 +216,77 @@
       header.addEventListener("animationend", e => {
         if (e.animationName === "nvaSheen" || (reduce.matches && e.animationName === "nvaFade")) header.classList.remove("nva-head-play");
       });
-      // Tocar el escudo o el nombre (cualquier zona de la cabecera que no sea un botón)
+      // Tocar el escudo o el nombre (cualquier zona de la cabecera que no sea un
+      // botón) hace la animación y, al terminar, recarga la app. En iOS (app
+      // instalada) no hay gesto de «tirar para recargar»; así vale igual en
+      // iOS, Android y ordenador.
       header.addEventListener("click", e => {
-        if (!e.target.closest("button, .network-badge")) play();
+        if (e.target.closest("button, .network-badge")) return;
+        play();
+        recargarTrasAnimacion();
       });
       // Al entrar: tras la intro (2,6 s) o enseguida si ya se vio
       setTimeout(play, html.classList.contains("nva-intro-on") ? 2600 : 500);
+    }
+
+    // ---------- Recargar la app desde el encabezado ----------
+    // Mientras se ve la animación se busca una versión nueva de la app (service
+    // worker) y se envía lo pendiente de sincronizar; después se recarga.
+    let recargando = false;
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    async function buscarVersionNueva() {
+      if (!("serviceWorker" in navigator) || !navigator.onLine) return;
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return;
+      await reg.update();
+      const nuevo = reg.installing || reg.waiting;
+      if (!nuevo) return;
+      // sw.js hace skipWaiting + clients.claim: se activa solo; se espera a que lo haga
+      if (reg.waiting === nuevo) nuevo.postMessage("skipWaiting");
+      await new Promise(res => {
+        const listo = () => nuevo.state === "activated" || nuevo.state === "redundant";
+        if (listo()) return res();
+        nuevo.addEventListener("statechange", () => { if (listo()) res(); });
+      });
+    }
+
+    async function recargarTrasAnimacion() {
+      if (recargando) return;
+      const aviso = typeof window.nvaAvisoAntesDeRecargar === "function" ? window.nvaAvisoAntesDeRecargar() : "";
+      if (aviso) {
+        const ok = typeof window.nvaConfirmar === "function"
+          ? await window.nvaConfirmar(aviso + " ¿Recargar la app?")
+          : false;
+        if (!ok) return;
+      }
+      recargando = true;
+      const inicio = Date.now();
+      // Cada tarea con su propio límite: si la red va lenta no se queda colgada
+      const tareas = Promise.all([
+        Promise.race([buscarVersionNueva().catch(() => {}), esperar(6000)]),
+        Promise.race([
+          (typeof window.nvaEnviarPendientes === "function" ? window.nvaEnviarPendientes() : Promise.resolve()).catch(() => {}),
+          esperar(8000)
+        ])
+      ]);
+      // La animación del escudo dura 1,5 s (sin animaciones, un instante)
+      await esperar(aviso ? 0 : Math.max(0, (reduce.matches ? 400 : 1500) - (Date.now() - inicio)));
+      let terminado = false;
+      tareas.then(() => { terminado = true; });
+      await esperar(50);
+      if (!terminado) {
+        const ov = document.getElementById("loadingOverlay");
+        const msg = document.getElementById("loadingMessage");
+        if (msg) msg.textContent = "Actualizando la app...";
+        if (ov) ov.classList.add("active");
+      }
+      await tareas;
+      try {
+        sessionStorage.setItem("nvaPaginaTrasRecarga",
+          html.classList.contains("modo-delegados") ? "delegados" : "principal");
+      } catch (e) { /* sin sessionStorage */ }
+      location.reload();
     }
 
     // ---------- Textos: cifras que cambian ----------

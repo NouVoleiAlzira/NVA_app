@@ -189,6 +189,27 @@
     return appData.players[teamKey];
   }
 
+  // Antes de recargar la app al tocar el encabezado (animaciones.js):
+  //  - devuelve un aviso si hay algo que se perdería (una pantalla de
+  //    registro abierta, que solo guarda al pulsar «Guardar»; el horario sin
+  //    guardar no, porque ya se conserva en el localStorage),
+  //  - y envía lo que quede en la cola offline. La cola ya vive en el
+  //    localStorage, así que aunque no dé tiempo a enviarla no se pierde:
+  //    se enviará al abrir la app de nuevo.
+  window.nvaAvisoAntesDeRecargar = () => {
+    const abierta = ["screenAttendance", "screenMatch"].some(id => {
+      const el = document.getElementById(id);
+      return el && el.classList.contains("active");
+    });
+    if (abierta) return "Volverás a la pantalla principal y se perderá lo que no hayas guardado en esta pantalla.";
+    return "";
+  };
+  window.nvaEnviarPendientes = async () => {
+    try {
+      if (navigator.onLine && offlineQueue.length > 0) await processOfflineQueue();
+    } catch (e) { console.warn("No se pudo enviar la cola antes de recargar:", e); }
+  };
+
   document.addEventListener("DOMContentLoaded", async () => {
     resetToTodayDate();
     updateNetworkStatusUI();

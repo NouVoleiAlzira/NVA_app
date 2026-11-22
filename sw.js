@@ -1,6 +1,6 @@
 // Service Worker - Nou Volei Alzira
 // Sube el número de versión cada vez que quieras forzar una renovación completa de la caché.
-const VERSION = "nva-v235";
+const VERSION = "nva-v236";
 
 const SHELL_CACHE = VERSION + "-shell";
 const CDN_CACHE = VERSION + "-cdn";
@@ -64,6 +64,12 @@ self.addEventListener("install", (event) => {
       Promise.all(SHELL_FILES.map((f) => cache.add(f).catch(() => null)))
     ).then(() => self.skipWaiting())
   );
+});
+
+// La app pide activar ya una versión nueva que se haya quedado esperando
+// (al recargar desde el encabezado, animaciones.js)
+self.addEventListener("message", (event) => {
+  if (event.data === "skipWaiting") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

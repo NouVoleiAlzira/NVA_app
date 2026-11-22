@@ -145,7 +145,7 @@
   const claveLocal = () => "NVA_KM_" + archivo();
   function datosGuardar() {
     return { coaches: st.coaches.slice(), desde: st.desde, hasta: st.hasta, guardado: new Date().toISOString(),
-      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
+      filas: st.filas.map(f => Object.assign({ id: f.id }, f.evento ? datosEvento(f) : {}, pick(f), f._tomado ? { sel: false, chain: false } : {}, { campoN: CAMPOS[f.campo] || "", salidaN: CAMPOS[f.salida] || "" })), total: +calcular().reduce((a, f) => a + f._km, 0).toFixed(1) };
   }
   function aplicar(d) {
     if (!d || !Array.isArray(d.filas)) return false;
@@ -221,6 +221,60 @@
   const datosEvento = (f) => ({ evento: true, date: f.date, time: f.time, concepto: f.concepto, ciudad: f.ciudad, equipo: "Otro evento", rival: f.concepto, venue: f.ciudad, home: false, coach: f.coach, sust: false });
   const pick = (o) => ({ sel: o.sel, chain: o.chain, salida: o.salida, campo: o.campo, kmMano: o.kmMano });
 
+  // ---------- Partidos que ya ha incluido un sustituto ----------
+  // Si un entrenador sustituye a otro, registra el partido y lo marca en SU
+  // kilometraje, los km son suyos: en el del entrenador del equipo ese
+  // partido sale bloqueado. Se leen los reportes guardados de los demás
+  // entrenadores (este dispositivo + Kilometraje/) que tocan estas fechas y,
+  // de cada uno, la versión más reciente de cada partido.
+  let tomados = new Map();   // id del partido -> nombre del sustituto
+  const rangoDe = (n) => {
+    const m = /_(\d{4}-\d{2})\.json$/.exec(n);
+    if (m) return [m[1] + "-01", finMes(m[1])];
+    const r = /_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.json$/.exec(n);
+    return r ? [r[1], r[2]] : null;
+  };
+  async function cargarTomados() {
+    const yo = appData.coaches.find(x => String(x.id) === st.coaches[0]);
+    const miPref = `km_${sanitizeFileName(yo ? yo.name : st.coaches[0])}_`;
+    const sirve = (n) => { if (!n.startsWith("km_") || n.startsWith(miPref)) return false; const r = rangoDe(n); return !!r && r[0] <= st.hasta && r[1] >= st.desde; };
+    const docs = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith("NVA_KM_Kilometraje/") || !sirve(k.slice(19))) continue;
+        try { docs.push(JSON.parse(localStorage.getItem(k))); } catch (e) {}
+      }
+    } catch (e) {}
+    if (ghSettings.user && ghSettings.repo && ghSettings.token && navigator.onLine) {
+      const base = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/Kilometraje`;
+      const h = { "Authorization": `token ${ghSettings.token}` };
+      try {
+        const r = await fetch(base, { cache: "no-store", headers: h });
+        const lista = r.ok ? await r.json() : [];
+        const nombres = (Array.isArray(lista) ? lista : []).filter(f => f.type === "file" && sirve(f.name)).map(f => f.name);
+        (await Promise.all(nombres.map(n => fetch(`${base}/${encodeURIComponent(n)}`, { cache: "no-store", headers: Object.assign({ "Accept": "application/vnd.github.raw" }, h) })
+          .then(x => x.ok ? x.json() : null).catch(() => null)))).forEach(d => docs.push(d));
+      } catch (e) {}
+    }
+    const ultimo = new Map();   // coach|id -> { guardado, sel, nombre }
+    docs.forEach(d => {
+      if (!d || !Array.isArray(d.filas) || !Array.isArray(d.coaches)) return;
+      const c = appData.coaches.find(x => String(x.id) === String(d.coaches[0]));
+      if (!c || (yo && c === yo)) return;
+      const suyos = new Set(getCoachTeamEntries(c).map(e => e.teamKey));
+      d.filas.forEach(f => {
+        if (!f || f.evento || !f.id) return;
+        if (suyos.has(String(f.id).split("|")[0])) return;   // solo cuenta si lo hizo como sustituto
+        const k = c.id + "|" + f.id, prev = ultimo.get(k);
+        if (!prev || (d.guardado || "") > prev.guardado) ultimo.set(k, { guardado: d.guardado || "", sel: !!f.sel, nombre: c.name, id: f.id });
+      });
+    });
+    const t = new Map();
+    ultimo.forEach(v => { if (v.sel && !t.has(v.id)) t.set(v.id, v.nombre); });
+    tomados = t;
+  }
+
   // Km de cada partido elegido: ida (desde la salida o desde el partido anterior
   // si está encadenado) + vuelta a casa (si no se encadena con el siguiente).
   // Partido bloqueado: no tiene registro del partido hecho (con jugadores/as).
@@ -232,8 +286,9 @@
   }
   function calcular() {
     st.filas.forEach(f => {
-      f._lock = !tieneRegistro(f);
-      f._pend = f._lock && !f.evento && !!window.nvaPartidoPendiente &&
+      f._tomado = !f.evento && !f.sust ? (tomados.get(f.id) || "") : "";
+      f._lock = !!f._tomado || !tieneRegistro(f);
+      f._pend = f._lock && !f._tomado && !f.evento && !!window.nvaPartidoPendiente &&
         window.nvaPartidoPendiente(f.key, f.date, window.nvaNumPartidoCalendario(f.key, f.date, f.time, f.rival));
     });
     const s = st.filas.filter(f => f.sel && !f._lock);
@@ -302,11 +357,11 @@
     if (!st.filas.length) { list.innerHTML = `<div class="cp-modal-txt">No hay partidos de estos equipos ${mesCompleto() ? "en " : ""}${etiquetaRango()}. Revisa que los calendarios estén cargados en «Equipos · PDF Competición».</div>`; }
     else list.innerHTML = st.filas.map((f, i) => {
       if (f._lock) return `<div class="km-row km-lock" data-i="${i}">
-        <span title="${f._pend ? "Pendiente de aceptar" : "Sin registro del partido"}">${f._pend ? "⏳" : "🔒"}</span>
+        <span title="${f._tomado ? "Lo ha incluido otro entrenador" : f._pend ? "Pendiente de aceptar" : "Sin registro del partido"}">${f._tomado ? "🔁" : f._pend ? "⏳" : "🔒"}</span>
         <div>
           <div class="km-t"><b>${esc(fmtDia(f.date))}${f.time ? " · " + esc(f.time) : ""}</b> · ${esc(f.equipo)}</div>
           <div class="km-t">${(f.local ?? f.home) ? "🏠 vs " : "🚌 en "}${esc(f.rival)}${f.sust ? ` (sustituyendo a ${esc(f.coach)})` : ""}</div>
-          ${f._pend ? `<div class="km-s">Registro pendiente de que lo acepte el entrenador del equipo: sus km no cuentan todavía.</div>` : `<div class="km-s">Sin registro del partido: sus km no cuentan.</div>
+          ${f._tomado ? `<div class="km-s">Lo ha incluido ${esc(f._tomado)} en su kilometraje (sustitución): sus km no cuentan aquí.</div>` : f._pend ? `<div class="km-s">Registro pendiente de que lo acepte el entrenador del equipo: sus km no cuentan todavía.</div>` : `<div class="km-s">Sin registro del partido: sus km no cuentan.</div>
           <button type="button" class="km-reg">📝 Hacer registro</button>`}
         </div>
         <div class="km-k">–<small>km</small></div>
@@ -409,8 +464,14 @@
     if (!appData.coaches.length) { alert("No hay entrenadores."); return; }
     estilos();
     const hoy = new Date();
+    // Un entrenador solo ve y guarda su propio kilometraje (el propietario,
+    // los administradores y quien no es entrenador pueden elegir cualquiera)
+    let perfilKm = null;
+    try { perfilKm = JSON.parse(localStorage.getItem("NVA_PERFIL") || "null"); } catch (e) {}
+    const yoKm = perfilKm && !["propietario", "administrador"].includes(perfilKm.rol) ? appData.coaches.find(c => c.usuario === perfilKm.id) : null;
+    if (yoKm && st && String(st.coaches[0]) !== String(yoKm.id)) st = null;
     const seguir = volver === true && st;
-    const primero = seguir ? st.coaches[0] : (typeof activeCoachId !== "undefined" && activeCoachId != null && appData.coaches.some(c => c.id == activeCoachId)) ? activeCoachId : appData.coaches[0].id;
+    const primero = yoKm ? yoKm.id : seguir ? st.coaches[0] : (typeof activeCoachId !== "undefined" && activeCoachId != null && appData.coaches.some(c => c.id == activeCoachId)) ? activeCoachId : appData.coaches[0].id;
     const mesHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
     if (!seguir) st = { desde: mesHoy + "-01", hasta: finMes(mesHoy), coaches: [String(primero)], filas: [] };
     const o = document.createElement("div");
@@ -418,7 +479,7 @@
     const optsCoach = (sel) => appData.coaches.map(c => `<option value="${esc(c.id)}"${String(c.id) === String(sel) ? " selected" : ""}>${esc(c.name)}</option>`).join("");
     o.innerHTML = `<div class="cp-modal-box km-box">
       <div class="cp-modal-title">🚗 Reporte Kilometraje</div>
-      <div class="km-top km-fechas"><select class="km-coach" title="Entrenador">${optsCoach(primero)}</select><span class="km-rango"><input type="date" class="km-desde" value="${st.desde}" title="Desde"><span>al</span><input type="date" class="km-hasta" value="${st.hasta}" title="Hasta"></span></div>
+      <div class="km-top km-fechas"><select class="km-coach" title="Entrenador"${yoKm ? " disabled" : ""}>${optsCoach(primero)}</select><span class="km-rango"><input type="date" class="km-desde" value="${st.desde}" title="Desde"><span>al</span><input type="date" class="km-hasta" value="${st.hasta}" title="Hasta"></span></div>
       <div class="km-top"><button type="button" class="cp-modal-btn km-otro" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Partidos de otro entrenador</button><button type="button" class="cp-modal-btn km-evento" style="flex:none;font-size:0.72rem;padding:5px 8px;">➕ Otro evento</button><span class="km-chips"></span><button type="button" class="cp-modal-btn km-cargar" style="flex:none;margin-left:auto;font-size:0.72rem;padding:5px 8px;" title="Carga el último reporte guardado de este entrenador">📂 Cargar guardado</button></div>
       <div class="km-list"></div>
       <div class="km-total"><span>TOTAL <small class="km-num" style="font-size:0.8rem;color:var(--niebla)"></small></span><b class="km-sum"></b></div>
@@ -437,6 +498,8 @@
     // Al cambiar de entrenador o mes se recupera lo guardado (primero lo local, luego GitHub)
     const recargar = async (conGuardado) => {
       if (conGuardado) {
+        const rangoT = st.desde + st.hasta + st.coaches[0];
+        cargarTomados().then(() => { if (o.isConnected && rangoT === st.desde + st.hasta + st.coaches[0]) pintar(o); });
         st.filas = []; st.guardado = "";
         aplicar(leerLocal());
         cargar(); pintar(o);
@@ -492,7 +555,7 @@
     };
     matrizGitHub().then(n => { if (n) recargar(true); });
     o.querySelector(".cp-modal-main").onclick = () => guardarPdf();
-    if (seguir) { cargar(); pintar(o); } else recargar(true);
+    if (seguir) { cargar(); pintar(o); cargarTomados().then(() => { if (o.isConnected) pintar(o); }); } else recargar(true);
     // Registros de partido al día (por si se hicieron desde otro dispositivo)
     if (typeof fetchMatchLogsFromGitHub === "function") fetchMatchLogsFromGitHub().then(() => { if (o.isConnected) pintar(o); }).catch(() => {});
   };

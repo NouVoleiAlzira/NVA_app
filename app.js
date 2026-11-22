@@ -3357,12 +3357,75 @@
     }
   }
 
+  // ---------------------------------------------------------------------
+  //  REGISTROS DE UN EQUIPO AJENO → PROPUESTA PARA SU ENTRENADOR
+  //  Un entrenador solo puede guardar en la nube los entrenamientos y
+  //  partidos de sus equipos (Supabase contesta 403 con los demás). Si
+  //  registra o modifica uno de otro equipo, se guarda en «Propuestas/» y
+  //  el entrenador de ese equipo ve un aviso para aceptarlo o rechazarlo.
+  //  Al aceptarlo lo guarda él, con su permiso, en registros/ o Partidos/.
+  // ---------------------------------------------------------------------
+  const PROPUESTAS_FOLDER = "Propuestas";
   let ultimoGuardadoSinPermiso = false;
+  let ultimaPropuestaPara = null;   // nombres de quienes deben aceptarla
   const AVISO_SIN_PERMISO = "No se ha guardado en la nube: tu usuario no tiene permiso para registrar este equipo. " +
     "Queda solo en este dispositivo. Pide a la dirección del club que te asigne el equipo o te dé permiso.";
 
+  function esRutaDeRegistro(fileName) {
+    return fileName.startsWith(TRAINING_LOGS_FOLDER + "/") || fileName.startsWith(MATCH_LOGS_FOLDER + "/");
+  }
+  function perfilConectado() {
+    try { return JSON.parse(localStorage.getItem("NVA_PERFIL") || "null"); } catch (e) { return null; }
+  }
+  function nombreEquipo(equipo) {
+    const t = (appData.teams || []).find(x => getTeamKey(x) === equipo || x.name === equipo);
+    return t ? `${t.name} (${t.category})` : equipo;
+  }
+  function entrenadoresDelEquipo(equipo) {
+    return (appData.coaches || []).filter(c => (c.teams || []).some(r => r === equipo || nombreEquipo(r) === nombreEquipo(equipo)));
+  }
+  function fechaCorta(f) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : (f || ""); }
+  function rutaPropuesta(fileName) { return `${PROPUESTAS_FOLDER}/${fileName.replace(/\//g, "__")}`; }
+
+  // Escribe un JSON (lee antes su sha). Devuelve el código HTTP (0 sin red).
+  async function ponerJson(fileName, obj, message) {
+    const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${fileName}`;
+    const auth = { "Authorization": `token ${ghSettings.token}` };
+    try {
+      let sha = "";
+      const g = await fetch(url, { headers: auth, cache: "no-store" });
+      if (g.ok) sha = (await g.json()).sha;
+      const r = await fetch(url, {
+        method: "PUT", headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ message, content: utf8_to_b64(JSON.stringify(obj, null, 2)), ...(sha && { sha }) })
+      });
+      return r.status;
+    } catch (e) { return 0; }
+  }
+
+  // Devuelve los nombres de quienes la deben aceptar, o null si no se pudo enviar
+  async function enviarPropuesta(fileName, registro) {
+    if (!registro || typeof registro !== "object" || !registro.equipo) return null;
+    const yo = perfilConectado() || {};
+    const esPartido = fileName.startsWith(MATCH_LOGS_FOLDER + "/");
+    const para = entrenadoresDelEquipo(registro.equipo).filter(c => !yo.id || c.usuario !== yo.id).map(c => c.name);
+    // Sin «equipo» arriba del todo: así cualquier entrenador puede escribirla
+    const propuesta = {
+      archivo: fileName,
+      tipo: esPartido ? "partido" : "entrenamiento",
+      accion: registro.modificado ? "modificar" : "registrar",
+      autor: { id: yo.id || "", nombre: yo.nombre || yo.email || "", email: yo.email || "" },
+      para,
+      enviada: new Date().toISOString(),
+      registro: Object.assign({}, registro, { propuestoPor: yo.nombre || yo.email || "" })
+    };
+    const st = await ponerJson(rutaPropuesta(fileName), propuesta, `Propuesta ${propuesta.tipo} ${registro.equipo} - ${registro.fecha}`);
+    return st >= 200 && st < 300 ? para : null;
+  }
+
   async function writeGitHubFile(fileName, dataObject, commitMessage) {
     ultimoGuardadoSinPermiso = false;
+    ultimaPropuestaPara = null;
     if (!navigator.onLine || !ghSettings.user || !ghSettings.repo || !ghSettings.token) {
       enqueueOfflineOp(fileName, dataObject, commitMessage);
       return false;
@@ -3384,9 +3447,13 @@
         body: JSON.stringify(body)
       });
 
-      // 403 = la nube no deja a este usuario guardar ese archivo (p. ej. un
-      // equipo que no tiene asignado). Se deja en cola igualmente, por si le
-      // dan permiso después, pero se avisa de verdad en vez de «sin conexión».
+      // 403 = la nube no deja a este usuario guardar ese archivo (un equipo
+      // que no tiene asignado). Un registro se envía como propuesta a su
+      // entrenador; si ni eso se puede, queda en cola y se avisa de verdad.
+      if (putRes.status === 403 && esRutaDeRegistro(fileName)) {
+        const para = await enviarPropuesta(fileName, dataObject);
+        if (para) { ultimaPropuestaPara = para; return false; }
+      }
       ultimoGuardadoSinPermiso = putRes.status === 403;
       if (!putRes.ok) {
         enqueueOfflineOp(fileName, dataObject, commitMessage);
@@ -3395,6 +3462,85 @@
     } catch (e) {
       enqueueOfflineOp(fileName, dataObject, commitMessage);
       return false;
+    }
+  }
+
+  function avisoPropuestaEnviada(tipo, para) {
+    const quien = para && para.length ? para.join(" o ") : "el entrenador del equipo";
+    return `Este equipo no es tuyo, así que el ${tipo} se ha enviado a ${quien} para que lo acepte. ` +
+      "Se guardará en la nube cuando lo acepte.";
+  }
+
+  // Avisa al entrenador conectado de las propuestas de sus equipos (una vez
+  // por sesión cada una si elige «Más tarde»).
+  const propuestasVistas = new Set();
+  let revisandoPropuestas = false;
+  async function revisarPropuestas() {
+    if (revisandoPropuestas || !ghSettings.user || !ghSettings.repo || !ghSettings.token || !navigator.onLine) return;
+    const yo = perfilConectado();
+    if (!yo || !yo.id) return;
+    const mio = (appData.coaches || []).find(c => c.usuario === yo.id);
+    revisandoPropuestas = true;
+    try {
+      const files = await listGitHubFolder(PROPUESTAS_FOLDER);
+      if (!files || !files.length) return;
+      const auth = { "Authorization": `token ${ghSettings.token}` };
+      let aceptadas = 0;
+      for (const f of files) {
+        if (!f.name || !f.name.endsWith(".json") || propuestasVistas.has(f.path + f.sha)) continue;
+        const p = await readListedGitHubJson(f, auth);
+        if (!p || !p.registro || !p.archivo || !esRutaDeRegistro(p.archivo)) continue;
+        if (p.autor && p.autor.id === yo.id) continue;
+        const equipo = p.registro.equipo;
+        const suyos = entrenadoresDelEquipo(equipo);
+        // Decide el entrenador del equipo; si el equipo no tiene, el propietario
+        const meToca = mio ? suyos.includes(mio) : (!suyos.length && yo.rol === "propietario");
+        if (!meToca) continue;
+        propuestasVistas.add(f.path + f.sha);
+
+        const jug = Array.isArray(p.registro.jugadores) ? p.registro.jugadores : [];
+        const pres = jug.filter(isPlayerPresent).length;
+        const que = p.tipo === "partido"
+          ? `el partido${matchNum(p.registro) > 1 ? ` (${matchNumLabel(p.registro.partido)})` : ""}`
+          : "el entrenamiento";
+        const texto = `${(p.autor && p.autor.nombre) || "Otro entrenador"} ha ${p.accion === "modificar" ? "modificado" : "registrado"} ` +
+          `${que} de ${nombreEquipo(equipo)} del ${fechaCorta(p.registro.fecha)}` +
+          (jug.length ? ` (${pres} de ${jug.length} presentes)` : "") + ".\n\n¿Aceptas que se guarde?";
+        if (typeof ocultarCargando === "function") ocultarCargando();
+        const r = await window.nvaElegir(texto, [
+          { valor: "si", texto: "✅ Aceptar y guardar" },
+          { valor: "no", texto: "❌ Rechazar" }
+        ], { titulo: "Registro de otro entrenador", no: "Más tarde" });
+        if (r !== "si" && r !== "no") continue;
+
+        // Puede que otro entrenador del equipo ya la haya resuelto
+        const url = `https://api.github.com/repos/${ghSettings.user}/${ghSettings.repo}/contents/${f.path}`;
+        const g = await fetch(url, { headers: auth, cache: "no-store" });
+        if (!g.ok) { if (g.status === 404) alert("Esta propuesta ya la ha resuelto otro entrenador."); continue; }
+        const gj = await g.json();
+        if (r === "si") {
+          const registro = Object.assign({}, p.registro);
+          delete registro.propuestoPor;
+          registro.registradoPor = (p.autor && p.autor.nombre) || "";
+          registro.aceptadoPor = yo.nombre || yo.email || "";
+          const ok = await writeGitHubFile(p.archivo, registro, `Registro ${p.tipo} ${equipo} - ${registro.fecha} (aceptado)`);
+          if (!ok) { alert("No se ha podido guardar el registro. Se volverá a preguntar más tarde."); propuestasVistas.delete(f.path + f.sha); continue; }
+          aceptadas++;
+        }
+        await fetch(url, {
+          method: "DELETE", headers: { ...auth, "Content-Type": "application/json" },
+          body: JSON.stringify({ message: `Propuesta ${r === "si" ? "aceptada" : "rechazada"}`, sha: gj.sha })
+        });
+      }
+      if (aceptadas) {
+        await fetchTrainingLogsFromGitHub();
+        if (typeof fetchMatchLogsFromGitHub === "function") await fetchMatchLogsFromGitHub();
+        refreshActiveScreenUI();
+      }
+    } catch (e) {
+      console.warn("No se pudieron revisar las propuestas:", e);
+    } finally {
+      revisandoPropuestas = false;
     }
   }
 
@@ -3582,6 +3728,7 @@
           body: JSON.stringify(body)
         });
 
+        if (putRes.status === 403 && esRutaDeRegistro(op.fileName) && await enviarPropuesta(op.fileName, op.dataObject)) continue;
         if (!putRes.ok) remaining.push(op);
       } catch (e) {
         remaining.push(op);
@@ -3628,6 +3775,7 @@
     ]);
 
     refreshActiveScreenUI();
+    revisarPropuestas();
   }
 
   // Vuelve a pintar la pantalla/modal que esté visible en este momento con
@@ -3760,6 +3908,8 @@
 
     if (success) {
       alert("¡Entrenamiento guardado y sincronizado!");
+    } else if (ultimaPropuestaPara) {
+      alert(avisoPropuestaEnviada("entrenamiento", ultimaPropuestaPara));
     } else if (ultimoGuardadoSinPermiso) {
       alert(AVISO_SIN_PERMISO);
     } else {
@@ -5005,6 +5155,8 @@
 
     if (success) {
       alert("¡Partido guardado y sincronizado!");
+    } else if (ultimaPropuestaPara) {
+      alert(avisoPropuestaEnviada("partido", ultimaPropuestaPara));
     } else if (ultimoGuardadoSinPermiso) {
       alert(AVISO_SIN_PERMISO);
     } else {

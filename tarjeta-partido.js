@@ -5,7 +5,7 @@
 //           local: { nombre, logo (Image|null), club (bool) }, visitante: { … },
 //           res: { l, v } | null, sets: "25-17 / 23-25 …", campo,
 //           patro: Image|null (patrocinador del equipo), anulado: bool, motivo }
-//  estilos: "duelo", "franja", "atardecer", "tv"
+//  estilos: "mezcla" (la que se usa), "duelo", "franja", "atardecer", "tv"
 //  Apaisada 16:9 (1600x900). Capas: fondo azul/naranja → marca de agua del
 //  escudo del club → patrocinador → textos y escudos.
 // =====================================================================
@@ -152,7 +152,7 @@
   const marcadorTxt = (d) => d.res ? `${d.res.l} - ${d.res.v}` : "VS";
 
   // ---------- 1. Duelo: el campo partido en diagonal, azul contra naranja ----------
-  function duelo(ctx, d, a) {
+  function duelo(ctx, d, a, mezcla) {
     const ga = ctx.createLinearGradient(0, 0, W * 0.6, H);
     ga.addColorStop(0, "#03103a"); ga.addColorStop(1, AZUL2);
     ctx.fillStyle = ga; ctx.fillRect(0, 0, W, H);
@@ -164,6 +164,18 @@
     ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 8;
     ctx.beginPath(); ctx.moveTo(W * 0.62, 0); ctx.lineTo(W * 0.38, H); ctx.stroke();
     marcaAgua(ctx, a, W / 2, H / 2 + 20, 820, 0.09);
+    if (mezcla) {
+      // Cabecera y campo como el rótulo de TV: jornada y fecha arriba a la izquierda,
+      // campo abajo a la izquierda y patrocinador abajo a la derecha
+      patrocinador(ctx, d.patro, W - 360, H - 150, 280, 90, { placa: "rgba(255,255,255,0.92)" });
+      ctx.fillStyle = NAR; ctx.fillRect(0, 0, W, 14);
+      ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.font = `700 28px ${F_TXT}`; ctx.fillStyle = NAR2;
+      espaciado(ctx, cabeceraTxt(d), 80, 84, 8, "left");
+      ctx.font = `italic 800 60px ${F_TIT}`; ctx.fillStyle = BLANCO;
+      ajustar(ctx, d.cuando.toUpperCase(), 820, 60, "italic 800", F_TIT);
+      ctx.fillText(d.cuando.toUpperCase(), 80, 148);
+    } else {
     patrocinador(ctx, d.patro, W / 2 - 150, H - 150, 300, 96, { placa: "rgba(255,255,255,0.92)" });
     // cabecera
     ctx.textBaseline = "middle"; ctx.textAlign = "center";
@@ -172,6 +184,7 @@
     ctx.font = `italic 800 52px ${F_TIT}`; ctx.fillStyle = BLANCO;
     ajustar(ctx, d.cuando.toUpperCase(), W - 300, 52, "italic 800", F_TIT);
     ctx.fillText(d.cuando.toUpperCase(), W / 2, 118);
+    }
     // equipos
     escudo(ctx, d.local, 330, 380, 300);
     escudo(ctx, d.visitante, W - 330, 380, 300);
@@ -192,9 +205,17 @@
       ctx.fillStyle = BLANCO; ctx.fillText(d.sets, W / 2, cy + 149);
     }
     // campo
+    if (mezcla) {
+      ctx.textAlign = "left"; ctx.font = `600 32px ${F_TXT}`; ctx.fillStyle = BLANCO;
+      ajustar(ctx, campoTxt(d), d.patro ? W - 560 : W - 200, 32, 600, F_TXT);
+      const cw = ctx.measureText(campoTxt(d)).width;   // píldora oscura: se lee igual sobre azul y naranja
+      redondo(ctx, 56, H - 134, cw + 48, 60, 30); ctx.fillStyle = "rgba(6,26,82,0.88)"; ctx.fill();
+      ctx.fillStyle = BLANCO; ctx.fillText(campoTxt(d), 80, H - 104);
+    } else {
     ctx.font = `600 32px ${F_TXT}`; ctx.fillStyle = BLANCO; ctx.textAlign = "center";
     ajustar(ctx, campoTxt(d), W - 400, 32, 600, F_TXT);
     ctx.fillText(campoTxt(d), W / 2, d.patro ? H - 196 : H - 70);
+    }
     if (d.anulado) sello(ctx, d.motivo, W / 2, cy);
     grano(ctx, 0.05);
   }
@@ -347,14 +368,16 @@
     grano(ctx, 0.04);
   }
 
-  const ESTILOS = { duelo, franja, atardecer, tv };
+  // 5. Mezcla (la elegida por Vic): escudos, equipos y resultado de «duelo»; jornada, fecha y campo de «tv»
+  const mezcla = (ctx, d, a) => duelo(ctx, d, a, true);
+  const ESTILOS = { mezcla, duelo, franja, atardecer, tv };
   async function dibujar(datos, estilo) {
     const a = await preparar();
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const ctx = c.getContext("2d");
     const d = Object.assign({ cuando: "", campo: "" }, datos);
     d.local = Object.assign({ nombre: "" }, d.local); d.visitante = Object.assign({ nombre: "" }, d.visitante);
-    (ESTILOS[estilo] || duelo)(ctx, d, a);
+    (ESTILOS[estilo] || mezcla)(ctx, d, a);
     return c;
   }
   window.nvaTarjetaPartido = { dibujar, estilos: Object.keys(ESTILOS) };

@@ -112,7 +112,7 @@
 
   // ---------- Tocar el calendario: tarjeta del entrenamiento o del partido ----------
   let dibujo = { hits: [], fecha: () => "" };   // lo que se pintó en el último dibujo
-  const ESTILO_TARJETA = "duelo";     // diseño de la imagen al «Enviar imagen» (tarjeta-partido.js)
+  const ESTILO_TARJETA = "mezcla";    // diseño de la imagen al «Enviar imagen» (tarjeta-partido.js)
   const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const diaLargo = f => { const d = new Date(f + "T12:00:00"); return `${DIAS_SEM[(d.getDay() + 6) % 7]} ${d.getDate()} de ${MESES[d.getMonth()]}`; };
 

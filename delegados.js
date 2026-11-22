@@ -196,15 +196,6 @@
     } else campo.textContent = "📍 " + p.campo;
     if (motivo) fila("cp-ficha-aviso dlg-ficha-anulado", "🚫 " + motivo);
 
-    // Mensaje de WhatsApp con la misma información
-    const texto = [
-      `🏐 *${jor ? "Jornada " + jor + " · " : ""}${cuando}*`,
-      local,
-      res ? `*${res.setsL} - ${res.setsV}*${sets ? " (" + sets + ")" : ""}` : "VS",
-      visitante,
-      "📍 " + p.campo + (mapa ? "\n" + mapa : ""),
-      motivo ? "🚫 " + motivo : ""
-    ].filter(Boolean).join("\n");
     // Imagen de la tarjeta: se prepara al abrir para compartirla dentro del mismo toque
     let archivo = null;
     const nombreImg = ("partido-" + (m.date || "") + "-" + nuestro).replace(/[^\w.-]+/g, "_").slice(0, 80) + ".png";
@@ -234,10 +225,7 @@
       }
       window.open("https://wa.me/?text=" + encodeURIComponent(cuerpo), "_blank", "noopener");
     };
-    nvaAviso("", { nodo: c, si: "Enviar imagen", alAceptar: enviarImagen, extra: {
-      texto: "Enviar", clase: "dlg-btn-whatsapp", titulo: "Enviar por WhatsApp",
-      accion: () => window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener")
-    } });
+    nvaAviso("", { nodo: c, si: "Enviar al grupo", alAceptar: enviarImagen });
   }
   (function () {
     const canvas = document.getElementById("dlgCanvas");

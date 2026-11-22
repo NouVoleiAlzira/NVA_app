@@ -766,7 +766,7 @@ button.app-input { text-align: left; cursor: pointer; font-weight: 600; }
 .nva-dlg-campo { width: 100%; box-sizing: border-box; font-size: 1rem; }
 .nva-dlg-botones { margin-top: 2px; }
 .nva-dlg-botones .cp-modal-btn { min-height: 40px; font-size: 0.85rem; }
-.nva-dlg-opciones { display: flex; flex-direction: column; gap: 8px; }
+.nva-dlg-opciones { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; overflow-y: auto; overscroll-behavior: contain; padding: 1px; }
 .nva-dlg-opcion {
   display: flex; align-items: center; gap: 10px; width: 100%;
   min-height: 46px; padding: 10px 14px; text-align: left;

@@ -409,8 +409,8 @@
     o.querySelector(".km-otro").onclick = async () => {
       const libres = appData.coaches.filter(c => !st.coaches.includes(String(c.id)));
       if (!libres.length) { alert("No hay más entrenadores."); return; }
-      const nombre = await nvaPreguntar("¿De qué entrenador quieres añadir partidos?\n\n" + libres.map((c, i) => `${i + 1}. ${c.name}`).join("\n") + "\n\nEscribe el número:");
-      const c = libres[(parseInt(nombre, 10) || 0) - 1];
+      const id = await nvaElegir("¿De qué entrenador quieres añadir partidos?", libres.map(c => ({ valor: String(c.id), texto: c.name, ico: "👤" })));
+      const c = id != null && libres.find(x => String(x.id) === id);
       if (c) { st.coaches.push(String(c.id)); recargar(); }
     };
     o.querySelector(".km-chips").onclick = (e) => { const b = e.target.closest("button[data-id]"); if (b) { st.coaches = st.coaches.filter(x => x !== b.dataset.id); recargar(); } };

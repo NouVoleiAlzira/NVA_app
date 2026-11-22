@@ -810,11 +810,9 @@
       if (!fed) {
         if (!r.names.length) { if (!batch) alert("No he encontrado partidos con fecha en este PDF."); return "sin partidos con fecha"; }
         if (silent) return "equipo no reconocido";
-        const menu = r.names.slice(0, 40).map((n, i) => `${i + 1}. ${n}`).join("\n");
-        const ans = await nvaPreguntar(`${key}: no sé cuál es en el PDF.\nEscribe el número del equipo que corresponde (vacío = saltar):\n\n${menu}`);
-        const n = parseInt(ans, 10);
-        if (!(n >= 1 && n <= Math.min(40, r.names.length))) return "saltado";
-        fed = r.names[n - 1]; asked = true;
+        const elegido = await nvaElegir(`${key}: no sé cuál es en el PDF.\nElige el equipo que corresponde:`, r.names.slice(0, 40), { no: "Saltar" });
+        if (elegido == null) return "saltado";
+        fed = elegido; asked = true;
       }
     }
     const matches = L.extractMatches(lines, fed);

@@ -3019,6 +3019,8 @@
       await syncConfigFromGitHub(true);
     }
     await syncCoachesWithUsers();
+    asignarSel.coach = null;
+    asignarSel.delegado = null;
     renderConfigTab1();
     renderConfigTab2Select();
     document.getElementById("modalOptions").classList.add("active");
@@ -3039,18 +3041,35 @@
     if (num === 6 && typeof escAbrir === "function") escAbrir();
   }
 
-  function renderConfigTab1() {
-    const coachesList = document.getElementById("configCoachesList");
-    coachesList.innerHTML = "";
-    document.getElementById("coachCountBadge").innerText = appData.coaches.length;
+  // Entrenador / delegado elegido en su lista para asignarle equipos (null = ninguno:
+  // la sección «Asignar» queda vacía). Se toca la fila para elegirlo y otra vez para soltarlo.
+  const asignarSel = { coach: null, delegado: null };
 
-    appData.coaches.forEach(c => {
-      const row = document.createElement("div");
-      row.className = "item-row";
-      row.innerHTML = `<span><strong>${escapeHtml(coachLabel(c))}</strong> (${c.teams ? c.teams.length : 0} eq.)</span>`;
-      coachesList.appendChild(row);
-    });
-    if (!appData.coaches.length) coachesList.innerHTML = `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay entrenadores. Invítalos con el rol Entrenador en «Usuarios y permisos».</p>`;
+  function filaAsignable(persona, tipo) {
+    const sel = asignarSel[tipo] === persona.id;
+    return `<button type="button" class="item-row asig-fila${sel ? " asig-sel" : ""}" aria-pressed="${sel}"
+      onclick="elegirParaAsignar('${tipo}', ${Number(persona.id)})"><span><strong>${escapeHtml(coachLabel(persona))}</strong> (${persona.teams ? persona.teams.length : 0} eq.)</span><span class="asig-punto" aria-hidden="true"></span></button>`;
+  }
+
+  function elegirParaAsignar(tipo, id) {
+    asignarSel[tipo] = asignarSel[tipo] === id ? null : id;
+    if (tipo === "coach") { renderCoachesConfigList(); renderCoachAssignments(); }
+    else renderDelegadosConfig();
+  }
+
+  function renderCoachesConfigList() {
+    const coachesList = document.getElementById("configCoachesList");
+    document.getElementById("coachCountBadge").innerText = appData.coaches.length;
+    if (!appData.coaches.some(c => c.id === asignarSel.coach)) asignarSel.coach = null;
+    const scroll = coachesList.scrollTop;
+    coachesList.innerHTML = appData.coaches.length
+      ? appData.coaches.map(c => filaAsignable(c, "coach")).join("")
+      : `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay entrenadores. Invítalos con el rol Entrenador en «Usuarios y permisos».</p>`;
+    coachesList.scrollTop = scroll;
+  }
+
+  function renderConfigTab1() {
+    renderCoachesConfigList();
 
     const teamsList = document.getElementById("configTeamsList");
     teamsList.innerHTML = "";
@@ -3064,14 +3083,6 @@
       teamsList.appendChild(row);
     });
 
-    const selectCoach = document.getElementById("selectCoachAssign");
-    selectCoach.innerHTML = "";
-    appData.coaches.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.innerText = coachLabel(c);
-      selectCoach.appendChild(opt);
-    });
     renderCoachAssignments();
     renderDelegadosConfig();
   }
@@ -3080,22 +3091,15 @@
   //     y en su página (delegados.js) solo ven esos equipos. ---
   function renderDelegadosConfig() {
     const lista = document.getElementById("configDelegadosList");
-    const sel = document.getElementById("selectDelegadoAssign");
-    if (!lista || !sel) return;
+    if (!lista) return;
     const delegados = Array.isArray(appData.delegados) ? appData.delegados : [];
     document.getElementById("delegadoCountBadge").innerText = delegados.length;
+    if (!delegados.some(d => d.id === asignarSel.delegado)) asignarSel.delegado = null;
+    const scroll = lista.scrollTop;
     lista.innerHTML = delegados.length
-      ? delegados.map(d => `<div class="item-row"><span><strong>${escapeHtml(coachLabel(d))}</strong> (${d.teams ? d.teams.length : 0} eq.)</span></div>`).join("")
+      ? delegados.map(d => filaAsignable(d, "delegado")).join("")
       : `<p style="font-size:0.8rem; color:#64748b; margin:4px 0;">No hay delegados. Invítalos con el rol Delegado o da a su rol acceso a la página de delegados en «Usuarios y permisos».</p>`;
-    const elegido = sel.value;
-    sel.innerHTML = "";
-    delegados.forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d.id;
-      opt.innerText = coachLabel(d);
-      sel.appendChild(opt);
-    });
-    if (delegados.some(d => String(d.id) === elegido)) sel.value = elegido;
+    lista.scrollTop = scroll;
     document.getElementById("grpDelegadoAssign").hidden = !delegados.length;
     renderDelegadoAssignments();
   }
@@ -3104,8 +3108,9 @@
     const container = document.getElementById("delegadoTeamsCheckboxes");
     if (!container) return;
     container.innerHTML = "";
-    const id = Number(document.getElementById("selectDelegadoAssign").value);
-    const del = (appData.delegados || []).find(d => d.id === id);
+    const del = (appData.delegados || []).find(d => d.id === asignarSel.delegado);
+    pintarTituloAsignar("delegadoAssignTitle", "Delegado", del);
+    container.hidden = !del;
     if (!del) return;
     appData.teams.forEach(t => {
       const key = getTeamKey(t);
@@ -3126,6 +3131,13 @@
     if (del.teams.includes(teamKey) || del.teams.includes(simpleName)) del.teams = del.teams.filter(t => t !== teamKey && t !== simpleName);
     else del.teams.push(teamKey);
     saveDataAndSyncGitHub();
+    const lista = document.getElementById("configDelegadosList");
+    if (lista) { const scroll = lista.scrollTop; lista.innerHTML = appData.delegados.map(d => filaAsignable(d, "delegado")).join(""); lista.scrollTop = scroll; }
+  }
+
+  function pintarTituloAsignar(idTitulo, rol, persona) {
+    const t = document.getElementById(idTitulo);
+    if (t) t.textContent = persona ? `Asignar equipos a ${persona.name}` : `Asignar equipos a ${rol}`;
   }
 
   function coachLabel(c) { return c.email ? `${c.name} (${c.email})` : c.name; }
@@ -3208,11 +3220,12 @@
   }
 
   function renderCoachAssignments() {
-    const coachId = parseInt(document.getElementById("selectCoachAssign").value);
     const container = document.getElementById("coachTeamsCheckboxes");
     container.innerHTML = "";
 
-    const coach = appData.coaches.find(c => c.id === coachId);
+    const coach = appData.coaches.find(c => c.id === asignarSel.coach);
+    pintarTituloAsignar("coachAssignTitle", "Entrenador", coach);
+    container.hidden = !coach;
     if (!coach) return;
 
     appData.teams.forEach(t => {
@@ -3243,6 +3256,7 @@
       coach.teams.push(teamKey);
     }
     saveDataAndSyncGitHub();
+    renderCoachesConfigList();
   }
 
   function renderConfigTab2Select() {

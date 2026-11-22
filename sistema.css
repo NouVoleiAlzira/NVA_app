@@ -1129,3 +1129,19 @@ button.dlg-par-res[aria-expanded="true"]::after { content: " ▴"; }
 
 /* Página de delegados: «Enviar al grupo» mientras se crea la imagen */
 .nva-dlg-si.dlg-btn-espera { opacity: .6; cursor: progress; }
+
+/* Opciones › Entrenadores y equipos: se elige el entrenador/delegado tocando su fila
+   (punto dorado = elegido); la sección «Asignar» solo muestra equipos si hay uno elegido. */
+.asig-equipos[hidden] { display: none !important; }
+button.asig-fila {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  text-align: left; font: inherit; cursor: pointer; flex: none;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.asig-punto {
+  flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(245, 197, 24, 0.55); transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+button.asig-fila.asig-sel { border-color: var(--balon); background: rgba(245, 197, 24, 0.12); }
+button.asig-fila.asig-sel .asig-punto { background: var(--balon); border-color: var(--balon); box-shadow: 0 0 8px rgba(245, 197, 24, 0.7); }
+@media (hover: hover) and (pointer: fine) { button.asig-fila:hover { border-color: rgba(245, 197, 24, 0.5); } }

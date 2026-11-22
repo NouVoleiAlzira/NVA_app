@@ -832,9 +832,8 @@
         </div>
 
         <div class="config-section">
-          <div class="config-subtitle">Asignar Equipos a Entrenador</div>
-          <select id="selectCoachAssign" class="app-select" style="margin-bottom: 6px;" onchange="renderCoachAssignments()"></select>
-          <div id="coachTeamsCheckboxes" style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
+          <div class="config-subtitle" id="coachAssignTitle">Asignar Equipos a Entrenador</div>
+          <div id="coachTeamsCheckboxes" class="asig-equipos" hidden style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
         </div>
 
         <div class="config-section">
@@ -844,9 +843,8 @@
         </div>
 
         <div class="config-section" id="grpDelegadoAssign" hidden>
-          <div class="config-subtitle">Asignar Equipos a Delegado</div>
-          <select id="selectDelegadoAssign" class="app-select" style="margin-bottom: 6px;" onchange="renderDelegadoAssignments()"></select>
-          <div id="delegadoTeamsCheckboxes" style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
+          <div class="config-subtitle" id="delegadoAssignTitle">Asignar Equipos a Delegado</div>
+          <div id="delegadoTeamsCheckboxes" class="asig-equipos" hidden style="display: flex; flex-direction: column; gap: 4px; background: white; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-border);"></div>
         </div>
       </div>
 

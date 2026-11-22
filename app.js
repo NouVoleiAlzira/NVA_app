@@ -3357,7 +3357,12 @@
     }
   }
 
+  let ultimoGuardadoSinPermiso = false;
+  const AVISO_SIN_PERMISO = "No se ha guardado en la nube: tu usuario no tiene permiso para registrar este equipo. " +
+    "Queda solo en este dispositivo. Pide a la dirección del club que te asigne el equipo o te dé permiso.";
+
   async function writeGitHubFile(fileName, dataObject, commitMessage) {
+    ultimoGuardadoSinPermiso = false;
     if (!navigator.onLine || !ghSettings.user || !ghSettings.repo || !ghSettings.token) {
       enqueueOfflineOp(fileName, dataObject, commitMessage);
       return false;
@@ -3379,6 +3384,10 @@
         body: JSON.stringify(body)
       });
 
+      // 403 = la nube no deja a este usuario guardar ese archivo (p. ej. un
+      // equipo que no tiene asignado). Se deja en cola igualmente, por si le
+      // dan permiso después, pero se avisa de verdad en vez de «sin conexión».
+      ultimoGuardadoSinPermiso = putRes.status === 403;
       if (!putRes.ok) {
         enqueueOfflineOp(fileName, dataObject, commitMessage);
       }
@@ -3751,6 +3760,8 @@
 
     if (success) {
       alert("¡Entrenamiento guardado y sincronizado!");
+    } else if (ultimoGuardadoSinPermiso) {
+      alert(AVISO_SIN_PERMISO);
     } else {
       alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }
@@ -4994,6 +5005,8 @@
 
     if (success) {
       alert("¡Partido guardado y sincronizado!");
+    } else if (ultimoGuardadoSinPermiso) {
+      alert(AVISO_SIN_PERMISO);
     } else {
       alert("Guardado localmente. Se sincronizará cuando recupere la conexión.");
     }

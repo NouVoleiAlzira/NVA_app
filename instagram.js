@@ -328,6 +328,7 @@
       const editable = meta.estado === "borrador";
       det.innerHTML = `
         <video class="ig-video" src="${videos[id]}" controls playsinline preload="metadata"></video>
+        ${meta.estilo && meta.estilo.formato ? `<small class="ig-info">${meta.estilo.formato === "diapositivas" ? "🖼️ Diapositivas" : "🎬 Vídeo"}${meta.estilo.inicioPortada === false ? " · empieza en negro" : " · empieza con la portada"}</small>` : ""}
         <p class="ig-info ig-video-err" hidden style="color:#b91c1c;">Este navegador no puede reproducir el vídeo aquí. Descárgalo para verlo.</p>
         ${BOTON_DESCARGA("⬇️ Descargar el vídeo")}
         <label class="ig-label">Texto del post${editable ? " (puedes cambiarlo)" : ""}</label>
@@ -384,9 +385,26 @@
       <label class="ig-label">Texto del post (puedes cambiarlo)</label>
       <textarea class="ig-texto" rows="6">${esc(meta.texto)}</textarea>
       <button class="btn-save-session ig-estilo" style="width:100%; margin-top:10px; background:#7c3aed;">🎨 Cambiar estilo</button>
+      <label class="ig-label" style="margin-top:12px;">Cómo se ve el reel</label>
+      <div class="ig-formato" style="display:flex; gap:8px;">
+        ${FORMATOS.map(([v, n, d]) => `<button type="button" data-formato="${v}" style="flex:1; padding:8px 6px; border-radius:10px; border:2px solid #cbd5e1; background:#fff; color:#1e293b; cursor:pointer; text-align:center;">
+          <b style="display:block;">${n}</b><small style="color:#64748b;">${d}</small></button>`).join("")}
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.9rem; cursor:pointer;">
+        <input type="checkbox" class="ig-inicio-portada"> Empezar ya con la portada (sin negro al principio)</label>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
         <button class="btn-save-session ig-video" style="flex:2; background:var(--btn-fondoVerde);">🎬 Crear vídeo</button></div>`;
+    const fmt = formatoInicial(meta.estilo);
+    const pintarFormato = () => det.querySelectorAll("[data-formato]").forEach(b => {
+      const si = b.dataset.formato === fmt.formato;
+      b.style.borderColor = si ? "#2563eb" : "#cbd5e1"; b.style.boxShadow = si ? "0 0 0 2px #93c5fd" : "none";
+    });
+    det.querySelectorAll("[data-formato]").forEach(b => b.onclick = () => { fmt.formato = b.dataset.formato; pintarFormato(); });
+    const casilla = det.querySelector(".ig-inicio-portada");
+    casilla.checked = fmt.inicioPortada;
+    casilla.onchange = () => { fmt.inicioPortada = casilla.checked; };
+    pintarFormato();
     const slides = [...det.querySelectorAll(".ig-slides img")].map(async img => {
       try {
         img.src = await blobUrl(`${DIR}/${id}/slides/${String(img.dataset.i).padStart(2, "0")}.jpg`);
@@ -425,9 +443,22 @@
         "Pedido. La previa se rehará con el nuevo estilo en unos minutos (pulsa 🔄 para actualizar).", det);
     };
     det.querySelector(".ig-video").onclick = async () => {
-      await pedirSobreBorrador({ tipo: "video", borrador: id, texto: texto() }, `Crear vídeo del reel ${id}`,
+      try { localStorage.setItem(FORMATO_KEY, JSON.stringify(fmt)); } catch (x) { /* sin almacenamiento */ }
+      await pedirSobreBorrador({ tipo: "video", borrador: id, texto: texto(), estilo: { formato: fmt.formato, inicioPortada: fmt.inicioPortada } },
+        `Crear ${fmt.formato === "diapositivas" ? "reel de diapositivas" : "vídeo del reel"} ${id}`,
         "Pedido. El vídeo estará listo en unos minutos (pulsa 🔄 para actualizar).", det);
     };
+  }
+
+  // Formato del vídeo, se elige en la previa: «video» (zoom suave y transiciones) o «diapositivas»
+  // (imágenes fijas que se suceden). inicioPortada: empieza ya con la portada en vez de salir de negro.
+  const FORMATO_KEY = "NVA_REEL_FORMATO";
+  const FORMATOS = [["video", "🎬 Vídeo", "Con zoom y transiciones"], ["diapositivas", "🖼️ Diapositivas", "Imágenes fijas una tras otra"]];
+  function formatoInicial(estilo) {
+    let guardado = {};
+    try { guardado = JSON.parse(localStorage.getItem(FORMATO_KEY)) || {}; } catch (e) { /* nada guardado */ }
+    const e = Object.assign({}, guardado, estilo && estilo.formato ? estilo : {});
+    return { formato: e.formato === "diapositivas" ? "diapositivas" : "video", inicioPortada: e.inicioPortada !== false };
   }
 
   async function pedirSobreBorrador(datos, msg, aviso, det) {

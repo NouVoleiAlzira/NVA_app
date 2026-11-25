@@ -488,6 +488,7 @@
     .nva-tabla .nva-email{display:block;font-size:.72rem;color:#A9B6DA;margin-top:4px;overflow-wrap:anywhere}
     .nva-tabla .nva-email[hidden]{display:none}
     .nva-tabla .nva-email span{display:block}
+    .nva-enlace{display:inline-flex;align-items:center;gap:4px;margin:6px 6px 0 0;height:28px;padding:0 10px;border-radius:8px;border:1px solid rgba(110,168,255,.45);background:rgba(110,168,255,.12);color:#A9CBFF;font-size:.72rem;font-weight:600;cursor:pointer}
     .nva-quitar{display:inline-flex;align-items:center;gap:4px;margin-top:6px;height:28px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,107,122,.45);background:rgba(255,107,122,.12);color:#FF9AA5;font-size:.72rem;font-weight:600;cursor:pointer}
     .nva-tabla select,.nva-tabla input[type=text]{width:100%;height:32px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(233,238,250,.24);border-radius:8px;background:rgba(7,15,43,.45);font-size:.8rem;color:#E9EEFA;margin:0;color-scheme:dark}
     .nva-tabla select:disabled{background:rgba(233,238,250,.04);color:#A9B6DA;opacity:.7}
@@ -921,6 +922,31 @@
   // ------------------------------------------------------------------
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
 
+  // Enlace de la app para un usuario inscrito. Entra con su correo; si no recuerda
+  // (o nunca eligió) la contraseña, la crea con «¿Has olvidado la contraseña?».
+  async function enviarEnlaceApp(x) {
+    const url = location.origin + location.pathname;
+    const nombre = (x.nombre || "").trim();
+    const asunto = "Enlace a la app de Nou Volei Alzira";
+    const texto = `Hola${nombre ? " " + nombre.split(" ")[0] : ""}, aquí tienes el enlace a la app de Nou Volei Alzira:\n${url}\n\n` +
+      `Entra con tu correo ${x.email} y tu contraseña. Si no la recuerdas o aún no la has elegido, pulsa «¿Has olvidado la contraseña?» en la pantalla de entrada y te llegará un correo para crearla.\n\n` +
+      `En el móvil puedes instalarla: en Android, menú ⋮ › «Añadir a pantalla de inicio»; en iPhone, Compartir › «Añadir a pantalla de inicio».`;
+    const opciones = [
+      { valor: "whatsapp", texto: "WhatsApp", ico: "💬" },
+      { valor: "correo", texto: "Correo a " + x.email, ico: "✉️" }
+    ];
+    if (navigator.share) opciones.push({ valor: "compartir", texto: "Otra app…", ico: "📤" });
+    opciones.push({ valor: "copiar", texto: "Copiar el mensaje", ico: "📋" });
+    const via = await nvaElegir(`Enviar el enlace de la app a ${nombre || x.email}:`, opciones);
+    if (via === "whatsapp") window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+    else if (via === "correo") location.href = `mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
+    else if (via === "compartir") { try { await navigator.share({ title: asunto, text: texto }); } catch (e) { /* cancelado */ } }
+    else if (via === "copiar") {
+      try { await navigator.clipboard.writeText(texto); alert("Mensaje copiado. Pégalo donde quieras enviarlo."); }
+      catch (e) { await nvaPreguntar("Copia el mensaje:", texto); }
+    }
+  }
+
   let rolPermisosElegido = null;
   const ROLES_BASE = ["propietario", "administrador", "entrenador", "delegado", "lectura"];
   async function pintarPanelUsuarios() {
@@ -958,7 +984,7 @@
       || nombreDe(a).localeCompare(nombreDe(b), "es", { sensitivity: "base" }));
     const filasUsuarios = u.data.map(x => `
       <tr data-id="${esc(x.id)}">
-        <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><div class="nva-email" hidden><span>${esc(x.email)}</span>${x.rol !== "propietario" && x.id !== perfil.id ? `<button type="button" class="nva-quitar" title="Quitar usuario" aria-label="Quitar usuario">🗑️ Quitar usuario</button>` : ""}</div></td>
+        <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><div class="nva-email" hidden><span>${esc(x.email)}</span><button type="button" class="nva-enlace" title="Enviar el enlace de la app" aria-label="Enviar el enlace de la app">📲 Enviar enlace</button>${x.rol !== "propietario" && x.id !== perfil.id ? `<button type="button" class="nva-quitar" title="Quitar usuario" aria-label="Quitar usuario">🗑️ Quitar usuario</button>` : ""}</div></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
       </tr>`).join("");
@@ -1000,7 +1026,7 @@
       seccion("usuarios", "Usuarios", `
         <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
         <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
-        <p class="nva-nota">Los usuarios con rol Entrenador o Delegado salen en la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre. Pulsa ? para ver su correo y, si hace falta, quitar al usuario.</p>
+        <p class="nva-nota">Los usuarios con rol Entrenador o Delegado salen en la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre. Pulsa ? para ver su correo, enviarle el enlace de la app o, si hace falta, quitar al usuario.</p>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
@@ -1025,6 +1051,12 @@
     caja.querySelectorAll(".nva-info").forEach(b => b.onclick = () => {
       const email = b.closest("td").querySelector(".nva-email");
       email.hidden = !email.hidden;
+    });
+
+    // Enviar el enlace de la app a un usuario ya inscrito: WhatsApp, correo, compartir o copiar
+    caja.querySelectorAll(".nva-enlace").forEach(b => b.onclick = () => {
+      const x = u.data.find(y => y.id === b.closest("tr").dataset.id);
+      if (x) enviarEnlaceApp(x);
     });
 
     // Quitar un usuario por completo: cuenta (correo y contraseña), perfil, rol y equipos.

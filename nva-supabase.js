@@ -57,7 +57,7 @@
     "direccion.consultas": ["[data-nva-menu=\"direccion.consultas\"]"],
     "direccion.horarios": ["[data-nva-menu=\"direccion.horarios\"]"],
     "direccion.registros": ["[data-nva-menu=\"direccion.registros\"]"],
-    "instagram.reels": ["#igSubHead_reels", "#igSub_reels"],
+    "instagram.reels": ["#igSubHead_reels", "#igSub_reels", "#igSubHead_carrusel", "#igSub_carrusel"],   // el carrusel usa los mismos datos
     "instagram.stories": ["#igSubHead_stories", "#igSub_stories"],
     "instagram.eventos": ["#igSubHead_eventos", "#igSub_eventos"],
     "opciones.entrenadores": [".tab-btn[onclick=\"switchTab(1)\"]", "#tabContent1"],

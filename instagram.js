@@ -129,8 +129,8 @@
     applySub(id, open);
   }
   const st0 = subsState();
-  ["reels", "stories", "eventos"].forEach(id => applySub(id, st0[id] !== false));
-  ["reelsPub", "storiesPub"].forEach(id => applySub(id, st0[id] === true));   // «Publicados» empieza plegado
+  ["reels", "carrusel", "stories", "eventos"].forEach(id => applySub(id, st0[id] !== false));
+  ["reelsPub", "carrPub", "storiesPub"].forEach(id => applySub(id, st0[id] === true));   // «Publicados» empieza plegado
   window.igToggleSub = igToggleSub;
 
   window.igActivate = igActivate;
@@ -274,18 +274,24 @@
     recargar();
   }
 
+  // Los reels (vídeo) y los carruseles (diapositivas) comparten Reels/borradores; cada uno en su sección
   async function cargar() {
-    const el = box(), pub = document.getElementById("igReelsPub");
+    await Promise.all([cargarSeccion("video"), cargarSeccion("carrusel")]);
+  }
+
+  async function cargarSeccion(formato) {
+    const carr = formato === "carrusel";
+    const el = document.getElementById(carr ? "igCarrList" : "igReelsList"), pub = document.getElementById(carr ? "igCarrPub" : "igReelsPub");
     if (!el || !window.igGetToken()) return;
     el.innerHTML = `<p class="ig-info">Cargando borradores…</p>`;
     try {
       const idx = await getJson(`${DIR}/indice.json`);
-      const todos = ((idx && idx.borradores) || []).filter(b => !OCULTOS.includes(b.estado));
+      const todos = ((idx && idx.borradores) || []).filter(b => !OCULTOS.includes(b.estado) && (b.formato === "carrusel") === carr);
       const det = (b) => b.tipo === "evento" ? `${esc(b.titulo || "")} · ${b.fotos || 0} fotos` : `${fmt(b.desde)} – ${fmt(b.hasta)} · ${b.partidos || 0} partidos`;
       const borr = todos.filter(b => b.estado !== "publicado").slice(0, 12), publ = todos.filter(b => b.estado === "publicado").slice(0, 30);
       el.innerHTML = borr.length ? borr.map(b => tarjeta(b, TIPOS[b.tipo] || esc(b.tipo), det(b), false)).join("")
         : `<p class="ig-info">No hay borradores pendientes.</p>`;
-      if (pub) pub.innerHTML = publ.length ? publ.map(b => tarjeta(b, TIPOS[b.tipo] || esc(b.tipo), det(b), true)).join("") : `<p class="ig-info">Todavía no hay reels publicados.</p>`;
+      if (pub) pub.innerHTML = publ.length ? publ.map(b => tarjeta(b, TIPOS[b.tipo] || esc(b.tipo), det(b), true)).join("") : `<p class="ig-info">Todavía no hay ${carr ? "carruseles" : "reels"} publicados.</p>`;
       [el, pub].filter(Boolean).forEach(cont => {
         cont.querySelectorAll(".ig-portada").forEach(async img => {
           try { img.src = await blobUrl(`${DIR}/${img.dataset.src}/portada.jpg`); } catch (e) { img.remove(); }
@@ -322,7 +328,7 @@
       const meta = await getJson(`${DIR}/${id}/meta.json`);
       if (meta.estado === "previa") return abrirPrevia(id, meta, det);
       if (meta.videoBorrado) return verSinVideo(id, meta, det);
-      const carrusel = !!(meta.estilo && meta.estilo.formato === "carrusel" && Array.isArray(meta.carrusel));
+      const carrusel = meta.formato === "carrusel" && Array.isArray(meta.carrusel);
       const vk = id + "|" + (meta.version || "");   // al cambiar el estilo el vídeo es otro
       if (!carrusel) {
         if (!videos[vk]) videos[vk] = await blobUrl(`${DIR}/${id}/reel.mp4`);
@@ -333,15 +339,15 @@
         ${carrusel ? `<div class="ig-slides" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; scroll-snap-type:x mandatory;">
           ${meta.carrusel.map((f, i) => `<img data-f="${esc(f)}" alt="Foto ${i + 1}" style="flex:0 0 auto; width:62%; aspect-ratio:4/5; object-fit:cover; border-radius:8px; background:#0b163a; scroll-snap-align:start; cursor:zoom-in;">`).join("")}
         </div>
-        <small class="ig-info">🖼️ Diapositivas: se publica como carrusel de ${meta.carrusel.length} fotos (sin música)</small>
+        <small class="ig-info">Se publica como carrusel de ${meta.carrusel.length} fotos (sin música).</small>
         ${BOTON_DESCARGA("⬇️ Descargar las fotos")}`
         : `<video class="ig-video" src="${videos[id]}" controls playsinline preload="metadata"></video>
-        ${meta.estilo && meta.estilo.formato === "video" ? `<small class="ig-info">🎬 Vídeo${meta.estilo.inicioPortada === false ? " · empieza en negro" : " · empieza con la portada"}</small>` : ""}
+        ${meta.estilo && "inicioPortada" in meta.estilo ? `<small class="ig-info">${meta.estilo.inicioPortada === false ? "Empieza en negro" : "Empieza ya con la portada"}</small>` : ""}
         <p class="ig-info ig-video-err" hidden style="color:#b91c1c;">Este navegador no puede reproducir el vídeo aquí. Descárgalo para verlo.</p>
         ${BOTON_DESCARGA("⬇️ Descargar el vídeo")}`}
         <label class="ig-label">Texto del post${editable ? " (puedes cambiarlo)" : ""}</label>
         <textarea class="ig-texto" rows="8" ${editable ? "" : "readonly"}>${esc(meta.texto)}</textarea>
-        <small class="ig-info">Música: ${esc(meta.musica || "sin música")}${meta.confirmadoPor ? ` · Confirmado por ${esc(meta.confirmadoPor)}` : ""}</small>
+        <small class="ig-info">${carrusel ? "" : `Música: ${esc(meta.musica || "sin música")}`}${meta.confirmadoPor ? `${carrusel ? "" : " · "}Confirmado por ${esc(meta.confirmadoPor)}` : ""}</small>
         ${editable ? `<button class="btn-save-session ig-estilo" style="width:100%; margin-top:10px; background:#7c3aed;">🎨 Cambiar estilo</button>
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
@@ -376,13 +382,15 @@
       if (!editable) return;
       det.querySelector(".ig-descartar").onclick = () => cambiarEstado(id, meta, "descartado");
       det.querySelector(".ig-estilo").onclick = async () => {
-        const estilo = await elegirEstilo(meta.estilo, "🎨 Rehacer la previa");
+        formatoActual = carrusel ? "carrusel" : "video";
+        const estilo = await elegirEstilo(meta.estilo, carrusel ? "🎨 Rehacer las diapositivas" : "🎨 Rehacer la previa");
         if (!estilo) return;
         try {
           await putJson("Reels/solicitud.json", { id: Date.now().toString(36), tipo: "regenerar", borrador: id, estilo,
             texto: det.querySelector(".ig-texto").value.trim(), pedido: new Date().toISOString() }, `Cambiar estilo del reel ${id}`);
           det.hidden = true;
-          alert("Pedido. Se rehará la previa con el nuevo estilo en unos minutos (pulsa 🔄 para actualizar). Después tendrás que crear el vídeo otra vez.");
+          alert(carrusel ? "Pedido. Las diapositivas se reharán con el nuevo estilo en unos minutos (pulsa 🔄 para actualizar)."
+            : "Pedido. Se rehará la previa con el nuevo estilo en unos minutos (pulsa 🔄 para actualizar). Después tendrás que crear el vídeo otra vez.");
         } catch (e) { alert(e.message); }
       };
       det.querySelector(".ig-confirmar").onclick = () => {
@@ -408,33 +416,15 @@
       <label class="ig-label">Texto del post (puedes cambiarlo)</label>
       <textarea class="ig-texto" rows="6">${esc(meta.texto)}</textarea>
       <button class="btn-save-session ig-estilo" style="width:100%; margin-top:10px; background:#7c3aed;">🎨 Cambiar estilo</button>
-      <label class="ig-label" style="margin-top:12px;">Cómo se ve el reel</label>
-      <div class="ig-formato" style="display:flex; gap:8px;">
-        ${FORMATOS.map(([v, n, d]) => `<button type="button" data-formato="${v}" style="flex:1; padding:8px 6px; border-radius:10px; border:2px solid #cbd5e1; background:#fff; color:#1e293b; cursor:pointer; text-align:center;">
-          <b style="display:block;">${n}</b><small style="color:#64748b;">${d}</small></button>`).join("")}
-      </div>
-      <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.9rem; cursor:pointer;">
+      <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:.9rem; cursor:pointer;">
         <input type="checkbox" class="ig-inicio-portada"> Empezar ya con la portada (sin negro al principio)</label>
-      <small class="ig-info ig-formato-info" hidden>Se publica como carrusel de fotos que se pasan con el dedo. No lleva música y las fotos quedan en formato 4:5 (Instagram no admite más altas en un carrusel).</small>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
         <button class="btn-save-session ig-video" style="flex:2; background:var(--btn-fondoVerde);">🎬 Crear vídeo</button></div>`;
     const fmt = formatoInicial(meta.estilo);
-    const pintarFormato = () => {
-      det.querySelectorAll("[data-formato]").forEach(b => {
-        const si = b.dataset.formato === fmt.formato;
-        b.style.borderColor = si ? "#2563eb" : "#cbd5e1"; b.style.boxShadow = si ? "0 0 0 2px #93c5fd" : "none";
-      });
-      const fotos = fmt.formato === "carrusel";
-      det.querySelector(".ig-inicio-portada").closest("label").hidden = fotos;
-      det.querySelector(".ig-formato-info").hidden = !fotos;
-      det.querySelector(".ig-video").textContent = fotos ? "🖼️ Crear diapositivas" : "🎬 Crear vídeo";
-    };
-    det.querySelectorAll("[data-formato]").forEach(b => b.onclick = () => { fmt.formato = b.dataset.formato; pintarFormato(); });
     const casilla = det.querySelector(".ig-inicio-portada");
     casilla.checked = fmt.inicioPortada;
     casilla.onchange = () => { fmt.inicioPortada = casilla.checked; };
-    pintarFormato();
     const slides = [...det.querySelectorAll(".ig-slides img")].map(async img => {
       try {
         img.src = await blobUrl(`${DIR}/${id}/slides/${String(img.dataset.i).padStart(2, "0")}.jpg`);
@@ -467,6 +457,7 @@
     };
     det.querySelector(".ig-descartar").onclick = () => cambiarEstado(id, meta, "descartado");
     det.querySelector(".ig-estilo").onclick = async () => {
+      formatoActual = "video";
       const estilo = await elegirEstilo(meta.estilo, "🎨 Rehacer la previa");
       if (!estilo) return;
       await pedirSobreBorrador({ tipo: "regenerar", borrador: id, estilo, texto: texto() }, `Cambiar estilo del reel ${id}`,
@@ -474,24 +465,18 @@
     };
     det.querySelector(".ig-video").onclick = async () => {
       try { localStorage.setItem(FORMATO_KEY, JSON.stringify(fmt)); } catch (x) { /* sin almacenamiento */ }
-      await pedirSobreBorrador({ tipo: "video", borrador: id, texto: texto(), estilo: { formato: fmt.formato, inicioPortada: fmt.inicioPortada } },
-        `Crear ${fmt.formato === "carrusel" ? "carrusel" : "vídeo"} del reel ${id}`,
-        fmt.formato === "carrusel" ? "Pedido. Las diapositivas estarán listas en un par de minutos (pulsa 🔄 para actualizar)."
-          : "Pedido. El vídeo estará listo en unos minutos (pulsa 🔄 para actualizar).", det);
+      await pedirSobreBorrador({ tipo: "video", borrador: id, texto: texto(), estilo: { inicioPortada: fmt.inicioPortada } },
+        `Crear vídeo del reel ${id}`, "Pedido. El vídeo estará listo en unos minutos (pulsa 🔄 para actualizar).", det);
     };
   }
 
-  // Formato, se elige en la previa: «video» (reel con zoom suave y transiciones) o «carrusel»
-  // (botón «Diapositivas»: post de fotos que se pasan con el dedo, sin vídeo ni música).
-  // inicioPortada (solo vídeo): empieza ya con la portada en vez de salir de negro.
+  // inicioPortada (se elige en la previa del reel): el vídeo empieza ya con la portada en vez de salir de negro.
   const FORMATO_KEY = "NVA_REEL_FORMATO";
-  const FORMATOS = [["video", "🎬 Vídeo", "Reel con música"], ["carrusel", "🖼️ Diapositivas", "Fotos que se pasan, sin vídeo"]];
   function formatoInicial(estilo) {
     let guardado = {};
     try { guardado = JSON.parse(localStorage.getItem(FORMATO_KEY)) || {}; } catch (e) { /* nada guardado */ }
-    const e = Object.assign({}, guardado, estilo && estilo.formato ? estilo : {});
-    // «diapositivas» era el reel de imágenes fijas (25/11): ahora ese botón es el carrusel
-    return { formato: ["carrusel", "diapositivas"].includes(e.formato) ? "carrusel" : "video", inicioPortada: e.inicioPortada !== false };
+    const e = Object.assign({}, guardado, estilo && "inicioPortada" in estilo ? estilo : {});
+    return { inicioPortada: e.inicioPortada !== false };
   }
 
   async function pedirSobreBorrador(datos, msg, aviso, det) {
@@ -549,7 +534,7 @@
 
   async function confirmar(id, meta) {
     if (!meta.texto) { alert("Escribe el texto del post."); return; }
-    if (!await nvaConfirmar(`¿Has visto ${meta.estilo && meta.estilo.formato === "carrusel" ? "las fotos" : "el vídeo"} y el texto? Al confirmar se publicará en el Instagram del club.`)) return;
+    if (!await nvaConfirmar(`¿Has visto ${meta.formato === "carrusel" ? "las diapositivas" : "el vídeo"} y el texto? Al confirmar se publicará en el Instagram del club.`)) return;
     const quien = (JSON.parse(localStorage.getItem("NVA_IG_SETTINGS") || "{}").login) || "";
     const ahora = new Date().toISOString();
     const ok = await cambiarEstado(id, meta, "confirmado", { confirmadoPor: quien, confirmadoEn: ahora });
@@ -602,10 +587,10 @@
   <div class="modal-backdrop active" id="modalIgEstilo" style="z-index:3000;">
     <div class="modal-box" style="max-width:460px; max-height:92vh; overflow:auto;">
       <div class="modal-header">
-        <div class="modal-title">🎨 Estilo del reel</div>
+        <div class="modal-title">🎨 Estilo del ${formatoActual === "carrusel" ? "carrusel" : "reel"}</div>
         <button class="btn-close-modal" type="button" data-est="cancelar">✕</button>
       </div>
-      <label class="ig-label">Estilo (para todo el reel)</label>
+      <label class="ig-label">Estilo (para todo el ${formatoActual === "carrusel" ? "carrusel" : "reel"})</label>
       <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px;">
         ${PLANTILLAS.map(([g, n]) => `<button type="button" class="ig-plantilla" data-g="${g}"
           style="flex:0 0 auto; width:70px; padding:3px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; cursor:pointer; color:#1e293b;">
@@ -616,12 +601,14 @@
       <label class="ig-label">Colores del estilo</label>
       <div id="igEstColores" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:4px;"></div>
       <small class="ig-info" id="igEstColInfo"></small>
+      <div ${formatoActual === "carrusel" ? "hidden" : ""}>
       <label class="ig-label" style="margin-top:10px;">Música</label>
       <div style="display:flex; gap:8px; align-items:center;">
         <span id="igEstMusica" style="flex:1; min-width:0; font-size:.85rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
         <button type="button" data-est="musica" style="border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:4px 10px; cursor:pointer; color:#1e293b;">🎵 Elegir</button>
       </div>
-      ${PARTES.map(([k, nombre, durs]) => `
+      </div>
+      ${formatoActual === "carrusel" ? "" : PARTES.map(([k, nombre, durs]) => `
       <div class="ig-est-parte" data-parte="${k}" style="margin-top:10px;">
         <label class="ig-label">${nombre}</label>
         <div style="display:grid; grid-template-columns:auto 4.2rem 3.9rem minmax(0,1fr); gap:6px; align-items:center;">
@@ -633,7 +620,7 @@
       </div>`).join("")}
       <div style="display:flex; gap:8px; margin-top:12px;">
         <button class="btn-save-session" type="button" data-est="cancelar" style="flex:1; background:#64748b;">Cancelar</button>
-        <button class="btn-save-session" type="button" data-est="ok" style="flex:2;">${textoBoton || "🎬 Generar reel"}</button>
+        <button class="btn-save-session" type="button" data-est="ok" style="flex:2;">${textoBoton || (formatoActual === "carrusel" ? "🖼️ Generar carrusel" : "🎬 Generar reel")}</button>
       </div>
     </div>
   </div>`);
@@ -1431,9 +1418,10 @@
   const tituloPartido = (id) => { const [eq, , rival] = String(id).split("|"); return `${(eq || "").replace(/\s*\(.*\)\s*$/, "")} – ${rival || ""}`; };
 
   // Botones de la sección: resultados, próximos o evento manual
-  function generar(tipo) {
+  function generar(tipo, formato) {
     crearMenu();
     destino = "reel";
+    formatoActual = formato === "carrusel" ? "carrusel" : "video";
     if (tipo === "proximos") {   // la misma ventana de elegir partidos que las stories (historia-semana.js)
       if (!window.nvaSemana) { pedirPartidos("proximos"); return; }
       window.nvaSemana.abrir("proximos", { reel: async (sel) => {
@@ -1454,9 +1442,9 @@
     if (!estilo) return;
     cerrarMenu();
     try {
-      await putJson("Reels/solicitud.json", Object.assign({ id: Date.now().toString(36), tipo, estilo, pedido: new Date().toISOString() }, extra || {}),
-        `Pedir reel ${tipo}`);
-      alert("Pedido. La previa de las diapositivas aparecerá aquí en unos minutos (pulsa 🔄 para actualizar).");
+      await putJson("Reels/solicitud.json", Object.assign({ id: Date.now().toString(36), tipo, estilo, pedido: new Date().toISOString() },
+        formatoActual === "carrusel" ? { formato: "carrusel" } : {}, extra || {}), `Pedir ${formatoActual === "carrusel" ? "carrusel" : "reel"} ${tipo}`);
+      alert(AVISO_PEDIDO());
     } catch (e) { alert(e.message); }
   }
 
@@ -1482,13 +1470,13 @@
         fotos.push(ruta);
       }
       estado.textContent = "Pidiendo el reel…";
-      await putJson("Reels/solicitud.json", { id, tipo: "evento", titulo, descripcion: texto, fotos, estilo,
-        pedido: new Date().toISOString() }, `Pedir reel de evento ${id}`);
+      await putJson("Reels/solicitud.json", Object.assign({ id, tipo: "evento", titulo, descripcion: texto, fotos, estilo,
+        pedido: new Date().toISOString() }, formatoActual === "carrusel" ? { formato: "carrusel" } : {}), `Pedir ${formatoActual === "carrusel" ? "carrusel" : "reel"} de evento ${id}`);
       fotosEvento.forEach(f => URL.revokeObjectURL(f.url)); fotosEvento = []; pintarFotos();
       document.getElementById("igEvTitulo").value = ""; document.getElementById("igEvTexto").value = "";
       estado.textContent = "";
       cerrarMenu();
-      alert("Pedido. La previa de las diapositivas aparecerá aquí en unos minutos (pulsa 🔄 para actualizar).");
+      alert(AVISO_PEDIDO());
     } catch (e) {
       estado.textContent = "";
       alert(e.message);
@@ -1507,7 +1495,11 @@
      borrador. Confirmar escribe Reels/publicar.json con tipo «historia».
      ===================================================================== */
   const DIR_H = "Reels/historias";
-  let destino = "reel";          // "reel" o "historia": a qué va el formulario del evento
+  let destino = "reel";
+  let formatoActual = "video";   // «video» (sección Reels) o «carrusel» (sección Carrusel)
+  const AVISO_PEDIDO = () => formatoActual === "carrusel"
+    ? "Pedido. Las diapositivas del carrusel aparecerán aquí en unos minutos (pulsa 🔄 para actualizar)."
+    : "Pedido. La previa de las diapositivas aparecerá aquí en unos minutos (pulsa 🔄 para actualizar).";          // "reel" o "historia": a qué va el formulario del evento
   // Resultados y Partidos: una story con todos los partidos de la semana (historia-semana.js)
   function generarHistoria(tipo) {
     if (tipo === "resultados" || tipo === "proximos") { window.nvaSemana.abrir(tipo); return; }

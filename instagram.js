@@ -322,15 +322,23 @@
       const meta = await getJson(`${DIR}/${id}/meta.json`);
       if (meta.estado === "previa") return abrirPrevia(id, meta, det);
       if (meta.videoBorrado) return verSinVideo(id, meta, det);
+      const carrusel = !!(meta.estilo && meta.estilo.formato === "carrusel" && Array.isArray(meta.carrusel));
       const vk = id + "|" + (meta.version || "");   // al cambiar el estilo el vídeo es otro
-      if (!videos[vk]) videos[vk] = await blobUrl(`${DIR}/${id}/reel.mp4`);
-      videos[id] = videos[vk];
+      if (!carrusel) {
+        if (!videos[vk]) videos[vk] = await blobUrl(`${DIR}/${id}/reel.mp4`);
+        videos[id] = videos[vk];
+      }
       const editable = meta.estado === "borrador";
       det.innerHTML = `
-        <video class="ig-video" src="${videos[id]}" controls playsinline preload="metadata"></video>
-        ${meta.estilo && meta.estilo.formato ? `<small class="ig-info">${meta.estilo.formato === "diapositivas" ? "🖼️ Diapositivas" : "🎬 Vídeo"}${meta.estilo.inicioPortada === false ? " · empieza en negro" : " · empieza con la portada"}</small>` : ""}
+        ${carrusel ? `<div class="ig-slides" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; scroll-snap-type:x mandatory;">
+          ${meta.carrusel.map((f, i) => `<img data-f="${esc(f)}" alt="Foto ${i + 1}" style="flex:0 0 auto; width:62%; aspect-ratio:4/5; object-fit:cover; border-radius:8px; background:#0b163a; scroll-snap-align:start; cursor:zoom-in;">`).join("")}
+        </div>
+        <small class="ig-info">🖼️ Diapositivas: se publica como carrusel de ${meta.carrusel.length} fotos (sin música)</small>
+        ${BOTON_DESCARGA("⬇️ Descargar las fotos")}`
+        : `<video class="ig-video" src="${videos[id]}" controls playsinline preload="metadata"></video>
+        ${meta.estilo && meta.estilo.formato === "video" ? `<small class="ig-info">🎬 Vídeo${meta.estilo.inicioPortada === false ? " · empieza en negro" : " · empieza con la portada"}</small>` : ""}
         <p class="ig-info ig-video-err" hidden style="color:#b91c1c;">Este navegador no puede reproducir el vídeo aquí. Descárgalo para verlo.</p>
-        ${BOTON_DESCARGA("⬇️ Descargar el vídeo")}
+        ${BOTON_DESCARGA("⬇️ Descargar el vídeo")}`}
         <label class="ig-label">Texto del post${editable ? " (puedes cambiarlo)" : ""}</label>
         <textarea class="ig-texto" rows="8" ${editable ? "" : "readonly"}>${esc(meta.texto)}</textarea>
         <small class="ig-info">Música: ${esc(meta.musica || "sin música")}${meta.confirmadoPor ? ` · Confirmado por ${esc(meta.confirmadoPor)}` : ""}</small>
@@ -338,9 +346,24 @@
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
           <button class="btn-save-session ig-confirmar" style="flex:2;">✅ Confirmar y publicar</button></div>` : ""}`;
-      det.querySelector(".ig-descargar").onclick = () => descargar([{ url: videos[id], nombre: `reel-${id}.mp4` }]);
-      const v = det.querySelector(".ig-video");
-      v.onerror = () => { det.querySelector(".ig-video-err").hidden = false; console.error("Vídeo", v.error); };
+      if (carrusel) {
+        const fotos = [...det.querySelectorAll(".ig-slides img")];
+        const bajar = det.querySelector(".ig-descargar");
+        bajar.disabled = true;
+        Promise.all(fotos.map(async img => {
+          const k = `${DIR}/${id}/${img.dataset.f}|${meta.version || ""}`;
+          try {
+            if (!videos[k]) videos[k] = await blobUrl(`${DIR}/${id}/${img.dataset.f}`);
+            img.src = videos[k];
+            img.onclick = () => window.open(img.src, "_blank");
+          } catch (e) { img.alt = "No disponible"; }
+        })).then(() => { bajar.disabled = false; });
+        bajar.onclick = () => descargar(fotos.filter(im => im.src).map((im, i) => ({ url: im.src, nombre: `carrusel-${id}-${String(i + 1).padStart(2, "0")}.jpg` })));
+      } else {
+        det.querySelector(".ig-descargar").onclick = () => descargar([{ url: videos[id], nombre: `reel-${id}.mp4` }]);
+        const v = det.querySelector(".ig-video");
+        v.onerror = () => { det.querySelector(".ig-video-err").hidden = false; console.error("Vídeo", v.error); };
+      }
       if (meta.enlace) det.insertAdjacentHTML("beforeend", `<p class="ig-info"><a href="${esc(meta.enlace)}" target="_blank" rel="noopener">📲 Ver en Instagram</a></p>`);
       if (meta.estado === "error") {
         det.insertAdjacentHTML("beforeend", `<p class="ig-info" style="color:#b91c1c;">${esc(meta.error)}</p>
@@ -392,14 +415,21 @@
       </div>
       <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:.9rem; cursor:pointer;">
         <input type="checkbox" class="ig-inicio-portada"> Empezar ya con la portada (sin negro al principio)</label>
+      <small class="ig-info ig-formato-info" hidden>Se publica como carrusel de fotos que se pasan con el dedo. No lleva música y las fotos quedan en formato 4:5 (Instagram no admite más altas en un carrusel).</small>
       <div style="display:flex; gap:8px; margin-top:8px;">
         <button class="btn-save-session ig-descartar" style="flex:1; background:#64748b;">🗑️ Descartar</button>
         <button class="btn-save-session ig-video" style="flex:2; background:var(--btn-fondoVerde);">🎬 Crear vídeo</button></div>`;
     const fmt = formatoInicial(meta.estilo);
-    const pintarFormato = () => det.querySelectorAll("[data-formato]").forEach(b => {
-      const si = b.dataset.formato === fmt.formato;
-      b.style.borderColor = si ? "#2563eb" : "#cbd5e1"; b.style.boxShadow = si ? "0 0 0 2px #93c5fd" : "none";
-    });
+    const pintarFormato = () => {
+      det.querySelectorAll("[data-formato]").forEach(b => {
+        const si = b.dataset.formato === fmt.formato;
+        b.style.borderColor = si ? "#2563eb" : "#cbd5e1"; b.style.boxShadow = si ? "0 0 0 2px #93c5fd" : "none";
+      });
+      const fotos = fmt.formato === "carrusel";
+      det.querySelector(".ig-inicio-portada").closest("label").hidden = fotos;
+      det.querySelector(".ig-formato-info").hidden = !fotos;
+      det.querySelector(".ig-video").textContent = fotos ? "🖼️ Crear diapositivas" : "🎬 Crear vídeo";
+    };
     det.querySelectorAll("[data-formato]").forEach(b => b.onclick = () => { fmt.formato = b.dataset.formato; pintarFormato(); });
     const casilla = det.querySelector(".ig-inicio-portada");
     casilla.checked = fmt.inicioPortada;
@@ -445,20 +475,23 @@
     det.querySelector(".ig-video").onclick = async () => {
       try { localStorage.setItem(FORMATO_KEY, JSON.stringify(fmt)); } catch (x) { /* sin almacenamiento */ }
       await pedirSobreBorrador({ tipo: "video", borrador: id, texto: texto(), estilo: { formato: fmt.formato, inicioPortada: fmt.inicioPortada } },
-        `Crear ${fmt.formato === "diapositivas" ? "reel de diapositivas" : "vídeo del reel"} ${id}`,
-        "Pedido. El vídeo estará listo en unos minutos (pulsa 🔄 para actualizar).", det);
+        `Crear ${fmt.formato === "carrusel" ? "carrusel" : "vídeo"} del reel ${id}`,
+        fmt.formato === "carrusel" ? "Pedido. Las diapositivas estarán listas en un par de minutos (pulsa 🔄 para actualizar)."
+          : "Pedido. El vídeo estará listo en unos minutos (pulsa 🔄 para actualizar).", det);
     };
   }
 
-  // Formato del vídeo, se elige en la previa: «video» (zoom suave y transiciones) o «diapositivas»
-  // (imágenes fijas que se suceden). inicioPortada: empieza ya con la portada en vez de salir de negro.
+  // Formato, se elige en la previa: «video» (reel con zoom suave y transiciones) o «carrusel»
+  // (botón «Diapositivas»: post de fotos que se pasan con el dedo, sin vídeo ni música).
+  // inicioPortada (solo vídeo): empieza ya con la portada en vez de salir de negro.
   const FORMATO_KEY = "NVA_REEL_FORMATO";
-  const FORMATOS = [["video", "🎬 Vídeo", "Con zoom y transiciones"], ["diapositivas", "🖼️ Diapositivas", "Imágenes fijas una tras otra"]];
+  const FORMATOS = [["video", "🎬 Vídeo", "Reel con música"], ["carrusel", "🖼️ Diapositivas", "Fotos que se pasan, sin vídeo"]];
   function formatoInicial(estilo) {
     let guardado = {};
     try { guardado = JSON.parse(localStorage.getItem(FORMATO_KEY)) || {}; } catch (e) { /* nada guardado */ }
     const e = Object.assign({}, guardado, estilo && estilo.formato ? estilo : {});
-    return { formato: e.formato === "diapositivas" ? "diapositivas" : "video", inicioPortada: e.inicioPortada !== false };
+    // «diapositivas» era el reel de imágenes fijas (25/11): ahora ese botón es el carrusel
+    return { formato: ["carrusel", "diapositivas"].includes(e.formato) ? "carrusel" : "video", inicioPortada: e.inicioPortada !== false };
   }
 
   async function pedirSobreBorrador(datos, msg, aviso, det) {
@@ -516,7 +549,7 @@
 
   async function confirmar(id, meta) {
     if (!meta.texto) { alert("Escribe el texto del post."); return; }
-    if (!await nvaConfirmar("¿Has visto el vídeo y el texto? Al confirmar se publicará en el Instagram del club.")) return;
+    if (!await nvaConfirmar(`¿Has visto ${meta.estilo && meta.estilo.formato === "carrusel" ? "las fotos" : "el vídeo"} y el texto? Al confirmar se publicará en el Instagram del club.`)) return;
     const quien = (JSON.parse(localStorage.getItem("NVA_IG_SETTINGS") || "{}").login) || "";
     const ahora = new Date().toISOString();
     const ok = await cambiarEstado(id, meta, "confirmado", { confirmadoPor: quien, confirmadoEn: ahora });

@@ -495,6 +495,12 @@
     .nva-check{display:flex;align-items:center;justify-content:center;height:32px}
     .nva-check input{width:18px;height:18px;margin:0}
     .nva-tabla .nva-col-rol{width:30%}
+    .nva-usuarios .nva-grupo-cab td{padding:10px 0 4px;border-bottom:0}
+    .nva-usuarios .nva-grupo-btn{margin-bottom:0}
+    .nva-usuarios .nva-grupo tr[data-id] td:first-child{padding-left:10px;box-shadow:inset 2px 0 0 rgba(245,197,24,.45)}
+    .nva-usuarios .nva-grupo[hidden]{display:none}
+    .nva-usuarios tr.nva-movida td{animation:nvaMovida 1.2s ease}
+    @keyframes nvaMovida{from{background:rgba(245,197,24,.22)}to{background:transparent}}
         .nva-tabla .nva-col-activo{width:44px;text-align:center}
     .nva-permisos td{vertical-align:middle}
     .nva-permisos .nva-col-acceso{width:110px}
@@ -948,6 +954,8 @@
   }
 
   let rolPermisosElegido = null;
+  // Grupos de usuarios (por rol) plegados en Usuarios y permisos; se recuerdan en este dispositivo
+  const gruposUsuariosCerrados = new Set((() => { try { return JSON.parse(localStorage.getItem("NVA_GRUPOS_USUARIOS")) || []; } catch (e) { return []; } })());
   const ROLES_BASE = ["propietario", "administrador", "entrenador", "delegado", "lectura"];
   async function pintarPanelUsuarios() {
     const caja = document.getElementById("nvaPanelUsuarios");
@@ -982,12 +990,26 @@
     const nombreDe = x => ((x.nombre || "").trim() || x.email || "");
     u.data.sort((a, b) => (rangoRol.has(a.rol) ? rangoRol.get(a.rol) : 999) - (rangoRol.has(b.rol) ? rangoRol.get(b.rol) : 999)
       || nombreDe(a).localeCompare(nombreDe(b), "es", { sensitivity: "base" }));
-    const filasUsuarios = u.data.map(x => `
+    const filaUsuario = x => `
       <tr data-id="${esc(x.id)}">
         <td><div class="nva-nombre"><input type="text" data-campo="nombre" value="${esc(x.nombre)}" placeholder="Nombre"><button type="button" class="nva-info" title="Ver email" aria-label="Ver email">?</button></div><div class="nva-email" hidden><span>${esc(x.email)}</span><button type="button" class="nva-enlace" title="Enviar el enlace de la app" aria-label="Enviar el enlace de la app">📲 Enviar enlace</button>${x.rol !== "propietario" && x.id !== perfil.id ? `<button type="button" class="nva-quitar" title="Quitar usuario" aria-label="Quitar usuario">🗑️ Quitar usuario</button>` : ""}</div></td>
         <td><select data-campo="rol">${opcRol(x.rol)}</select></td>
         <td><div class="nva-check"><input type="checkbox" data-campo="activo"${x.activo ? " checked" : ""}></div></td>
-      </tr>`).join("");
+      </tr>`;
+    // Usuarios agrupados por rol en subsecciones desplegables (mismo orden: de más permisos a menos).
+    // Hay un grupo por rol aunque esté vacío (oculto), para que un usuario al que se le cambia el rol pase a él.
+    const rolesOrden = roles.slice().sort((a, b) => rangoRol.get(a.id) - rangoRol.get(b.id));
+    const sinRol = u.data.filter(x => !rangoRol.has(x.rol));
+    const grupos = rolesOrden.map(ro => ({ id: ro.id, nombre: ro.nombre, lista: u.data.filter(x => x.rol === ro.id) }))
+      .concat(sinRol.length ? [{ id: "", nombre: "Sin rol", lista: sinRol }] : []);
+    const ICONO_ROL = { propietario: "👑", administrador: "🛠️", entrenador: "🧑‍🏫", delegado: "📋", lectura: "👀" };
+    const filasUsuarios = grupos.map(g => {
+      const abierto = !gruposUsuariosCerrados.has(g.id);
+      return `<tbody class="nva-grupo" data-rol="${esc(g.id)}"${g.lista.length ? "" : " hidden"}>
+        <tr class="nva-grupo-cab"><td colspan="3"><button type="button" class="hz-sub-btn esc-sec-btn nva-grupo-btn${abierto ? " open" : ""}" aria-expanded="${abierto}">
+          <span>${ICONO_ROL[g.id] || "👥"} ${esc(g.nombre)} <small class="badge">${g.lista.length}</small></span><span class="nva-grupo-flecha">${abierto ? "🔻" : "➤"}</span>
+        </button></td></tr>${g.lista.map(filaUsuario).join("")}</tbody>`;
+    }).join("");
 
     // Permisos: cada menú y cada subsección tienen su nivel. En una subsección
     // vale el menor entre el suyo y el de su menú; sin fila propia sigue a su menú.
@@ -1024,9 +1046,9 @@
         <button class="btn-save-session" id="nvaInvitar">✉️ Enviar invitación</button>
         <p style="font-size:.75rem;color:var(--txt-2)">Le llegará un email para elegir su contraseña.</p>`) +
       seccion("usuarios", "Usuarios", `
-        <table class="nva-tabla"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
-        <tbody id="nvaUsuarios">${filasUsuarios}</tbody></table>
-        <p class="nva-nota">Los usuarios con rol Entrenador o Delegado salen en la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre. Pulsa ? para ver su correo, enviarle el enlace de la app o, si hace falta, quitar al usuario.</p>
+        <table class="nva-tabla nva-usuarios" id="nvaUsuarios"><thead><tr><th>Usuario</th><th class="nva-col-rol">Rol</th><th class="nva-col-activo">Activo</th></tr></thead>
+        ${filasUsuarios}</table>
+        <p class="nva-nota">Los usuarios con rol Entrenador o Delegado salen en la pestaña «Entrenadores y equipos», donde se les asignan los equipos. Dos usuarios no pueden tener el mismo nombre. Pulsa ? para ver su correo, enviarle el enlace de la app o, si hace falta, quitar al usuario. Si le cambias el rol, pasa a su grupo.</p>
         <button class="btn-save-session" id="nvaGuardarUsuarios">💾 Guardar usuarios</button>`) +
       seccion("permisos", "Permisos por rol", `
         <select id="nvaPermRol" class="app-input">${roles.map(x => `<option value="${esc(x.id)}"${x.id === rolPermisosElegido ? " selected" : ""}>${esc(x.nombre)}</option>`).join("")}</select>
@@ -1052,6 +1074,45 @@
       const email = b.closest("td").querySelector(".nva-email");
       email.hidden = !email.hidden;
     });
+
+    // Grupos de usuarios por rol: se pliegan y despliegan; al cambiar el rol, el usuario pasa a su grupo
+    const pintarGrupo = tb => {
+      const abierto = !gruposUsuariosCerrados.has(tb.dataset.rol);
+      const n = tb.querySelectorAll("tr[data-id]").length;
+      const btn = tb.querySelector(".nva-grupo-btn");
+      btn.classList.toggle("open", abierto);
+      btn.setAttribute("aria-expanded", abierto);
+      btn.querySelector(".badge").textContent = n;
+      btn.querySelector(".nva-grupo-flecha").textContent = abierto ? "🔻" : "➤";
+      tb.querySelectorAll("tr[data-id]").forEach(tr => { tr.hidden = !abierto; });
+      tb.hidden = !n;
+    };
+    const guardarGrupos = () => { try { localStorage.setItem("NVA_GRUPOS_USUARIOS", JSON.stringify([...gruposUsuariosCerrados])); } catch (e) { /* sin almacenamiento */ } };
+    caja.querySelectorAll("#nvaUsuarios .nva-grupo").forEach(tb => {
+      tb.querySelector(".nva-grupo-btn").onclick = () => {
+        const id = tb.dataset.rol;
+        if (gruposUsuariosCerrados.has(id)) gruposUsuariosCerrados.delete(id); else gruposUsuariosCerrados.add(id);
+        guardarGrupos();
+        pintarGrupo(tb);
+      };
+      pintarGrupo(tb);
+    });
+    caja.querySelectorAll("#nvaUsuarios select[data-campo=rol]").forEach(s => s.addEventListener("change", () => {
+      const tr = s.closest("tr");
+      const desde = tr.closest(".nva-grupo");
+      const hacia = Array.from(caja.querySelectorAll("#nvaUsuarios .nva-grupo")).find(tb => tb.dataset.rol === s.value);
+      if (!hacia || hacia === desde) return;
+      // Se coloca por orden de nombre y su grupo se abre para que se vea dónde ha ido
+      const nombre = tr.querySelector("[data-campo=nombre]").value.trim();
+      const sig = Array.from(hacia.querySelectorAll("tr[data-id]")).find(o =>
+        nombre.localeCompare(o.querySelector("[data-campo=nombre]").value.trim(), "es", { sensitivity: "base" }) < 0);
+      hacia.insertBefore(tr, sig || null);
+      if (gruposUsuariosCerrados.delete(hacia.dataset.rol)) guardarGrupos();
+      pintarGrupo(desde);
+      pintarGrupo(hacia);
+      tr.classList.remove("nva-movida"); void tr.offsetWidth; tr.classList.add("nva-movida");
+      tr.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }));
 
     // Enviar el enlace de la app a un usuario ya inscrito: WhatsApp, correo, compartir o copiar
     caja.querySelectorAll(".nva-enlace").forEach(b => b.onclick = () => {
@@ -1123,7 +1184,7 @@
       pintarPanelUsuarios();
     };
     caja.querySelector("#nvaGuardarUsuarios").onclick = async () => {
-      const filas = Array.from(caja.querySelectorAll("#nvaUsuarios tr"));
+      const filas = Array.from(caja.querySelectorAll("#nvaUsuarios tr[data-id]"));
       const rep = repetido(filas.map(tr => tr.querySelector("[data-campo=nombre]").value));
       if (rep) return alert(`Hay dos usuarios con el mismo nombre («${rep}»). Cambia uno de ellos.`);
       for (const tr of filas) {
